@@ -6,14 +6,15 @@ interface DeviceOrientationEventIOS extends DeviceOrientationEvent {
 }
 
 /**
- * Mobile-First Multi-Touch Virtual Joystick + Gyroscope Arcade Controller:
+ * Mobile-First Multi-Touch Dynamic Floating Joystick + Thumb-Arc Arcade Controller:
  * - Native TouchEvent (`passive: false`) multi-touch engine for rock-solid iOS Safari / Android Chrome / WeChat support,
- *   plus mouse PointerEvent support so desktop users can also test touch controls.
- * - Floating Virtual Analog Steering Joystick on the lower-left thumb zone:
- *   smoothly centers under your thumb when touched, tracks 360° tactile puck movement, and outputs
- *   a progressive automotive analog steering curve (-1..+1) with center deadzone stability.
- * - Optional Gyroscope Tilt Steering (`TILT`) supporting portrait & landscape orientations + iOS permission flow.
- * - Independent multi-touch DRIFT, NITRO, BRAKE, GAS/REV pedals + Auto-Throttle (`AUTO`) + Haptic vibration feedback.
+ *   plus mouse PointerEvent fallback so desktop users can also test touch controls.
+ * - True Dynamic Floating Virtual Joystick across the ENTIRE lower-left half of the screen:
+ *   touching down ANYWHERE ALWAYS spawns the joystick origin at the EXACT touchdown coordinates (0.00 steering bias!),
+ *   so slightly off-center presses NEVER jerk the car or cause loss of control.
+ *   Includes smooth anti-slip origin follow when dragged past 1.35× max radius for instant counter-steer reversals.
+ * - Ergonomic Right-Thumb Arc Layout (DRIFT, NITRO, BRAKE, contextual REV/GAS).
+ * - Full Mobile Fullscreen support (Android/Chrome native Fullscreen API + orientation hint + iOS Safari PWA tip).
  */
 export class TouchControls {
   private readonly container = document.getElementById('touch-controls')!;
@@ -34,9 +35,11 @@ export class TouchControls {
   public autoThrottle = true;
   public tiltEnabled = false;
 
-  // Virtual analog joystick state
+  // Dynamic floating analog joystick state
   private steerTouchId: number | null = null;
   private steerMouseActive = false;
+  private joyHomeX = 0;
+  private joyHomeY = 0;
   private joyOriginX = 0;
   private joyOriginY = 0;
   private joyMaxRadius = 48;
@@ -52,15 +55,18 @@ export class TouchControls {
   };
 
   private onToggleChange?: (enabled: boolean) => void;
+  private onFullscreenChange?: (isFullscreen: boolean) => void;
   private onAnyInteract?: () => void;
   private onStatusMessage?: (msg: string) => void;
 
   constructor(opts?: {
     onToggleChange?: (enabled: boolean) => void;
+    onFullscreenChange?: (isFullscreen: boolean) => void;
     onAnyInteract?: () => void;
     onStatusMessage?: (msg: string) => void;
   }) {
     this.onToggleChange = opts?.onToggleChange;
+    this.onFullscreenChange = opts?.onFullscreenChange;
     this.onAnyInteract = opts?.onAnyInteract;
     this.onStatusMessage = opts?.onStatusMessage;
 
@@ -120,8 +126,13 @@ export class TouchControls {
 
     this.fullscreenBtn.addEventListener('click', () => {
       this.onAnyInteract?.();
-      this.toggleFullscreen();
+      void this.toggleFullscreen();
     });
+
+    // Keep HUD + Menu fullscreen buttons synced whenever user exits fullscreen via gesture/ESC
+    const syncFs = () => this.syncFullscreenUI();
+    document.addEventListener('fullscreenchange', syncFs);
+    document.addEventListener('webkitfullscreenchange', syncFs);
 
     // Clear stuck touches if app goes to background or loses focus
     document.addEventListener('visibilitychange', () => {
@@ -131,6 +142,7 @@ export class TouchControls {
 
     this.syncAutoGasUI();
     this.syncTiltUI();
+    this.syncFullscreenUI();
   }
 
   public vibrate(pattern: number | number[]): void {
@@ -159,6 +171,88 @@ export class TouchControls {
   public toggle(): boolean {
     this.setEnabled(!this.enabled);
     return this.enabled;
+  }
+
+  public isFullscreen(): boolean {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element;
+      mozFullScreenElement?: Element;
+      msFullscreenElement?: Element;
+    };
+    const standalone =
+      window.matchMedia?.('(display-mode: fullscreen)').matches ||
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+    return Boolean(
+      doc.fullscreenElement ||
+        doc.webkitFullscreenElement ||
+        doc.mozFullScreenElement ||
+        doc.msFullscreenElement ||
+        standalone
+    );
+  }
+
+  private syncFullscreenUI(): void {
+    const fs = this.isFullscreen();
+    this.fullscreenBtn.classList.toggle('active-pill', fs);
+    this.fullscreenBtn.textContent = fs ? '🗗' : '⛶';
+    this.onFullscreenChange?.(fs);
+  }
+
+  public async toggleFullscreen(): Promise<void> {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element;
+      webkitExitFullscreen?: () => Promise<void>;
+      mozCancelFullScreen?: () => Promise<void>;
+      msExitFullscreen?: () => Promise<void>;
+    };
+    const root = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+      mozRequestFullScreen?: () => Promise<void>;
+      msRequestFullscreen?: () => Promise<void>;
+    };
+
+    const isNativeFs = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
+
+    try {
+      if (!isNativeFs) {
+        if (root.requestFullscreen) {
+          await root.requestFullscreen({ navigationUI: 'hide' }).catch(() => root.requestFullscreen());
+        } else if (root.webkitRequestFullscreen) {
+          await root.webkitRequestFullscreen();
+        } else if (root.mozRequestFullScreen) {
+          await root.mozRequestFullScreen();
+        } else if (root.msRequestFullscreen) {
+          await root.msRequestFullscreen();
+        } else {
+          // iOS Safari browser tabs restrict Fullscreen API: minimize bar & guide user to PWA Fullscreen
+          window.scrollTo(0, 1);
+          this.onStatusMessage?.('iOS 请点底部分享 →「添加到主屏幕」享无边框真全屏');
+          return;
+        }
+        this.vibrate(14);
+        // Optional gentle landscape lock hint on phones (silent fallback if unsupported)
+        const orient = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+        if (this.enabled && typeof orient?.lock === 'function') {
+          orient.lock('landscape').catch(() => {});
+        }
+      } else {
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        } else if (doc.mozCancelFullScreen) {
+          await doc.mozCancelFullScreen();
+        } else if (doc.msExitFullscreen) {
+          await doc.msExitFullscreen();
+        }
+      }
+    } catch {
+      window.scrollTo(0, 1);
+      this.onStatusMessage?.('当前浏览器限制全屏，可「添加到主屏幕」全屏畅玩');
+    } finally {
+      this.syncFullscreenUI();
+    }
   }
 
   public resetAllInputs(): void {
@@ -208,7 +302,6 @@ export class TouchControls {
       return;
     }
 
-    // iOS 13+ requires explicit user-gesture permission prompt
     const DOE = window.DeviceOrientationEvent as unknown as DeviceOrientationEventIOS;
     if (typeof DOE.requestPermission === 'function') {
       try {
@@ -244,7 +337,6 @@ export class TouchControls {
       tiltDeg = e.gamma ?? 0;
     }
 
-    // Clean deadzone (±3.5°) + responsive full lock at ±26°
     const deadzone = 3.5;
     if (Math.abs(tiltDeg) < deadzone) {
       this.tiltSteerAxis = 0;
@@ -254,91 +346,65 @@ export class TouchControls {
       this.tiltSteerAxis = sign * Math.pow(norm, 1.15);
     }
 
-    // Mirror live tilt on virtual joystick puck when thumb isn't touching it
     if (this.steerTouchId === null && !this.steerMouseActive) {
       const r = Math.max(this.joystickBase.offsetWidth * 0.36, 40);
       this.updateJoystickStickVisual(this.tiltSteerAxis * r, 0, this.tiltSteerAxis);
     }
   };
 
-  private toggleFullscreen(): void {
-    const doc = document as Document & {
-      webkitFullscreenElement?: Element;
-      webkitExitFullscreen?: () => Promise<void>;
-    };
-    const root = document.documentElement as HTMLElement & {
-      webkitRequestFullscreen?: () => Promise<void>;
-    };
-    const isFs = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
-    try {
-      if (!isFs) {
-        if (root.requestFullscreen) {
-          void root.requestFullscreen();
-        } else if (root.webkitRequestFullscreen) {
-          void root.webkitRequestFullscreen();
-        }
-      } else {
-        if (doc.exitFullscreen) {
-          void doc.exitFullscreen();
-        } else if (doc.webkitExitFullscreen) {
-          void doc.webkitExitFullscreen();
-        }
-      }
-    } catch {
-      // Ignore if browser disallows fullscreen
-    }
-  }
-
   /**
-   * Starts a virtual joystick session:
-   * - If thumb lands inside the resting joystick center, keeps base anchored for quick steering;
-   * - If thumb lands elsewhere in the lower-left zone, floats the ring smoothly to meet the thumb!
+   * True AAA Dynamic Floating Joystick Initialization:
+   * ALWAYS places the neutral center (0, 0) at the EXACT touchdown point (clientX, clientY)!
+   * Result: ZERO accidental steering jerk on landing, no matter where your left thumb lands!
    */
   private beginJoystickAt(clientX: number, clientY: number): void {
-    // Temporarily read resting base rect without active float transform
+    // Clear active transform temporarily to read exact resting home center in viewport coordinates
+    this.joystickBase.classList.remove('dragging');
     this.joystickBase.style.transform = 'translate3d(0px, 0px, 0px)';
     const baseRect = this.joystickBase.getBoundingClientRect();
-    const zoneRect = this.joystickZone.getBoundingClientRect();
 
-    const homeCenterX = baseRect.left + baseRect.width * 0.5;
-    const homeCenterY = baseRect.top + baseRect.height * 0.5;
-    const baseHalf = baseRect.width * 0.5;
-    this.joyMaxRadius = Math.max(baseRect.width * 0.37, 42);
+    this.joyHomeX = baseRect.left + baseRect.width * 0.5;
+    this.joyHomeY = baseRect.top + baseRect.height * 0.5;
+    this.joyMaxRadius = Math.max(baseRect.width * 0.38, 44);
 
-    const distFromHome = Math.hypot(clientX - homeCenterX, clientY - homeCenterY);
+    // Exact touchdown point IS ALWAYS the neutral 0.00 center!
+    this.joyOriginX = clientX;
+    this.joyOriginY = clientY;
+    this.touchSteerAxis = 0;
 
-    if (distFromHome <= baseHalf * 0.85) {
-      // Finger landed directly on the resting joystick: keep base anchored & respond immediately!
-      this.joyOriginX = homeCenterX;
-      this.joyOriginY = homeCenterY;
-      this.joystickBase.classList.add('dragging');
-      this.updateJoystickMove(clientX, clientY);
-    } else {
-      // Finger landed in expanded comfort zone: smoothly float joystick base right under the thumb!
-      const minX = zoneRect.left + baseHalf + 8;
-      const maxX = zoneRect.right - baseHalf - 8;
-      const minY = zoneRect.top + baseHalf + 8;
-      const maxY = zoneRect.bottom - baseHalf - 8;
-
-      const clampedCenterX = clamp(clientX, minX, Math.max(minX, maxX));
-      const clampedCenterY = clamp(clientY, minY, Math.max(minY, maxY));
-
-      const shiftX = clampedCenterX - homeCenterX;
-      const shiftY = clampedCenterY - homeCenterY;
-      this.joystickBase.style.transform = `translate3d(${shiftX.toFixed(1)}px, ${shiftY.toFixed(1)}px, 0px)`;
-      this.joystickBase.classList.add('dragging');
-
-      this.joyOriginX = clampedCenterX;
-      this.joyOriginY = clampedCenterY;
-      this.updateJoystickMove(clientX, clientY);
-    }
+    const shiftX = this.joyOriginX - this.joyHomeX;
+    const shiftY = this.joyOriginY - this.joyHomeY;
+    this.joystickBase.classList.add('dragging');
+    this.joystickBase.style.transform = `translate3d(${shiftX.toFixed(1)}px, ${shiftY.toFixed(1)}px, 0px)`;
+    this.updateJoystickStickVisual(0, 0, 0);
   }
 
   private updateJoystickMove(clientX: number, clientY: number): void {
-    const dx = clientX - this.joyOriginX;
-    const dy = clientY - this.joyOriginY;
-    const dist = Math.hypot(dx, dy);
+    let dx = clientX - this.joyOriginX;
+    let dy = clientY - this.joyOriginY;
+    let dist = Math.hypot(dx, dy);
     const maxR = this.joyMaxRadius;
+
+    // Anti-slip dynamic follow ("跟手防脱"): if thumb drags far beyond rim (>1.35× radius),
+    // gently pull the origin along so quick counter-steer reversals remain instant & crisp!
+    const followLimit = maxR * 1.35;
+    if (dist > followLimit && dist > 0.001) {
+      const pull = dist - followLimit;
+      const ux = dx / dist;
+      const uy = dy / dist;
+      const zoneRect = this.joystickZone.getBoundingClientRect();
+      const pad = 26;
+      this.joyOriginX = clamp(this.joyOriginX + ux * pull, zoneRect.left + pad, zoneRect.right - pad);
+      this.joyOriginY = clamp(this.joyOriginY + uy * pull, zoneRect.top + pad, zoneRect.bottom - pad);
+
+      const shiftX = this.joyOriginX - this.joyHomeX;
+      const shiftY = this.joyOriginY - this.joyHomeY;
+      this.joystickBase.style.transform = `translate3d(${shiftX.toFixed(1)}px, ${shiftY.toFixed(1)}px, 0px)`;
+
+      dx = clientX - this.joyOriginX;
+      dy = clientY - this.joyOriginY;
+      dist = Math.hypot(dx, dy);
+    }
 
     // Tactile 360° circular puck clamp
     let visX = dx;
@@ -358,7 +424,7 @@ export class TouchControls {
       this.touchSteerAxis = 0;
     } else {
       const sign = Math.sign(normX);
-      const t = clamp((absX - deadzone) / (0.92 - deadzone), 0, 1);
+      const t = clamp((absX - deadzone) / (0.90 - deadzone), 0, 1);
       this.touchSteerAxis = sign * Math.pow(t, 1.18);
     }
 
@@ -386,7 +452,7 @@ export class TouchControls {
   }
 
   private bindVirtualJoystick(): void {
-    // 1. Native multi-touch TouchEvents (rock-solid on iOS Safari, Android Chrome, WeChat)
+    // 1. Native multi-touch TouchEvents across entire lower-left half
     this.joystickZone.addEventListener(
       'touchstart',
       (e) => {
@@ -431,7 +497,7 @@ export class TouchControls {
     this.joystickZone.addEventListener('touchend', endTouchSteer, { passive: false });
     this.joystickZone.addEventListener('touchcancel', endTouchSteer, { passive: false });
 
-    // 2. Mouse / stylus fallback via PointerEvent (ignored for pointerType === 'touch' to prevent double-firing)
+    // 2. Mouse / stylus fallback via PointerEvent (ignored for touch to prevent double-firing)
     this.joystickZone.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'touch') return;
       e.preventDefault();
@@ -482,7 +548,6 @@ export class TouchControls {
       }
     };
 
-    // Native multi-touch
     el.addEventListener(
       'touchstart',
       (e) => {
@@ -504,7 +569,6 @@ export class TouchControls {
     el.addEventListener('touchend', onTouchEnd, { passive: false });
     el.addEventListener('touchcancel', onTouchEnd, { passive: false });
 
-    // Mouse / stylus fallback
     el.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'touch') return;
       e.preventDefault();
@@ -544,7 +608,6 @@ export class TouchControls {
     const nitro = this.activeHold.nitro.size > 0;
     const drift = this.activeHold.drift.size > 0;
 
-    // Virtual joystick overrides gyroscope tilt whenever finger is on the stick
     const hasTouchSteer = this.steerTouchId !== null || this.steerMouseActive;
     const steerAxis = hasTouchSteer
       ? this.touchSteerAxis

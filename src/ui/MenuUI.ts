@@ -8,6 +8,7 @@ export interface MenuCallbacks {
   onStartRace: () => void;
   onToggleAudio: () => boolean;
   onToggleTouch: () => boolean;
+  onToggleFullscreen: () => void;
 }
 
 export class MenuUI {
@@ -18,6 +19,7 @@ export class MenuUI {
   private readonly trackInfoEl = document.getElementById('track-info')!;
   private readonly showcaseCarName = document.getElementById('showcase-car-name')!;
   private readonly showcaseTrackName = document.getElementById('showcase-track-name')!;
+  private readonly fullscreenBtn = document.getElementById('btn-menu-fullscreen')!;
   private readonly audioBtn = document.getElementById('btn-menu-audio')!;
   private readonly touchBtn = document.getElementById('btn-menu-touch')!;
   private readonly controlsBtn = document.getElementById('btn-menu-controls')!;
@@ -52,6 +54,7 @@ export class MenuUI {
     this.updateSelectionReadout();
 
     this.startBtn.addEventListener('click', () => this.callbacks.onStartRace());
+    this.fullscreenBtn.addEventListener('click', () => this.callbacks.onToggleFullscreen());
     this.audioBtn.addEventListener('click', () => {
       const muted = this.callbacks.onToggleAudio();
       this.setMuted(muted);
@@ -99,6 +102,14 @@ export class MenuUI {
     const label = this.touchBtn.querySelector('.label')!;
     label.textContent = enabled ? '触屏: 开' : '触屏: 关';
     this.touchBtn.style.borderColor = enabled ? '#00ff9d' : '';
+  }
+
+  public setFullscreen(active: boolean): void {
+    const icon = this.fullscreenBtn.querySelector('.icon')!;
+    const label = this.fullscreenBtn.querySelector('.label')!;
+    icon.textContent = active ? '🗗' : '⛶';
+    label.textContent = active ? '退出全屏' : '全屏';
+    this.fullscreenBtn.style.borderColor = active ? '#00f2ff' : '';
   }
 
   private renderCars(): void {

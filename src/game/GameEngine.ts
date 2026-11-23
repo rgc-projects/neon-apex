@@ -153,11 +153,16 @@ export class GameEngine {
       onToggleChange: (enabled) => {
         this.hud.setTouchLabel(enabled);
         this.menuUI?.setTouchEnabled(enabled);
+        this.cameraController.setMobileMode(enabled);
+      },
+      onFullscreenChange: (isFs) => {
+        this.menuUI?.setFullscreen(isFs);
       },
       onStatusMessage: (msg) => {
         this.hud.pushCallout(msg, 'cyan');
       },
     });
+    this.cameraController.setMobileMode(this.touchControls.enabled);
 
     // Wire UI
     this.menuUI = new MenuUI({
@@ -186,8 +191,13 @@ export class GameEngine {
         this.audio.unlock();
         return this.touchControls.toggle();
       },
+      onToggleFullscreen: () => {
+        this.audio.unlock();
+        void this.touchControls.toggleFullscreen();
+      },
     });
     this.menuUI.setTouchEnabled(this.touchControls.enabled);
+    this.menuUI.setFullscreen(this.touchControls.isFullscreen());
     this.hud.setTouchLabel(this.touchControls.enabled);
 
     this.resultsUI = new ResultsUI({
@@ -238,6 +248,9 @@ export class GameEngine {
     this.bindInputs();
     this.bindMenuShowroomDrag(canvas);
     window.addEventListener('resize', this.onResize);
+    window.visualViewport?.addEventListener('resize', this.onResize);
+    document.addEventListener('fullscreenchange', this.onResize);
+    document.addEventListener('webkitfullscreenchange', this.onResize);
 
     // Initial load: Track 0 + Showcase Car 0
     this.loadTrack(0);
@@ -580,8 +593,8 @@ export class GameEngine {
   }
 
   private onResize = (): void => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const w = Math.round(window.visualViewport?.width ?? window.innerWidth);
+    const h = Math.round(window.visualViewport?.height ?? window.innerHeight);
     const isMobile =
       window.matchMedia?.('(pointer: coarse)').matches || Math.min(w, h) <= 720;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.75));
@@ -589,7 +602,7 @@ export class GameEngine {
     this.composer.setSize(w, h);
     const bloomScale = isMobile ? 0.5 : 1.0;
     this.bloomPass.setSize(w * bloomScale, h * bloomScale);
-    this.cameraController.setAspect(w / h);
+    this.cameraController.setAspect(w / Math.max(h, 1));
     this.speedLines.resize(w, h);
   };
 

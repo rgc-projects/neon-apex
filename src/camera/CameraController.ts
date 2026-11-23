@@ -18,6 +18,7 @@ export class CameraController {
   private menuDragging = false;
   private finishOrbitAngle = 0;
   private initialized = false;
+  private mobileMode = false;
 
   private readonly _targetPos = new THREE.Vector3();
   private readonly _targetLook = new THREE.Vector3();
@@ -31,6 +32,15 @@ export class CameraController {
   public setAspect(aspect: number): void {
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
+  }
+
+  public setMobileMode(mobile: boolean): void {
+    this.mobileMode = mobile;
+  }
+
+  private isMobileViewport(): boolean {
+    const minDim = Math.min(window.innerWidth, window.innerHeight);
+    return this.mobileMode || minDim <= 560;
   }
 
   public toggleMode(): CameraMode {
@@ -62,19 +72,25 @@ export class CameraController {
       this.menuOrbitVel = damp(this.menuOrbitVel, 0, 5.5, dt);
       this.menuOrbitAngle += (0.34 + this.menuOrbitVel) * dt;
     }
-    const dist = window.innerWidth < 760 ? 9.4 : 8.4;
+    const isMobLandscape = this.isMobileViewport() && this.camera.aspect >= 1.35;
+    const isMobPortrait = window.innerWidth < 760 && window.innerHeight > window.innerWidth;
+    const dist = isMobPortrait ? 9.4 : isMobLandscape ? 6.9 : 8.4;
     const camX = showcaseOrigin.x + Math.sin(this.menuOrbitAngle) * dist;
     const camZ = showcaseOrigin.z + Math.cos(this.menuOrbitAngle) * dist;
-    const camY = showcaseOrigin.y + (window.innerWidth < 760 ? 2.8 : 2.45) + Math.sin(this.menuOrbitAngle * 0.7) * 0.25;
+    const camY =
+      showcaseOrigin.y +
+      (isMobPortrait ? 2.8 : isMobLandscape ? 2.15 : 2.45) +
+      Math.sin(this.menuOrbitAngle * 0.7) * 0.25;
 
     this.camera.position.set(camX, camY, camZ);
     this.camera.up.set(0, 1, 0);
     // Shift lookAt slightly down in portrait so car shines cleanly in upper showroom window!
-    const lookYOffset = window.innerWidth < 760 && window.innerHeight > window.innerWidth ? -0.35 : 0.65;
+    const lookYOffset = isMobPortrait ? -0.35 : isMobLandscape ? 0.55 : 0.65;
     this.camera.lookAt(showcaseOrigin.x, showcaseOrigin.y + lookYOffset, showcaseOrigin.z);
 
-    if (Math.abs(this.camera.fov - 44) > 0.1) {
-      this.camera.fov = damp(this.camera.fov, 44, 6, dt);
+    const menuFov = isMobLandscape ? 40 : 44;
+    if (Math.abs(this.camera.fov - menuFov) > 0.1) {
+      this.camera.fov = damp(this.camera.fov, menuFov, 6, dt);
       this.camera.updateProjectionMatrix();
     }
   }
@@ -147,11 +163,61 @@ export class CameraController {
     }
 
     // Dynamic Arcade 3rd-Person Chase Camera with Corner-Apex Lookahead during Drift!
-    const backDist = 7.4 + speedRatio * 1.45 + boostAdd * 1.35 + (racer.isDrifting ? 0.75 : 0);
-    const height = 2.75 + (racer.isAirborne ? 0.75 : 0) - boostAdd * 0.25 + (racer.isDrifting ? 0.22 : 0);
+    // Desktop PC framing stays 100% untouched; Mobile viewports adapt seamlessly to ultrawide (19.5:9 / 20:9 / 21:9) & portrait!
+    const isMob = this.isMobileViewport();
+    const aspect = this.camera.aspect;
+    const isMobLandscape = isMob && aspect >= 1.35;
+    const isMobPortrait = isMob && aspect < 0.95;
+
+    let backDist: number;
+    let height: number;
+    let lookAhead: number;
+    let lookUp: number;
+    let baseFov: number;
+    let speedFovAdd: number;
+    let boostFovAdd: number;
+    let minFov: number;
+    let maxFov: number;
+
+    if (isMobLandscape) {
+      // Continuous Horizontal-FOV compensation for modern long phones (16:9 -> 19.5:9 -> 20:9 -> 2.6:1 with browser bar)
+      // Pulls camera closer & tightens vertical FOV so the Ferrari looks heroic & sharp instead of tiny/fisheyed!
+      const ultra = clamp((aspect - 1.65) / 0.85, 0, 1);
+      backDist = (5.95 - ultra * 0.45) + speedRatio * 0.85 + boostAdd * 0.85 + (racer.isDrifting ? 0.48 : 0);
+      height = (2.22 - ultra * 0.14) + (racer.isAirborne ? 0.55 : 0) - boostAdd * 0.14 + (racer.isDrifting ? 0.15 : 0);
+      lookAhead = 15.5;
+      lookUp = 0.98;
+      baseFov = 51.5 - ultra * 7.5;
+      speedFovAdd = 12.0;
+      boostFovAdd = 9.5;
+      minFov = 42;
+      maxFov = 70;
+    } else if (isMobPortrait) {
+      backDist = 7.1 + speedRatio * 1.15 + boostAdd * 1.05 + (racer.isDrifting ? 0.65 : 0);
+      height = 2.82 + (racer.isAirborne ? 0.65 : 0) - boostAdd * 0.2 + (racer.isDrifting ? 0.2 : 0);
+      lookAhead = 16.5;
+      lookUp = 1.12;
+      baseFov = 66;
+      speedFovAdd = 14;
+      boostFovAdd = 11;
+      minFov = 64;
+      maxFov = 92;
+    } else {
+      // Original Desktop PC framing (100% preserved!)
+      backDist = 7.4 + speedRatio * 1.45 + boostAdd * 1.35 + (racer.isDrifting ? 0.75 : 0);
+      height = 2.75 + (racer.isAirborne ? 0.75 : 0) - boostAdd * 0.25 + (racer.isDrifting ? 0.22 : 0);
+      lookAhead = 17;
+      lookUp = 1.15;
+      baseFov = 62;
+      speedFovAdd = 18;
+      boostFovAdd = 15;
+      minFov = 60;
+      maxFov = 96;
+    }
+
     // Swing camera slightly to the OUTSIDE of the drift while aiming lookAt INTO the apex!
-    const driftCamSwing = racer.visualSlipAngle * 2.65;
-    const apexLookBias = racer.isDrifting ? racer.driftDir * 3.1 : 0;
+    const driftCamSwing = racer.visualSlipAngle * (isMobLandscape ? 2.1 : 2.65);
+    const apexLookBias = racer.isDrifting ? racer.driftDir * (isMobLandscape ? 2.6 : 3.1) : 0;
 
     // Follow road-aligned forward blended with car forward so hairpin exits stay crystal clear!
     const followDir = racer.frame.tangent.clone().lerp(racer.worldForward, racer.isDrifting ? 0.32 : 0.55).normalize();
@@ -166,9 +232,9 @@ export class CameraController {
 
     this._targetLook
       .copy(racer.worldPos)
-      .addScaledVector(followDir, 17)
+      .addScaledVector(followDir, lookAhead)
       .addScaledVector(followRight, apexLookBias)
-      .addScaledVector(followUp, 1.15);
+      .addScaledVector(followUp, lookUp);
 
     // Subtle banking roll with the banked highway (55% bank sells high-G banked bowl thrills!)
     this._targetUp.set(0, 1, 0).lerp(followUp, 0.58).normalize();
@@ -201,8 +267,8 @@ export class CameraController {
     this.camera.lookAt(this.currentLook);
 
     // Dynamic FOV pull for insane arcade speed feel
-    const targetFov = 62 + speedRatio * 18 + boostAdd * 15;
-    this.currentFov = damp(this.currentFov, clamp(targetFov, 60, 96), 7.5, dt);
+    const targetFov = baseFov + speedRatio * speedFovAdd + boostAdd * boostFovAdd;
+    this.currentFov = damp(this.currentFov, clamp(targetFov, minFov, maxFov), 7.5, dt);
     this.camera.fov = this.currentFov;
     this.camera.updateProjectionMatrix();
   }

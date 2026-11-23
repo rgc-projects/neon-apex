@@ -4,7 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#040714" />
+  <link rel="manifest" href="/manifest.json" />
   <title>NEON APEX // 3D 未来街机赛车</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
@@ -21,6 +24,10 @@
           <h1 class="brand-title">NEON<span>APEX</span></h1>
         </div>
         <div class="header-actions">
+          <button id="btn-menu-fullscreen" class="cyber-icon-btn" title="进入/退出全屏模式">
+            <span class="icon">⛶</span>
+            <span class="label">全屏</span>
+          </button>
           <button id="btn-menu-touch" class="cyber-icon-btn" title="开启/关闭手机触屏按键">
             <span class="icon">📱</span>
             <span class="label">触屏: 自动</span>
@@ -109,7 +116,7 @@
         </div>
         <div class="pro-tips">
           <strong>进阶玩法：</strong> 留意屏幕顶部 <span>弯道预警提示</span> 与赛道边 <span>150m/100m/50m</span> 刹车牌，在弯前果断起漂并借倾斜坡度控时长 · 紧跟对手车尾触发 <span>尾流加速</span> · 冲上跳台获取 <span>滞空特技加分</span>！<br />
-          <strong>📱 手机触屏操作：</strong> 手机打开自动开启触屏（也可点击顶部 <span>📱</span> 手动切换）；左手 <span>虚拟方向摇杆</span> 精准控向（支持跟手浮动）、右手按住 <span>DRIFT</span> 漂移集气与 <span>NITRO</span> 喷射氮气，默认开启 <span>AUTO GAS 自动油门</span>。
+          <strong>📱 手机触屏操作：</strong> 左半屏任意位置落指即刻生成 <span>动态浮动摇杆</span>（永远以落指点为绝对中心、零误偏），右手采用 <span>拇指扇形布局</span>（自然落位漂移、上滑氮气、内侧点刹）；点击顶部 <span>⛶ 全屏</span> 可隐藏手机浏览器导航栏畅玩。
         </div>
       </div>
     </div>
@@ -265,28 +272,24 @@
           </div>
         </div>
 
-        <!-- Right Thumb: Drift, Nitro, Brake, Gas/Rev -->
-        <div class="touch-action-cluster">
-          <div class="touch-row-top">
-            <button id="touch-brake" class="touch-btn brake-btn" type="button">
-              <span class="tbtn-main">BRAKE</span>
-              <span class="tbtn-sub">刹车</span>
-            </button>
-            <button id="touch-nitro" class="touch-btn nitro-btn" type="button">
-              <span class="tbtn-main">NITRO</span>
-              <span class="tbtn-sub">40%</span>
-            </button>
-          </div>
-          <div class="touch-row-bottom">
-            <button id="touch-gas" class="touch-btn gas-btn hidden" type="button">
-              <span class="tbtn-main">REV</span>
-              <span class="tbtn-sub">油门</span>
-            </button>
-            <button id="touch-drift" class="touch-btn drift-btn" type="button">
-              <span class="tbtn-main">DRIFT</span>
-              <span class="tbtn-sub">按住漂移</span>
-            </button>
-          </div>
+        <!-- Right Thumb: Ergonomic Thumb-Arc Action Pad -->
+        <div class="touch-action-arc">
+          <button id="touch-drift" class="touch-btn arc-btn drift-btn" type="button">
+            <span class="tbtn-main">DRIFT</span>
+            <span class="tbtn-sub">按住漂移</span>
+          </button>
+          <button id="touch-nitro" class="touch-btn arc-btn nitro-btn" type="button">
+            <span class="tbtn-main">NITRO</span>
+            <span class="tbtn-sub">40%</span>
+          </button>
+          <button id="touch-brake" class="touch-btn arc-btn brake-btn" type="button">
+            <span class="tbtn-main">BRAKE</span>
+            <span class="tbtn-sub">点刹</span>
+          </button>
+          <button id="touch-gas" class="touch-btn arc-btn gas-btn hidden" type="button">
+            <span class="tbtn-main">REV</span>
+            <span class="tbtn-sub">油门</span>
+          </button>
         </div>
       </div>
     </div>
