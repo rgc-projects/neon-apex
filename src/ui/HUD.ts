@@ -151,10 +151,11 @@ export class HUD {
       this.nitroStatus.textContent = 'DRIFT TO CHARGE';
     }
 
-    // Live Drift Charge HUD
+    // Live Drift Charge HUD (also displays active road banking angle on tilted corners!)
     if (telemetry.isDrifting) {
       this.driftHud.classList.remove('hidden');
-      this.driftMeters.textContent = `${telemetry.driftDistance}m`;
+      const bankTag = telemetry.bankAngleDeg >= 14 ? ` · BANK ${telemetry.bankAngleDeg}°` : '';
+      this.driftMeters.textContent = `${telemetry.driftDistance}m${bankTag}`;
       this.driftFill.style.width = `${Math.round(telemetry.driftChargeNorm * 100)}%`;
 
       const labels = ['DRIFTING...', 'MINI BOOST READY', 'SUPER DRIFT READY!', '★ ULTRA DRIFT ★'];

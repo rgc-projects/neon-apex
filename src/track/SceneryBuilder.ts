@@ -35,9 +35,21 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
 
   // 2. Vast Cyber Horizon Grid / Shimmering Neon Ocean Plane
   const gridColor =
-    cfg.theme === 'bridge' ? '#00e5ff' : cfg.theme === 'tunnel' ? '#9333ea' : '#ff2a9d';
+    cfg.theme === 'bridge'
+      ? '#00e5ff'
+      : cfg.theme === 'tunnel'
+        ? '#9333ea'
+        : cfg.theme === 'mountain'
+          ? '#00ffaa'
+          : '#ff2a9d';
   const gridBg =
-    cfg.theme === 'bridge' ? '#03122a' : cfg.theme === 'tunnel' ? '#070312' : '#090418';
+    cfg.theme === 'bridge'
+      ? '#03122a'
+      : cfg.theme === 'tunnel'
+        ? '#070312'
+        : cfg.theme === 'mountain'
+          ? '#070414'
+          : '#090418';
   const groundTex = createCyberGridTexture(gridColor, gridBg);
   const groundGeo = new THREE.PlaneGeometry(5200, 5200);
   groundGeo.rotateX(-Math.PI / 2);
@@ -47,7 +59,8 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     opacity: cfg.theme === 'bridge' ? 0.92 : 0.72,
   });
   const groundPlane = new THREE.Mesh(groundGeo, groundMat);
-  groundPlane.position.y = cfg.theme === 'bridge' ? -1.5 : cfg.theme === 'tunnel' ? -44 : -18;
+  groundPlane.position.y =
+    cfg.theme === 'bridge' ? -1.5 : cfg.theme === 'tunnel' ? -46 : cfg.theme === 'mountain' ? -12 : -18;
   group.add(groundPlane);
   disposables.push(groundTex, groundGeo, groundMat);
 
@@ -56,8 +69,8 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     buildTunnelRibs(spline, group, disposables);
   }
 
-  // 4. Support Pillars under elevated track sections (city & bridge)
-  if (cfg.theme === 'city' || cfg.theme === 'bridge') {
+  // 4. Support Pillars under elevated track sections (city, bridge & mountain switchbacks)
+  if (cfg.theme === 'city' || cfg.theme === 'bridge' || cfg.theme === 'mountain') {
     const pillarPositions: { x: number; yTop: number; z: number; h: number }[] = [];
     const floorY = groundPlane.position.y;
     for (let i = 0; i < spline.sampleCount; i += 24) {
@@ -95,6 +108,8 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     buildCyberCity(spline, group, disposables, rand, groundPlane.position.y, animatedRings);
   } else if (cfg.theme === 'bridge') {
     buildSuspensionBridgeScenery(spline, group, disposables, rand, groundPlane.position.y);
+  } else if (cfg.theme === 'mountain') {
+    buildTougeMountainScenery(spline, group, disposables, rand, groundPlane.position.y);
   } else {
     buildUndergroundCavernScenery(spline, group, disposables, rand, animatedRings);
   }
@@ -495,5 +510,109 @@ function buildUndergroundCavernScenery(
     ring.quaternion.setFromRotationMatrix(basis);
     group.add(ring);
     animatedRings.push(ring);
+  }
+}
+
+/** Cyber Touge Mountain Scenery: Wireframe synthwave peaks, neon Torii highway gates & glowing alpine beacons */
+function buildTougeMountainScenery(
+  spline: TrackSpline,
+  group: THREE.Group,
+  disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[],
+  rand: () => number,
+  floorY: number
+): void {
+  // 1. Stylized Low-Poly Synthwave Mountain Peaks with Neon Ridge Wireframes
+  const peakGeo = new THREE.ConeGeometry(1, 1, 5);
+  const peakMat = new THREE.MeshStandardMaterial({
+    color: 0x100826,
+    metalness: 0.45,
+    roughness: 0.65,
+    flatShading: true,
+  });
+  const wireMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xff2a9d).multiplyScalar(1.18),
+    wireframe: true,
+    transparent: true,
+    opacity: 0.45,
+    toneMapped: false,
+  });
+  disposables.push(peakGeo, peakMat, wireMat);
+
+  const peaks: { x: number; z: number; r: number; h: number; rot: number }[] = [];
+  let tries = 0;
+  while (peaks.length < 90 && tries < 900) {
+    tries++;
+    const x = -360 + rand() * 1160;
+    const z = -660 + rand() * 1360;
+    const dist = spline.minHorizontalDistanceToTrack(x, z);
+    const r = 38 + rand() * 72;
+    if (dist < spline.halfWidth + r * 0.85 + 16) continue;
+    const h = 65 + rand() * 185;
+    peaks.push({ x, z, r, h, rot: rand() * Math.PI });
+  }
+
+  const peakInst = new THREE.InstancedMesh(peakGeo, peakMat, peaks.length);
+  const wireInst = new THREE.InstancedMesh(peakGeo, wireMat, peaks.length);
+  const dummy = new THREE.Object3D();
+
+  peaks.forEach((p, i) => {
+    dummy.position.set(p.x, floorY + p.h * 0.5, p.z);
+    dummy.rotation.set(0, p.rot, 0);
+    dummy.scale.set(p.r, p.h, p.r);
+    dummy.updateMatrix();
+    peakInst.setMatrixAt(i, dummy.matrix);
+
+    dummy.scale.set(p.r * 1.015, p.h * 1.01, p.r * 1.015);
+    dummy.updateMatrix();
+    wireInst.setMatrixAt(i, dummy.matrix);
+  });
+  group.add(peakInst, wireInst);
+
+  // 2. Iconic Illuminated Cyber Torii Gates straddling Touge Hairpin Entries!
+  const pillarMat = new THREE.MeshStandardMaterial({
+    color: 0x1b0820,
+    metalness: 0.75,
+    roughness: 0.3,
+  });
+  const toriiNeon = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xff2a6d).multiplyScalar(1.38),
+    toneMapped: false,
+  });
+  const toriiAccent = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0x00ffaa).multiplyScalar(1.3),
+    toneMapped: false,
+  });
+  const legGeo = new THREE.BoxGeometry(1.1, 13.5, 1.1);
+  const topBeamGeo = new THREE.BoxGeometry(spline.roadWidth + 8.5, 1.15, 1.4);
+  const subBeamGeo = new THREE.BoxGeometry(spline.roadWidth + 4.5, 0.7, 0.9);
+  const neonStripGeo = new THREE.BoxGeometry(spline.roadWidth + 8.8, 0.25, 1.55);
+  disposables.push(pillarMat, toriiNeon, toriiAccent, legGeo, topBeamGeo, subBeamGeo, neonStripGeo);
+
+  const basis = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const hw = spline.halfWidth + 1.8;
+
+  for (const t of [0.08, 0.26, 0.44, 0.62, 0.78, 0.92]) {
+    const f = spline.getFrameAtDistance(t * spline.totalLength);
+    const gate = new THREE.Group();
+    gate.position.copy(f.pos);
+    basis.makeBasis(f.right, f.up, f.tangent.clone().negate());
+    q.setFromRotationMatrix(basis);
+    gate.quaternion.copy(q);
+
+    const legL = new THREE.Mesh(legGeo, pillarMat);
+    legL.position.set(-hw, 6.75, 0);
+    const legR = new THREE.Mesh(legGeo, pillarMat);
+    legR.position.set(hw, 6.75, 0);
+
+    const topBeam = new THREE.Mesh(topBeamGeo, toriiNeon);
+    topBeam.position.set(0, 13.6, 0);
+    const subBeam = new THREE.Mesh(subBeamGeo, pillarMat);
+    subBeam.position.set(0, 11.2, 0);
+    const accent = new THREE.Mesh(neonStripGeo, toriiAccent);
+    accent.position.set(0, 11.2, 0);
+
+    gate.add(legL, legR, topBeam, subBeam, accent);
+    group.add(gate);
   }
 }

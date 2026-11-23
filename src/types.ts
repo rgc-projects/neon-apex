@@ -1,6 +1,6 @@
 export type GameState = 'MENU' | 'COUNTDOWN' | 'RACING' | 'PAUSED' | 'FINISH_SLOWMO' | 'RESULTS';
 export type CameraMode = 'CHASE' | 'HOOD';
-export type TrackTheme = 'city' | 'bridge' | 'tunnel';
+export type TrackTheme = 'city' | 'bridge' | 'tunnel' | 'mountain';
 
 export interface CarSpec {
   id: string;
@@ -37,7 +37,8 @@ export interface ControlPointDef {
   x: number;
   y: number;
   z: number;
-  bankDeg?: number; // optional extra manual banking
+  /** Optional explicit inward corner banking angle in degrees (0 = flat street corner, 34 = steep Karussell bowl) */
+  inwardBankDeg?: number;
 }
 
 export interface TrackZone {
@@ -110,6 +111,7 @@ export interface RacerHUDTelemetry {
   driftTier: 0 | 1 | 2 | 3;
   driftChargeNorm: number;
   driftDistance: number;
+  bankAngleDeg: number;  // current absolute road banking angle in degrees
   isAirborne: boolean;
   airTime: number;
   isSlipstreaming: boolean;

@@ -28,10 +28,9 @@ export class TrackSpline {
   public readonly totalLength: number;
   public readonly roadWidth: number;
   public readonly halfWidth: number;
-  public readonly sampleCount = 960;
+  public readonly sampleCount = 1200;
 
   private readonly _tmpA = new THREE.Vector3();
-  private readonly _tmpB = new THREE.Vector3();
 
   constructor(config: TrackConfig) {
     this.config = config;
@@ -39,6 +38,7 @@ export class TrackSpline {
     this.halfWidth = config.roadWidth * 0.5;
 
     const pts = config.points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
+    // 'centripetal' Catmull-Rom prevents loops/overshoots on sharp 90° bends and tight 180° hairpins!
     this.curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal', 0.5);
     this.totalLength = this.curve.getLength();
 
@@ -60,7 +60,7 @@ export class TrackSpline {
       rawFlatRights.push(flatRight);
     }
 
-    // 2. Signed curvature at each sample (positive = track curves RIGHT)
+    // 2. Signed curvature at each sample (positive = curving RIGHT, negative = curving LEFT)
     const rawCurv = new Float32Array(N);
     for (let i = 0; i < N; i++) {
       const prev = rawTangents[(i - 1 + N) % N];
@@ -69,9 +69,9 @@ export class TrackSpline {
       rawCurv[i] = diff.dot(rawFlatRights[i]) / (2 * ds);
     }
 
-    // 3. Smooth curvature for silky banking transitions
+    // 3. Smooth curvature with a crisp window so tight hairpins & 90° turns bank responsively
     const smoothCurv = new Float32Array(N);
-    const windowRadius = 16;
+    const windowRadius = 11;
     for (let i = 0; i < N; i++) {
       let sum = 0;
       let weightSum = 0;
@@ -83,10 +83,89 @@ export class TrackSpline {
       smoothCurv[i] = sum / weightSum;
     }
 
-    // 4. Construct final banked frames
-    const maxBankRad = THREE.MathUtils.degToRad(config.maxBankDeg);
-    const bankGain = 48.0; // radians per (1/m) curvature
+    // 4. Map explicit per-control-point `inwardBankDeg` onto nearest spline sample indices
+    const cpBanks: { idx: number; deg: number }[] = [];
+    for (let p = 0; p < config.points.length; p++) {
+      const cp = config.points[p];
+      if (cp.inwardBankDeg === undefined) continue;
+      let bestIdx = 0;
+      let bestDistSq = Infinity;
+      for (let i = 0; i < N; i++) {
+        const sp = rawPositions[i];
+        const dx = sp.x - cp.x;
+        const dy = sp.y - cp.y;
+        const dz = sp.z - cp.z;
+        const dSq = dx * dx + dy * dy + dz * dz;
+        if (dSq < bestDistSq) {
+          bestDistSq = dSq;
+          bestIdx = i;
+        }
+      }
+      cpBanks.push({ idx: bestIdx, deg: cp.inwardBankDeg });
+    }
 
+    // Compute per-sample target banking radians
+    const rawBank = new Float32Array(N);
+    const maxBankRad = THREE.MathUtils.degToRad(config.maxBankDeg);
+    const autoBankGain = 36.0;
+
+    for (let i = 0; i < N; i++) {
+      const t = i / N;
+      const sc = smoothCurv[i];
+
+      // Automatic inward banking proportional to curvature (curv > 0 right turn => bank < 0 lifts left edge)
+      let targetBank = clamp(-sc * autoBankGain, -maxBankRad, maxBankRad);
+
+      // Blend designer-authored corner banking angles (e.g., 5° flat 90° turn vs 34° steep banked U-turn!)
+      if (cpBanks.length > 0 && Math.abs(sc) > 0.0018) {
+        let influence = 0;
+        let weightedDeg = 0;
+        const influenceSpan = 34; // ~3% of track length around the corner apex
+        for (const cb of cpBanks) {
+          let di = Math.abs(i - cb.idx);
+          if (di > N * 0.5) di = N - di;
+          if (di < influenceSpan) {
+            const w = smoothstep(influenceSpan, 0, di);
+            weightedDeg += cb.deg * w;
+            influence += w;
+          }
+        }
+        if (influence > 0.001) {
+          const explicitDeg = weightedDeg / influence;
+          const explicitRad = THREE.MathUtils.degToRad(explicitDeg);
+          const turnSign = -Math.sign(sc); // inward banking direction!
+          const curveEnvelope = smoothstep(0.002, 0.0075, Math.abs(sc));
+          const explicitBank = turnSign * explicitRad * curveEnvelope;
+          targetBank = lerp(targetBank, explicitBank, clamp(influence, 0, 1));
+        }
+      }
+
+      // Flatten start/finish grid & jump ramp takeoffs cleanly
+      const distFromStart = Math.min(t, 1 - t);
+      let bankMask = smoothstep(0.012, 0.045, distFromStart);
+      for (const ramp of config.jumpRamps) {
+        if (t >= ramp.tStart - 0.02 && t <= ramp.tEnd + 0.025) {
+          bankMask *= 0.12;
+        }
+      }
+      rawBank[i] = clamp(targetBank * bankMask, -maxBankRad, maxBankRad);
+    }
+
+    // Smooth final banking gently so there's zero sudden roll snap entering/exiting banked bowls
+    const finalBank = new Float32Array(N);
+    const bankSmoothR = 9;
+    for (let i = 0; i < N; i++) {
+      let sum = 0;
+      let wSum = 0;
+      for (let k = -bankSmoothR; k <= bankSmoothR; k++) {
+        const w = 1 - Math.abs(k) / (bankSmoothR + 1);
+        sum += rawBank[(i + k + N) % N] * w;
+        wSum += w;
+      }
+      finalBank[i] = sum / wSum;
+    }
+
+    // 5. Build final orthonormal banked frames
     for (let i = 0; i < N; i++) {
       const s = i * ds;
       const t = i / N;
@@ -95,17 +174,7 @@ export class TrackSpline {
       const flatRight = rawFlatRights[i];
       const flatUp = new THREE.Vector3().crossVectors(flatRight, tan).normalize();
 
-      // Suppress banking near Start/Finish straight & jump ramps so takeoff is clean
-      const distFromStart = Math.min(t, 1 - t);
-      let bankMask = smoothstep(0.015, 0.06, distFromStart);
-      for (const ramp of config.jumpRamps) {
-        if (t >= ramp.tStart - 0.025 && t <= ramp.tEnd + 0.03) {
-          bankMask *= 0.15;
-        }
-      }
-
-      // Curvature > 0 (right turn) => bank < 0 (left/outside raised)
-      const bank = clamp(-smoothCurv[i] * bankGain, -maxBankRad, maxBankRad) * bankMask;
+      const bank = finalBank[i];
       const c = Math.cos(bank);
       const sn = Math.sin(bank);
 
@@ -160,14 +229,12 @@ export class TrackSpline {
     return res;
   }
 
-  /** Computes world position for track coordinates (s, lateral d, height above deck h) */
   public trackToWorld(s: number, d: number, h: number, out = new THREE.Vector3()): THREE.Vector3 {
     const f = this.getFrameAtDistance(s);
     out.copy(f.pos).addScaledVector(f.right, d).addScaledVector(f.up, h);
     return out;
   }
 
-  /** Evaluates ramp deck elevation & launch slope at (s, d) */
   public getRampSurface(sRaw: number, d: number): RampSurfaceInfo {
     const s = wrapDistance(sRaw, this.totalLength);
     const t = s / this.totalLength;
@@ -178,7 +245,6 @@ export class TrackSpline {
         if (Math.abs(d) <= rampHalfW + 0.6) {
           const u = (t - ramp.tStart) / (ramp.tEnd - ramp.tStart);
           const rampLen = (ramp.tEnd - ramp.tStart) * this.totalLength;
-          // Smoothly rising quadratic launch kicker: h(u) = H * u^1.65
           const exp = 1.65;
           const height = ramp.height * Math.pow(u, exp);
           const dhdu = ramp.height * exp * Math.pow(Math.max(u, 0.02), exp - 1);
@@ -195,7 +261,6 @@ export class TrackSpline {
     return { height: 0, slope: 0, onRamp: false, nearLip: false };
   }
 
-  /** Returns matching BoostPadDef if (s, d) is inside a boost pad */
   public getBoostPadAt(sRaw: number, d: number): BoostPadDef | null {
     const s = wrapDistance(sRaw, this.totalLength);
     for (const pad of this.config.boostPads) {
@@ -221,7 +286,6 @@ export class TrackSpline {
     return this.config.jumpRamps;
   }
 
-  /** Minimum horizontal (XZ) distance from any point to the track centerline (for safe scenery placement) */
   public minHorizontalDistanceToTrack(x: number, z: number): number {
     let minSq = Infinity;
     for (let i = 0; i < this.sampleCount; i += 4) {
@@ -234,7 +298,6 @@ export class TrackSpline {
     return Math.sqrt(minSq);
   }
 
-  /** Normalized 2D points (0..1) for HUD minimap & menu preview SVG */
   public getMinimapOutline(step = 6): {
     points: { x: number; y: number }[];
     minX: number;

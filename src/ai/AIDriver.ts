@@ -31,18 +31,20 @@ export class AIDriver {
     }
 
     const halfW = spline.halfWidth;
-    const fNear = spline.getFrameAtDistance(self.s + 24);
-    const fMid = spline.getFrameAtDistance(self.s + 54);
-    const fFar = spline.getFrameAtDistance(self.s + 92);
+    const fHere = spline.getFrameAtDistance(self.s + 6);
+    const fNear = spline.getFrameAtDistance(self.s + 22);
+    const fMid = spline.getFrameAtDistance(self.s + 48);
+    const fFar = spline.getFrameAtDistance(self.s + 86);
 
-    const avgCurv = (fNear.curvature + fMid.curvature * 1.4 + fFar.curvature * 0.8) / 3.2;
+    const avgCurv = (fHere.curvature * 1.1 + fNear.curvature * 1.4 + fMid.curvature * 1.2 + fFar.curvature * 0.6) / 4.3;
+    const peakCurv = Math.max(Math.abs(fHere.curvature), Math.abs(fNear.curvature), Math.abs(fMid.curvature));
 
-    // 1. Optimal racing line (hug corner apex on turns, cruise preferred line on straights)
+    // 1. Optimal racing line (hug corner apex on tight 90° & 180° bends, cruise preferred line on straights)
     let targetD = this.dynamicLaneBias * (halfW - 3.6);
-    if (Math.abs(avgCurv) > 0.003) {
+    if (Math.abs(avgCurv) > 0.0028) {
       // Curvature > 0 = turning right => apex is +d (right side)
       const apexSign = Math.sign(avgCurv);
-      targetD = apexSign * (halfW - 4.2) * clamp(Math.abs(avgCurv) * 140, 0.3, 0.88);
+      targetD = apexSign * (halfW - 3.6) * clamp(Math.abs(avgCurv) * 115, 0.35, 0.92);
     }
 
     // 2. Aim for upcoming Boost Pads & Jump Ramps!
@@ -78,42 +80,43 @@ export class AIDriver {
     targetD = clamp(targetD, -(halfW - 2.8), halfW - 2.8);
 
     // 4. Compute desired heading offset to smoothly converge on targetD
-    const lookaheadDist = clamp(self.speed * 0.48, 18, 42);
-    const desiredYaw = Math.atan2(targetD - self.d, lookaheadDist) + fNear.curvature * 9.5;
+    const lookaheadDist = clamp(self.speed * 0.38, 14, 36);
+    const desiredYaw = Math.atan2(targetD - self.d, lookaheadDist) + fHere.curvature * 11.5;
     const yawError = desiredYaw - self.yawOffset;
 
-    const steerDeadzone = 0.045;
+    const steerDeadzone = 0.04;
     const left = yawError < -steerDeadzone;
     const right = yawError > steerDeadzone;
 
-    // 5. Engage real arcade drifting on sharp turns!
-    const sharpCorner = Math.abs(avgCurv) > 0.0046 && self.speed > 58;
+    // 5. Engage real arcade drifting on 90° corners & 180° hairpins!
+    const sharpCorner = (peakCurv > 0.0075 || Math.abs(avgCurv) > 0.0052) && self.speed > 44;
     const drift = sharpCorner && ((avgCurv > 0 && right) || (avgCurv < 0 && left));
 
+    // Gently trail-brake before ultra-tight flat hairpins so AI nails apexes cleanly
+    const needsEntryBrake = peakCurv > 0.0155 && self.speed > 76 && Math.abs(fHere.bank) < 0.25;
+
     // 6. Smart Nitro deployment on straightaways or chasing player
-    const straightAhead = Math.abs(fMid.curvature) < 0.0028 && Math.abs(fFar.curvature) < 0.003;
+    const straightAhead = Math.abs(fNear.curvature) < 0.004 && Math.abs(fMid.curvature) < 0.004 && Math.abs(fFar.curvature) < 0.0045;
     let nitro = false;
     if (self.isNitroActive && self.nitro > 14 && straightAhead) {
       nitro = true;
     } else if (
       this.nitroCooldown <= 0 &&
       straightAhead &&
-      self.speed > 55 &&
+      self.speed > 52 &&
       self.nitro >= (this.profile.aggression > 0.7 ? 52 : 76)
     ) {
       nitro = true;
-      this.nitroCooldown = 4.5 + Math.random() * 3.5;
+      this.nitroCooldown = 4.2 + Math.random() * 3.2;
     }
 
     // 7. Gentle, Fun Rubber-Banding so races stay intense without ever feeling unfair!
-    const progressGap = self.totalProgress - player.totalProgress; // positive if AI is ahead
+    const progressGap = self.totalProgress - player.totalProgress;
     let rubberBand = 0;
     if (!player.finished) {
       if (progressGap > 65) {
-        // AI is far ahead -> slightly ease off
         rubberBand = -clamp((progressGap - 65) / 280, 0, 0.085);
       } else if (progressGap < -65) {
-        // AI fell behind -> mild surge to rejoin pack
         rubberBand = clamp((-progressGap - 65) / 260, 0, 0.095);
       }
     }
@@ -122,8 +125,8 @@ export class AIDriver {
 
     return {
       input: {
-        throttle: true,
-        brake: Math.abs(avgCurv) > 0.0085 && self.speed > 92 && !drift,
+        throttle: !needsEntryBrake,
+        brake: needsEntryBrake,
         left,
         right,
         drift,

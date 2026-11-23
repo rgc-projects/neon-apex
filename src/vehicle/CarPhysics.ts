@@ -253,18 +253,25 @@ export class RacerPhysics {
     if (this.miniBoostTimer > 0) this.miniBoostTimer = Math.max(0, this.miniBoostTimer - dt);
     if (this.boostPadTimer > 0) this.boostPadTimer = Math.max(0, this.boostPadTimer - dt);
 
-    // 3. Arcade Drift Mechanics (Mario Kart x OutRun hybrid)
-    const canDrift = !this.isAirborne && this.speed > 25 && input.drift;
+    // 3. Arcade Drift Mechanics (Banking-Controlled Drift Duration & Arc!)
+    // Sample current road frame early so drift physics directly react to track tilt/banking angle
+    spline.getFrameAtDistance(this.s, this.frame);
+
+    const canDrift = !this.isAirborne && this.speed > 22 && input.drift;
+    // Inward bank angle aligned with active drift direction (>0 means banked inward like a bowl!)
+    const inwardBankRad = this.isDrifting ? -this.frame.bank * this.driftDir : 0;
+    const bankNorm = clamp(inwardBankRad / THREE.MathUtils.degToRad(34), -0.35, 1.15);
+
     if (canDrift) {
       if (!this.isDrifting) {
-        if (Math.abs(rawSteer) > 0.1 || Math.abs(this.steerSmooth) > 0.18) {
+        if (Math.abs(rawSteer) > 0.1 || Math.abs(this.steerSmooth) > 0.16) {
           this.isDrifting = true;
           this.driftDir = (rawSteer !== 0 ? rawSteer : this.steerSmooth) > 0 ? 1 : -1;
           this.driftDuration = 0;
           this.driftDistance = 0;
           this.driftCharge = 0;
           this.driftTier = 0;
-          // Subtle playful drift-hop micro bounce!
+          // Playful drift-hop micro bounce!
           this.suspensionVel = 1.65;
         }
       } else {
@@ -272,16 +279,22 @@ export class RacerPhysics {
         this.driftDistance += this.speed * dt;
         // Steering into the drift charges much faster than widening out
         const align = rawSteer * this.driftDir; // >0 into drift, <0 counter-steer
-        const intoDrift = align > 0.2 ? 1.45 : align < -0.2 ? 0.68 : 1.0;
-        const speedFactor = clamp(this.speed / 72, 0.55, 1.35);
-        this.driftCharge += dt * intoDrift * speedFactor * this.spec.driftChargeRate;
+        const intoDrift = align > 0.2 ? 1.48 : align < -0.2 ? 0.68 : 1.0;
+        const speedFactor = clamp(this.speed / 68, 0.58, 1.38);
 
-        // Direct live nitro feed while drifting!
-        this.nitro = Math.min(100, this.nitro + dt * 11.5 * intoDrift * this.spec.driftChargeRate);
+        // Track banking angle controls drift pacing & duration:
+        // - Flat/low-bank 90° street corners (bankNorm ~ 0): crisp fast snap-charge (~0.9s..1.4s)
+        // - Steeply banked U-turn bowls (bankNorm ~ 1): stretched long sustained high-G drift (~2.2s..3.8s) with bonus nitro!
+        const bankChargePace = 1.24 - clamp(bankNorm, 0, 1) * 0.42;
+        this.driftCharge += dt * intoDrift * speedFactor * bankChargePace * this.spec.driftChargeRate;
+
+        // Banked bowl drifts yield rich bonus Nitro flow!
+        const bankNitroBonus = 1.0 + clamp(bankNorm, 0, 1) * 0.45;
+        this.nitro = Math.min(100, this.nitro + dt * 12.2 * intoDrift * bankNitroBonus * this.spec.driftChargeRate);
 
         if (this.driftCharge >= 2.35) this.driftTier = 3;
-        else if (this.driftCharge >= 1.35) this.driftTier = 2;
-        else if (this.driftCharge >= 0.52) this.driftTier = 1;
+        else if (this.driftCharge >= 1.32) this.driftTier = 2;
+        else if (this.driftCharge >= 0.48) this.driftTier = 1;
         else this.driftTier = 0;
       }
     } else if (this.isDrifting) {
@@ -291,15 +304,15 @@ export class RacerPhysics {
       }
       if (this.driftTier >= 1) {
         const tier = this.driftTier as 1 | 2 | 3;
-        const powers = [0, 15, 23, 31];
-        const durations = [0, 0.68, 1.08, 1.52];
-        const nitroBonus = [0, 10, 20, 32];
-        const points = [0, 150, 350, 650];
+        const powers = [0, 17, 25, 34];
+        const durations = [0, 0.72, 1.15, 1.62];
+        const nitroBonus = [0, 12, 22, 35];
+        const points = [0, 180, 400, 750];
 
         this.miniBoostPower = powers[tier];
         this.miniBoostTimer = durations[tier];
         this.nitro = Math.min(100, this.nitro + nitroBonus[tier]);
-        const distPoints = Math.round(this.driftDistance * 1.4);
+        const distPoints = Math.round(this.driftDistance * 1.5);
         const totalPts = points[tier] + distPoints;
         this.styleScore += totalPts;
         events?.onDriftBoost?.(tier, this.driftDistance, totalPts);
@@ -312,7 +325,7 @@ export class RacerPhysics {
       this.driftTier = 0;
     }
 
-    // 4. Longitudinal Acceleration, Top Speed & Boost Stacking
+    // 4. Longitudinal Acceleration, Road Slope Gravity & Banked Speed Retention
     const baseMax = this.spec.maxSpeed * paceScale;
     let boostMaxAdd = 0;
     let boostAccelAdd = 0;
@@ -324,7 +337,7 @@ export class RacerPhysics {
     }
     if (this.miniBoostTimer > 0) {
       boostMaxAdd = Math.max(boostMaxAdd, this.miniBoostPower);
-      boostAccelAdd += 34;
+      boostAccelAdd += 36;
     }
     if (this.boostPadTimer > 0) {
       boostMaxAdd = Math.max(boostMaxAdd, 28);
@@ -335,72 +348,78 @@ export class RacerPhysics {
       boostAccelAdd += 18 * this.slipstreamLevel;
     }
 
-    const driftDragFactor = this.isDrifting ? 0.965 : 1.0;
+    // Steep inward banking preserves blazing speed through banked U-turns; flat 90° bends scrub slightly more speed for sharp rotation!
+    const driftDragFactor = this.isDrifting ? 0.91 + clamp(bankNorm, 0, 1) * 0.082 : 1.0;
     const effectiveMaxSpeed = (baseMax + boostMaxAdd) * driftDragFactor;
+
+    // Downhill / uphill slope acceleration (like Mount Akina downhill hairpins!)
+    const roadSlopeAccel = -this.frame.tangent.y * 16.5;
 
     if (!this.isAirborne) {
       if (input.throttle || this.isNitroActive || this.miniBoostTimer > 0 || this.boostPadTimer > 0) {
-        // Strong punchy low-end acceleration tapering gracefully toward top speed
         const speedRatio = clamp(this.speed / Math.max(effectiveMaxSpeed, 1), 0, 1.3);
         const torqueCurve = Math.max(0.18, 1.15 - speedRatio * 0.88);
-        const accel = (this.spec.acceleration * paceScale * torqueCurve) + boostAccelAdd;
+        const accel = (this.spec.acceleration * paceScale * torqueCurve) + boostAccelAdd + roadSlopeAccel;
         if (this.speed < effectiveMaxSpeed) {
-          this.speed = Math.min(effectiveMaxSpeed, this.speed + accel * dt);
+          this.speed = Math.min(effectiveMaxSpeed, this.speed + Math.max(4, accel) * dt);
         } else {
-          // Gentle overspeed decay after boost wears off
-          this.speed = damp(this.speed, effectiveMaxSpeed, 2.4, dt);
+          this.speed = damp(this.speed, effectiveMaxSpeed, 2.8, dt);
         }
       } else {
-        // Natural aerodynamic coasting drag
-        this.speed = Math.max(0, this.speed - (11 + this.speed * 0.14) * dt);
+        this.speed = Math.max(0, this.speed - (11 + this.speed * 0.14 - roadSlopeAccel) * dt);
       }
 
       if (input.brake) {
         if (this.speed > 2) {
-          this.speed = Math.max(0, this.speed - 68 * dt);
+          this.speed = Math.max(0, this.speed - 74 * dt);
         } else {
           this.speed = Math.max(-18, this.speed - 24 * dt);
         }
       }
     } else {
-      // Minimal air drag while soaring off jumps
       this.speed = Math.max(10, this.speed - 2.2 * dt);
     }
 
-    // 5. Steering & Arcade Yaw Rotation
-    const speedSteerScale = clamp(Math.abs(this.speed) / 22, 0.25, 1.0) *
-      (1.0 - clamp((this.speed - 75) / 140, 0, 0.28));
+    // 5. Steering & Banking-Modulated Arcade Drift Yaw Rotation
+    // Normal high-speed grip has realistic understeer on tight 90°/180° bends -> makes DRIFTING essential & super rewarding!
+    const speedSteerScale = clamp(Math.abs(this.speed) / 20, 0.25, 1.0) *
+      (1.0 - clamp((this.speed - 48) / 72, 0, 0.56));
     const airSteerScale = this.isAirborne ? 0.22 : 1.0;
     const revSign = this.speed >= -0.1 ? 1 : -1;
 
     let yawRate = 0;
     if (this.isDrifting) {
-      // Drift steering: base drift arc + player modulation (-1 widens, +1 tightens)
+      // Drift unlocks high cornering bite to slice cleanly through 90° corners & 180° hairpins!
+      // - Low-bank flat 90° corners rotate extra crisply for quick snap-drifts
+      // - Steep banked U-turns give wide, smooth, sustained high-speed arc modulation
       const mod = this.steerSmooth * this.driftDir; // +1 into drift, -1 counter-steer
-      const arcFactor = 0.72 + mod * 0.62; // ranges ~0.10 (wide) to ~1.34 (tight apex!)
-      yawRate = this.driftDir * arcFactor * 1.48 * this.spec.driftControl;
+      const bankSnapFactor = 1.12 - clamp(bankNorm, 0, 1) * 0.16;
+      const arcFactor = (0.86 + mod * 0.72) * bankSnapFactor;
+      const hairpinAssist = clamp(Math.abs(this.frame.curvature) * 32, 0, 0.42);
+      yawRate = this.driftDir * (arcFactor + hairpinAssist) * 1.92 * this.spec.driftControl;
     } else {
-      yawRate = this.steerSmooth * 1.52 * this.spec.handling * speedSteerScale * airSteerScale * revSign;
+      yawRate = this.steerSmooth * 1.38 * this.spec.handling * speedSteerScale * airSteerScale * revSign;
     }
     this.yawOffset += yawRate * dt;
 
-    // 6. Advance Along Spline & Apply True Road Curvature Centrifugal Drift
-    spline.getFrameAtDistance(this.s, this.frame);
-
+    // 6. Advance Along Spline, Apply True Curvature Centrifugal Drift & Banked Gravity Hold
     const cosYaw = Math.cos(this.yawOffset);
     const sinYaw = Math.sin(this.yawOffset);
     const vForwardTrack = this.speed * cosYaw;
     const vLateral = this.speed * sinYaw;
 
     // Differential geometry arc-length correction: inside lane covers corners faster!
-    const radiusFactor = clamp(1 - this.d * this.frame.curvature, 0.45, 1.85);
+    const radiusFactor = clamp(1 - this.d * this.frame.curvature, 0.4, 1.95);
     const ds = (vForwardTrack * dt) / radiusFactor;
 
     const prevTangent = this.frame.tangent.clone();
     const prevFlatRight = this.frame.flatRight.clone();
 
     this.s = wrapDistance(this.s + ds, spline.totalLength);
-    this.d += vLateral * dt;
+    // Lateral gravity pull from track banking holds the car securely into steep banked bowls!
+    // bank < 0 (right turn inward bank) pulls toward +d (right/inside); bank > 0 pulls toward -d (left/inside)
+    const bankGravityLateral = !this.isAirborne ? -Math.sin(this.frame.bank) * (this.isDrifting ? 14.5 : 5.5) : 0;
+    this.d += (vLateral + bankGravityLateral) * dt;
 
     // Update frame at new s and subtract actual track turn angle from yawOffset
     spline.getFrameAtDistance(this.s, this.frame);
@@ -641,6 +660,7 @@ export class RacerPhysics {
       driftTier: this.driftTier,
       driftChargeNorm: clamp(this.driftCharge / 2.35, 0, 1),
       driftDistance: Math.round(this.driftDistance),
+      bankAngleDeg: Math.round(THREE.MathUtils.radToDeg(Math.abs(this.frame.bank))),
       isAirborne: this.isAirborne,
       airTime: this.currentAirTime,
       isSlipstreaming: this.isSlipstreaming,

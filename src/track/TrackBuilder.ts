@@ -457,26 +457,26 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   topArchInst.count = archIdx;
   group.add(leftArchInst, rightArchInst, topArchInst);
 
-  // Corner warning neon chevron boards on outside of sharp turns
+  // Corner warning neon chevron boards on outside of sharp 90° bends & 180° hairpins
   const chevronTex = createChevronBannerTexture('#ffae00');
   const chevronMat = new THREE.MeshBasicMaterial({
     map: chevronTex,
     toneMapped: false,
     side: THREE.DoubleSide,
   });
-  const chevronGeo = new THREE.PlaneGeometry(5.5, 2.1);
+  const chevronGeo = new THREE.PlaneGeometry(5.8, 2.25);
   disposables.push(chevronTex, chevronMat, chevronGeo);
 
   const chevronBoards: { pos: THREE.Vector3; quat: THREE.Quaternion }[] = [];
-  for (let i = 0; i < N; i += 10) {
+  for (let i = 0; i < N; i += 8) {
     const f = spline.samples[i];
-    if (Math.abs(f.curvature) > 0.0048) {
+    if (Math.abs(f.curvature) > 0.0068) {
       // Outside of turn: if turning right (curv > 0), outside is left (-right)
       const outSign = f.curvature > 0 ? -1 : 1;
       const pos = f.pos
         .clone()
         .addScaledVector(f.right, outSign * (halfW + 0.55))
-        .addScaledVector(f.up, 2.35);
+        .addScaledVector(f.up, 2.4);
       // Orient plane facing inward toward road
       const normalIn = f.right.clone().multiplyScalar(-outSign);
       const planeX = f.tangent.clone().multiplyScalar(outSign > 0 ? 1 : -1);
