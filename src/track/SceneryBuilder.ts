@@ -58,12 +58,12 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   let groundMat: THREE.MeshStandardMaterial;
   if (cfg.theme === 'bridge' || cfg.theme === 'city') {
     groundMat = new THREE.MeshStandardMaterial({
-      color: cfg.theme === 'bridge' ? 0x0b2038 : 0x09101c,
+      color: cfg.theme === 'bridge' ? 0x0d223a : 0x070f1c,
       normalMap: oceanNormal,
       normalScale: new THREE.Vector2(cfg.theme === 'bridge' ? 0.85 : 0.45, cfg.theme === 'bridge' ? 0.85 : 0.45),
-      roughness: cfg.theme === 'bridge' ? 0.14 : 0.24,
-      metalness: 0.68,
-      envMapIntensity: cfg.theme === 'bridge' ? 1.85 : 1.15,
+      roughness: cfg.theme === 'bridge' ? 0.22 : 0.36,
+      metalness: cfg.theme === 'bridge' ? 0.55 : 0.35,
+      envMapIntensity: cfg.theme === 'bridge' ? 1.15 : 0.65,
     });
   } else {
     groundMat = new THREE.MeshStandardMaterial({

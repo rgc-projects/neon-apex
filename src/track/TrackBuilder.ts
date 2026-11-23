@@ -210,11 +210,11 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   const roadMat = new THREE.MeshStandardMaterial({
     map: roadPBR.map,
     normalMap: roadPBR.normalMap,
-    normalScale: new THREE.Vector2(0.45, 0.45),
+    normalScale: new THREE.Vector2(0.32, 0.32),
     roughnessMap: roadPBR.roughnessMap,
     roughness: 1.0,
-    metalness: 0.12,
-    envMapIntensity: 1.35,
+    metalness: 0.02,
+    envMapIntensity: 0.42,
   });
   group.add(new THREE.Mesh(roadGeo, roadMat));
   disposables.push(roadGeo, roadMat);
