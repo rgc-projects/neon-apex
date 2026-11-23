@@ -37,8 +37,14 @@
       </header>
 
       <div class="menu-body">
+        <!-- Mobile Portrait Compact Tab Switcher -->
+        <div id="mobile-menu-tabs" class="mobile-menu-tabs">
+          <button id="tab-cars" class="mob-tab active" type="button">🏎 选择超跑</button>
+          <button id="tab-tracks" class="mob-tab" type="button">🏁 选择赛道</button>
+        </div>
+
         <!-- Left Panel: Car Selection -->
-        <section class="glass-panel panel-left">
+        <section id="menu-panel-cars" class="glass-panel panel-left mob-tab-active">
           <div class="panel-heading">
             <span class="accent-bar"></span>
             <h2>SELECT MACHINE / 选择超跑</h2>
@@ -63,7 +69,7 @@
         </section>
 
         <!-- Right Panel: Track Selection -->
-        <section class="glass-panel panel-right">
+        <section id="menu-panel-tracks" class="glass-panel panel-right">
           <div class="panel-heading">
             <span class="accent-bar magenta"></span>
             <h2>SELECT CIRCUIT / 选择赛道</h2>
@@ -142,8 +148,10 @@
         <div class="hud-right-tools">
           <button id="btn-hud-touch" class="hud-mini-btn" title="切换触屏按键">📱</button>
           <button id="btn-hud-autogas" class="hud-mini-btn touch-only" title="切换自动油门">AUTO</button>
+          <button id="btn-hud-tilt" class="hud-mini-btn touch-only" title="切换重力感应转向">TILT</button>
           <button id="btn-hud-reset" class="hud-mini-btn touch-only" title="赛道复位 (R)">↺</button>
           <button id="btn-hud-cam" class="hud-mini-btn" title="切换视角 (C)">CHASE</button>
+          <button id="btn-hud-fullscreen" class="hud-mini-btn touch-only" title="全屏模式">⛶</button>
           <button id="btn-hud-audio" class="hud-mini-btn" title="切换静音 (M)">🔊</button>
           <button id="btn-hud-pause" class="hud-mini-btn" title="暂停 (ESC)">❚❚</button>
         </div>
@@ -248,6 +256,7 @@
             <span class="steer-arrow">▶</span>
             <span class="steer-lbl">RIGHT</span>
           </div>
+          <div id="steer-knob" class="steer-knob"></div>
         </div>
 
         <!-- Right Thumb: Drift, Nitro, Brake, Gas/Rev -->

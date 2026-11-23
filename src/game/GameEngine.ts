@@ -95,23 +95,28 @@ export class GameEngine {
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     const speedCanvas = document.getElementById('speedlines-canvas') as HTMLCanvasElement;
 
+    const isMobile =
+      window.matchMedia?.('(pointer: coarse)').matches ||
+      Math.min(window.innerWidth, window.innerHeight) <= 720;
+
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: !isMobile,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.75));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
 
     this.cameraController = new CameraController(window.innerWidth / window.innerHeight);
 
-    // Post-Processing: Render -> UnrealBloomPass -> OutputPass
+    // Post-Processing: Render -> UnrealBloomPass (half-res on mobile for locked 60 FPS) -> OutputPass
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.cameraController.camera));
+    const bloomScale = isMobile ? 0.5 : 1.0;
     this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      new THREE.Vector2(window.innerWidth * bloomScale, window.innerHeight * bloomScale),
       0.34, // strength - crisp jewel-like neon glow without white washout
       0.28, // radius
       0.86  // threshold
@@ -143,6 +148,9 @@ export class GameEngine {
       onToggleChange: (enabled) => {
         this.hud.setTouchLabel(enabled);
         this.menuUI?.setTouchEnabled(enabled);
+      },
+      onStatusMessage: (msg) => {
+        this.hud.pushCallout(msg, 'cyan');
       },
     });
 
@@ -223,6 +231,7 @@ export class GameEngine {
     });
 
     this.bindInputs();
+    this.bindMenuShowroomDrag(canvas);
     window.addEventListener('resize', this.onResize);
 
     // Initial load: Track 0 + Showcase Car 0
@@ -464,6 +473,33 @@ export class GameEngine {
     });
   }
 
+  private bindMenuShowroomDrag(canvas: HTMLCanvasElement): void {
+    let dragging = false;
+    let lastX = 0;
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (this.state !== 'MENU') return;
+      dragging = true;
+      lastX = e.clientX;
+      this.cameraController.setMenuDragging(true);
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!dragging || this.state !== 'MENU') return;
+      const dx = e.clientX - lastX;
+      lastX = e.clientX;
+      this.cameraController.orbitMenuBy(-dx * 0.0085);
+    });
+
+    const stop = () => {
+      if (!dragging) return;
+      dragging = false;
+      this.cameraController.setMenuDragging(false);
+    };
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+  }
+
   private pollPlayerInput(isCountdown = false): InputState {
     const touch = this.touchControls.getInput(isCountdown);
     this.input.throttle = this.keys.has('KeyW') || this.keys.has('ArrowUp') || touch.throttle;
@@ -472,15 +508,20 @@ export class GameEngine {
     this.input.right = this.keys.has('KeyD') || this.keys.has('ArrowRight') || touch.right;
     this.input.drift = this.keys.has('Space') || touch.drift;
     this.input.nitro = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || touch.nitro;
+    this.input.steerAxis = touch.steerAxis ?? 0;
     return this.input;
   }
 
   private onResize = (): void => {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const isMobile =
+      window.matchMedia?.('(pointer: coarse)').matches || Math.min(w, h) <= 720;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.75));
     this.renderer.setSize(w, h);
     this.composer.setSize(w, h);
-    this.bloomPass.setSize(w, h);
+    const bloomScale = isMobile ? 0.5 : 1.0;
+    this.bloomPass.setSize(w * bloomScale, h * bloomScale);
     this.cameraController.setAspect(w / h);
     this.speedLines.resize(w, h);
   };
@@ -618,11 +659,13 @@ export class GameEngine {
         this.hud.pushCallout(`${names[tier]} ${Math.round(distMeters)}m +${points}`, colors[tier]);
         this.audio.playDriftBoost(tier);
         this.cameraController.addShake(0.2 + tier * 0.14);
+        this.touchControls.vibrate(tier >= 2 ? [20, 15, 30] : 22);
       },
       onBoostPad: () => {
         this.hud.pushCallout('⚡ BOOST PAD +120', 'cyan');
         this.audio.playBoostPad();
         this.cameraController.addShake(0.32);
+        this.touchControls.vibrate(20);
       },
       onJumpLaunch: () => {
         this.audio.playJumpLaunch();
@@ -632,11 +675,13 @@ export class GameEngine {
         this.hud.pushCallout(`AIR TIME ${airTime.toFixed(1)}s! +${points}`, 'gold');
         this.audio.playLanding();
         this.cameraController.addShake(clamp(airTime * 0.35, 0.25, 0.65));
+        this.touchControls.vibrate(25);
         this.particles.emitImpactBurst(player.worldPos, 0x00f2ff, 20);
       },
       onWallHit: (worldPos, intensity) => {
         this.audio.playCollision(intensity * 0.85);
         this.cameraController.addShake(intensity * 0.55);
+        this.touchControls.vibrate(32);
         this.particles.emitImpactBurst(worldPos, 0xffae00, 18);
       },
       onGearShift: () => {
@@ -645,6 +690,7 @@ export class GameEngine {
       onNitroStart: (isSuper) => {
         this.audio.playNitroStart(isSuper);
         this.cameraController.addShake(isSuper ? 0.52 : 0.26);
+        this.touchControls.vibrate(isSuper ? [28, 18, 46] : 24);
         if (isSuper) {
           this.hud.pushCallout('🔥 SUPER NITRO OVERDRIVE!', 'magenta');
         }

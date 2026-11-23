@@ -216,9 +216,15 @@ export class RacerPhysics {
     if (this.wallCooldown > 0) this.wallCooldown -= dt;
     if (this.boostPadCooldown > 0) this.boostPadCooldown -= dt;
 
-    // 1. Steering input smoothing
-    const rawSteer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    this.steerSmooth = damp(this.steerSmooth, rawSteer, 11.5, dt);
+    // 1. Steering input smoothing (supports both digital keyboard and smooth analog touch/tilt)
+    const digitalSteer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const rawSteer =
+      digitalSteer !== 0
+        ? digitalSteer
+        : input.steerAxis !== undefined
+          ? clamp(input.steerAxis, -1, 1)
+          : 0;
+    this.steerSmooth = damp(this.steerSmooth, rawSteer, 12.0, dt);
 
     // 2. Nitro activation & Super Nitro logic
     const prevNitroActive = this.isNitroActive;
@@ -265,7 +271,8 @@ export class RacerPhysics {
         this.driftDuration += dt;
         this.driftDistance += this.speed * dt;
         // Steering into the drift charges much faster than widening out
-        const intoDrift = rawSteer === this.driftDir ? 1.45 : rawSteer === -this.driftDir ? 0.68 : 1.0;
+        const align = rawSteer * this.driftDir; // >0 into drift, <0 counter-steer
+        const intoDrift = align > 0.2 ? 1.45 : align < -0.2 ? 0.68 : 1.0;
         const speedFactor = clamp(this.speed / 72, 0.55, 1.35);
         this.driftCharge += dt * intoDrift * speedFactor * this.spec.driftChargeRate;
 

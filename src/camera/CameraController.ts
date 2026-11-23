@@ -14,6 +14,8 @@ export class CameraController {
   private currentFov = 64;
   private shakeIntensity = 0;
   private menuOrbitAngle = 0.55;
+  private menuOrbitVel = 0;
+  private menuDragging = false;
   private finishOrbitAngle = 0;
   private initialized = false;
 
@@ -46,16 +48,30 @@ export class CameraController {
     this.finishOrbitAngle = 0;
   }
 
+  public setMenuDragging(dragging: boolean): void {
+    this.menuDragging = dragging;
+  }
+
+  public orbitMenuBy(deltaRad: number): void {
+    this.menuOrbitAngle += deltaRad;
+    this.menuOrbitVel = deltaRad * 18;
+  }
+
   public updateMenuShowcase(dt: number, showcaseOrigin: THREE.Vector3): void {
-    this.menuOrbitAngle += dt * 0.34;
-    const dist = 8.4;
+    if (!this.menuDragging) {
+      this.menuOrbitVel = damp(this.menuOrbitVel, 0, 5.5, dt);
+      this.menuOrbitAngle += (0.34 + this.menuOrbitVel) * dt;
+    }
+    const dist = window.innerWidth < 760 ? 9.4 : 8.4;
     const camX = showcaseOrigin.x + Math.sin(this.menuOrbitAngle) * dist;
     const camZ = showcaseOrigin.z + Math.cos(this.menuOrbitAngle) * dist;
-    const camY = showcaseOrigin.y + 2.45 + Math.sin(this.menuOrbitAngle * 0.7) * 0.28;
+    const camY = showcaseOrigin.y + (window.innerWidth < 760 ? 2.8 : 2.45) + Math.sin(this.menuOrbitAngle * 0.7) * 0.25;
 
     this.camera.position.set(camX, camY, camZ);
     this.camera.up.set(0, 1, 0);
-    this.camera.lookAt(showcaseOrigin.x, showcaseOrigin.y + 0.65, showcaseOrigin.z);
+    // Shift lookAt slightly down in portrait so car shines cleanly in upper showroom window!
+    const lookYOffset = window.innerWidth < 760 && window.innerHeight > window.innerWidth ? -0.35 : 0.65;
+    this.camera.lookAt(showcaseOrigin.x, showcaseOrigin.y + lookYOffset, showcaseOrigin.z);
 
     if (Math.abs(this.camera.fov - 44) > 0.1) {
       this.camera.fov = damp(this.camera.fov, 44, 6, dt);

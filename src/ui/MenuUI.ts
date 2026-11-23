@@ -24,6 +24,10 @@ export class MenuUI {
   private readonly controlsModal = document.getElementById('controls-modal')!;
   private readonly closeControlsBtn = document.getElementById('btn-close-controls')!;
   private readonly startBtn = document.getElementById('btn-start-race')!;
+  private readonly tabCarsBtn = document.getElementById('tab-cars')!;
+  private readonly tabTracksBtn = document.getElementById('tab-tracks')!;
+  private readonly panelCars = document.getElementById('menu-panel-cars')!;
+  private readonly panelTracks = document.getElementById('menu-panel-tracks')!;
 
   private selectedCar = 0;
   private selectedTrack = 0;
@@ -65,6 +69,16 @@ export class MenuUI {
     this.controlsModal.addEventListener('click', (e) => {
       if (e.target === this.controlsModal) this.controlsModal.classList.add('hidden');
     });
+
+    // Mobile portrait tab switch (Car Selection <-> Track Selection)
+    const setMobileTab = (tab: 'cars' | 'tracks') => {
+      this.tabCarsBtn.classList.toggle('active', tab === 'cars');
+      this.tabTracksBtn.classList.toggle('active', tab === 'tracks');
+      this.panelCars.classList.toggle('mob-tab-active', tab === 'cars');
+      this.panelTracks.classList.toggle('mob-tab-active', tab === 'tracks');
+    };
+    this.tabCarsBtn.addEventListener('click', () => setMobileTab('cars'));
+    this.tabTracksBtn.addEventListener('click', () => setMobileTab('tracks'));
   }
 
   public setVisible(visible: boolean): void {

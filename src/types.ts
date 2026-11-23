@@ -95,6 +95,8 @@ export interface InputState {
   right: boolean;
   drift: boolean;
   nitro: boolean;
+  /** Optional analog steering (-1..+1) from touch slide pad or phone gyroscope */
+  steerAxis?: number;
 }
 
 export interface RacerHUDTelemetry {
