@@ -345,8 +345,11 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   disposables.push(rampTex);
   const rampTopMat = new THREE.MeshStandardMaterial({
     map: rampTex,
-    roughness: 0.45,
-    metalness: 0.55,
+    emissive: 0xffffff,
+    emissiveMap: rampTex,
+    emissiveIntensity: 0.35,
+    roughness: 0.42,
+    metalness: 0.45,
     side: THREE.DoubleSide,
   });
   const rampSideMat = new THREE.MeshStandardMaterial({

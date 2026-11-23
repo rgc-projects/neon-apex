@@ -83,21 +83,41 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     buildRealisticConcreteTunnel(spline, group, disposables);
   }
 
-  // 4. Realistic Concrete Viaduct Support Piers with T-Cap Crossbeams
+  // 4. Realistic Concrete Viaduct Support Piers with Bank-Aligned T-Cap Crossbeams (Zero road clipping!)
   if (cfg.theme === 'city' || cfg.theme === 'bridge' || cfg.theme === 'mountain') {
     const floorY = groundPlane.position.y;
-    const pierList: { pos: THREE.Vector3; quat: THREE.Quaternion; h: number }[] = [];
+    const pierList: {
+      pos: THREE.Vector3;
+      right: THREE.Vector3;
+      up: THREE.Vector3;
+      bankQuat: THREE.Quaternion;
+      flatQuat: THREE.Quaternion;
+      leftColTopY: number;
+      rightColTopY: number;
+    }[] = [];
     const basis = new THREE.Matrix4();
+    const flatUp = new THREE.Vector3(0, 1, 0);
+    const colOffset = spline.roadWidth * 0.24;
 
     for (let i = 0; i < spline.sampleCount; i += 32) {
       const f = spline.samples[i];
-      const h = f.pos.y - floorY - 3.0;
-      if (h > 4) {
-        basis.makeBasis(f.flatRight, new THREE.Vector3(0, 1, 0), f.tangent.clone().negate());
+      // Exact underside elevation of the banked concrete box-girder at left & right pier column anchor points
+      const leftColTopY = f.pos.y + f.right.y * -colOffset - f.up.y * 4.35;
+      const rightColTopY = f.pos.y + f.right.y * colOffset - f.up.y * 4.35;
+      if (Math.min(leftColTopY, rightColTopY) - floorY > 3.5) {
+        const negTan = f.tangent.clone().negate();
+        basis.makeBasis(f.right, f.up, negTan);
+        const bankQuat = new THREE.Quaternion().setFromRotationMatrix(basis);
+        basis.makeBasis(f.flatRight, flatUp, negTan);
+        const flatQuat = new THREE.Quaternion().setFromRotationMatrix(basis);
         pierList.push({
           pos: f.pos.clone(),
-          quat: new THREE.Quaternion().setFromRotationMatrix(basis),
-          h,
+          right: f.right.clone(),
+          up: f.up.clone(),
+          bankQuat,
+          flatQuat,
+          leftColTopY,
+          rightColTopY,
         });
       }
     }
@@ -110,29 +130,35 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
         roughness: 0.84,
         metalness: 0.1,
       });
-      const colGeo = new THREE.BoxGeometry(3.6, 1, 3.6);
-      const capGeo = new THREE.BoxGeometry(spline.roadWidth * 0.72, 2.2, 4.2);
+      const colGeo = new THREE.BoxGeometry(3.4, 1, 3.4);
+      const capGeo = new THREE.BoxGeometry(spline.roadWidth * 0.66, 2.0, 4.0);
       const colInst = new THREE.InstancedMesh(colGeo, pierMat, pierList.length * 2);
       const capInst = new THREE.InstancedMesh(capGeo, pierMat, pierList.length);
       const dummy = new THREE.Object3D();
 
       pierList.forEach((p, idx) => {
-        // Twin concrete columns
-        for (let s = 0; s < 2; s++) {
-          const offset = (s === 0 ? -1 : 1) * (spline.roadWidth * 0.24);
-          const right = new THREE.Vector3(1, 0, 0).applyQuaternion(p.quat);
+        // Twin vertical concrete columns terminating strictly UNDER the banked underside of the viaduct deck
+        const sides: [number, number][] = [
+          [-colOffset, p.leftColTopY],
+          [colOffset, p.rightColTopY],
+        ];
+        sides.forEach(([offset, topY], s) => {
+          const colH = Math.max(1, topY - floorY);
           dummy.position
-            .set(p.pos.x, p.pos.y - 3.2 - p.h * 0.5, p.pos.z)
-            .addScaledVector(right, offset);
-          dummy.quaternion.copy(p.quat);
-          dummy.scale.set(1, p.h, 1);
+            .set(
+              p.pos.x + p.right.x * offset - p.up.x * 4.35,
+              floorY + colH * 0.5,
+              p.pos.z + p.right.z * offset - p.up.z * 4.35
+            );
+          dummy.quaternion.copy(p.flatQuat);
+          dummy.scale.set(1, colH, 1);
           dummy.updateMatrix();
           colInst.setMatrixAt(idx * 2 + s, dummy.matrix);
-        }
+        });
 
-        // Top concrete T-cap crossbeam
-        dummy.position.set(p.pos.x, p.pos.y - 3.2, p.pos.z);
-        dummy.quaternion.copy(p.quat);
+        // Bank-aligned concrete T-cap crossbeam tucked cleanly beneath the 3.2m box-girder deck (-4.35m along road up!)
+        dummy.position.copy(p.pos).addScaledVector(p.up, -4.35);
+        dummy.quaternion.copy(p.bankQuat);
         dummy.scale.set(1, 1, 1);
         dummy.updateMatrix();
         capInst.setMatrixAt(idx, dummy.matrix);
@@ -521,8 +547,8 @@ function buildRealisticMountainPass(
   const centerX = (minX + maxX) * 0.5;
   const centerZ = (minZ + maxZ) * 0.5;
 
-  const segX = 96;
-  const segZ = 96;
+  const segX = 128;
+  const segZ = 128;
   const terrainGeo = new THREE.PlaneGeometry(widthX, depthZ, segX, segZ);
   terrainGeo.rotateX(-Math.PI / 2);
 
@@ -534,10 +560,16 @@ function buildRealisticMountainPass(
     return (n1 + n2 + n3) * 0.5 + 0.5; // ~0..1
   };
 
-  // Pre-downsample spline points for super-fast terrain clearance carving
-  const coarsePts: THREE.Vector3[] = [];
-  for (let i = 0; i < spline.sampleCount; i += 6) {
-    coarsePts.push(spline.samples[i].pos);
+  // Pre-downsample spline samples (including banking!) for accurate roadbed carving beneath banked hairpins
+  const coarseSamples: { x: number; y: number; z: number; bankDrop: number }[] = [];
+  for (let i = 0; i < spline.sampleCount; i += 4) {
+    const s = spline.samples[i];
+    coarseSamples.push({
+      x: s.pos.x,
+      y: s.pos.y,
+      z: s.pos.z,
+      bankDrop: spline.halfWidth * Math.sin(Math.abs(s.bank)),
+    });
   }
 
   const posAttr = terrainGeo.attributes.position as THREE.BufferAttribute;
@@ -548,17 +580,19 @@ function buildRealisticMountainPass(
     const vx = posAttr.getX(i) + centerX;
     const vz = posAttr.getZ(i) + centerZ;
 
-    // Find nearest road sample to carve a clean natural mountain roadbed beneath the highway
+    // Find nearest road sample to carve a clean natural mountain roadbed beneath even 34° banked hairpins
     let minD2 = Infinity;
     let nearestY = floorY;
-    for (let k = 0; k < coarsePts.length; k++) {
-      const p = coarsePts[k];
+    let nearestBankDrop = 0;
+    for (let k = 0; k < coarseSamples.length; k++) {
+      const p = coarseSamples[k];
       const dx = vx - p.x;
       const dz = vz - p.z;
       const d2 = dx * dx + dz * dz;
       if (d2 < minD2) {
         minD2 = d2;
         nearestY = p.y;
+        nearestBankDrop = p.bankDrop;
       }
     }
     const dist = Math.sqrt(minD2);
@@ -567,10 +601,10 @@ function buildRealisticMountainPass(
     const ridgeNoise = fbm(vx, vz);
     const rawMountainY = floorY - 4 + ridgeNoise * 165 + Math.max(0, (dist - 120) * 0.22);
 
-    // Carve smooth embankment directly under & beside the highway (always >= 4.5m below road deck!)
-    const roadClearance = spline.halfWidth + 14;
-    const blend = smoothstep(roadClearance, roadClearance + 78, dist);
-    const carvedY = nearestY - 5.2;
+    // Carve generously below the lowest edge of the banked viaduct deck (NEVER pokes through asphalt!)
+    const roadClearance = spline.halfWidth + 26;
+    const blend = smoothstep(roadClearance, roadClearance + 82, dist);
+    const carvedY = nearestY - nearestBankDrop - 8.5;
     const finalY = carvedY * (1 - blend) + rawMountainY * blend;
 
     posAttr.setXYZ(i, vx, finalY, vz);
@@ -626,7 +660,7 @@ function buildRealisticMountainPass(
     const tx = sample.pos.x + sample.flatRight.x * side * offset + (rand() - 0.5) * 14;
     const tz = sample.pos.z + sample.flatRight.z * side * offset + (rand() - 0.5) * 14;
 
-    if (spline.minHorizontalDistanceToTrack(tx, tz) < spline.halfWidth + 6.5) continue;
+    if (spline.minHorizontalDistanceToTrack(tx, tz) < spline.halfWidth + 9.5) continue;
     // Place naturally along embankment height
     const ty = sample.pos.y - 4.5 + (rand() - 0.35) * 6;
     trees.push({ x: tx, y: Math.max(floorY, ty), z: tz, s: 0.85 + rand() * 1.1 });
@@ -766,9 +800,9 @@ function buildRealisticSubterraneanCavern(
   });
   group.add(monoInst, stripInst);
 
-  // Giant spinning industrial ventilation turbines framing cavern transitions
-  const ringGeo = new THREE.TorusGeometry(28, 1.2, 10, 32);
-  const bladeGeo = new THREE.BoxGeometry(52, 2.2, 0.5);
+  // Giant spinning industrial ventilation turbines mounted cleanly HIGH overhead in the cavern
+  const ringGeo = new THREE.TorusGeometry(21, 1.1, 10, 32);
+  const bladeGeo = new THREE.BoxGeometry(38, 2.0, 0.5);
   const steelMat = new THREE.MeshStandardMaterial({
     color: 0x475569,
     metalness: 0.8,
@@ -779,7 +813,7 @@ function buildRealisticSubterraneanCavern(
   for (const t of [0.30, 0.72]) {
     const f = spline.getFrameAtDistance(t * spline.totalLength);
     const hub = new THREE.Group();
-    hub.position.copy(f.pos).addScaledVector(f.up, 28);
+    hub.position.copy(f.pos).addScaledVector(f.up, 44);
     const basis = new THREE.Matrix4().makeBasis(f.right, f.up, f.tangent.clone().negate());
     hub.quaternion.setFromRotationMatrix(basis);
 

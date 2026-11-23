@@ -77,14 +77,14 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     boostPads: [
       { t: 0.045, d: 0, length: 30, width: 7.5 },
       { t: 0.145, d: 0, length: 28, width: 7.2 },
-      { t: 0.275, d: 0, length: 30, width: 7.5 },
+      { t: 0.292, d: 0, length: 30, width: 7.5 },
       { t: 0.495, d: -3.0, length: 28, width: 7 },
       { t: 0.725, d: 3.0, length: 30, width: 7.2 },
       { t: 0.935, d: 0, length: 32, width: 8 },
     ],
     jumpRamps: [
       { tStart: 0.258, tEnd: 0.276, height: 3.8, widthRatio: 0.64 },
-      { tStart: 0.922, tEnd: 0.938, height: 3.6, widthRatio: 0.62 },
+      { tStart: 0.865, tEnd: 0.883, height: 3.6, widthRatio: 0.62 },
     ],
     tunnelZones: [{ tStart: 0.905, tEnd: 0.968 }],
     coneClusters: [
@@ -314,10 +314,10 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     ),
     boostPads: [
       { t: 0.04, d: 0, length: 30, width: 7.2 },
-      { t: 0.155, d: 0, length: 28, width: 6.8 },
+      { t: 0.175, d: 0, length: 28, width: 6.8 },
       { t: 0.395, d: 0, length: 28, width: 6.8 },
       { t: 0.56, d: 0, length: 28, width: 6.8 },
-      { t: 0.945, d: 0, length: 30, width: 7.2 },
+      { t: 0.958, d: 0, length: 30, width: 7.2 },
     ],
     jumpRamps: [
       { tStart: 0.145, tEnd: 0.162, height: 3.4, widthRatio: 0.62 },

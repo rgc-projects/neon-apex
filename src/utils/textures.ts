@@ -267,17 +267,28 @@ export function createRampTexture(): THREE.CanvasTexture {
     ctx.fillRect(234, y + 24, 22, 24);
   }
 
-  // Recessed amber runway launch arrows
-  for (let i = 0; i < 4; i++) {
-    const baseY = 476 - i * 114;
-    ctx.strokeStyle = i === 3 ? '#fef08a' : '#f59e0b';
-    ctx.lineWidth = 14;
+  // Bright motorsport stunt launch chevrons + clear "JUMP" deck marking so ramps are unmistakably jumpable!
+  for (let i = 0; i < 3; i++) {
+    const baseY = 468 - i * 118;
+    ctx.save();
+    ctx.shadowColor = '#38bdf8';
+    ctx.shadowBlur = 14;
+    ctx.strokeStyle = i === 2 ? '#e0f2fe' : '#38bdf8';
+    ctx.lineWidth = 16;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(50, baseY);
-    ctx.lineTo(128, baseY - 56);
-    ctx.lineTo(206, baseY);
+    ctx.moveTo(48, baseY);
+    ctx.lineTo(128, baseY - 58);
+    ctx.lineTo(208, baseY);
     ctx.stroke();
+    ctx.restore();
   }
+
+  ctx.fillStyle = '#fde047';
+  ctx.font = '900 44px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('JUMP', 128, 76);
 
   ctx.fillStyle = '#fef08a';
   ctx.fillRect(0, 0, 256, 14);
