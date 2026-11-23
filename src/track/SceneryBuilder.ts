@@ -218,7 +218,7 @@ function buildRealisticConcreteTunnel(
   const radius = spline.halfWidth + 2.4;
   const outerR = radius + 1.8;
   const shape = new THREE.Shape();
-  const segs = 14;
+  const segs = 22;
 
   for (let s = 0; s <= segs; s++) {
     const a = -0.05 + (s / segs) * (Math.PI + 0.1);
@@ -641,10 +641,10 @@ function buildRealisticMountainPass(
   disposables.push(terrainTex, terrainGeo, terrainMat);
 
   // 2. 520 Dense Japanese Cedar / Pine Trees lining the Mountain Pass (InstancedMesh!)
-  const trunkGeo = new THREE.CylinderGeometry(0.32, 0.55, 4.5, 6);
-  const foliageGeo1 = new THREE.ConeGeometry(3.4, 8.0, 7);
-  const foliageGeo2 = new THREE.ConeGeometry(2.6, 7.0, 7);
-  const foliageGeo3 = new THREE.ConeGeometry(1.7, 5.5, 7);
+  const trunkGeo = new THREE.CylinderGeometry(0.32, 0.55, 4.5, 8);
+  const foliageGeo1 = new THREE.ConeGeometry(3.4, 8.0, 12);
+  const foliageGeo2 = new THREE.ConeGeometry(2.6, 7.0, 12);
+  const foliageGeo3 = new THREE.ConeGeometry(1.7, 5.5, 12);
 
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2b1e16, roughness: 0.95, envMapIntensity: 0.2 });
   const pineMatDark = new THREE.MeshStandardMaterial({ color: 0x0b2219, roughness: 0.92, envMapIntensity: 0.22 });

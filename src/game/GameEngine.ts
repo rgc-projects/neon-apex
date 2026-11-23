@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 
 import { AI_PROFILES, CAR_SPECS } from '../config/cars';
 import { TRACK_CONFIGS } from '../config/tracks';
@@ -100,34 +101,56 @@ export class GameEngine {
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     const speedCanvas = document.getElementById('speedlines-canvas') as HTMLCanvasElement;
 
+    const initW = Math.round(window.visualViewport?.width ?? window.innerWidth);
+    const initH = Math.round(window.visualViewport?.height ?? window.innerHeight);
     const isMobile =
       window.matchMedia?.('(pointer: coarse)').matches ||
-      Math.min(window.innerWidth, window.innerHeight) <= 720;
+      Math.min(initW, initH) <= 720;
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: !isMobile,
+      antialias: true,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.75));
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.75 : 2.0);
+    this.renderer.setPixelRatio(dpr);
+    this.renderer.setSize(initW, initH);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
 
-    this.cameraController = new CameraController(window.innerWidth / window.innerHeight);
+    this.cameraController = new CameraController(initW / Math.max(initH, 1));
 
-    // Post-Processing: Render -> Optical Cinema UnrealBloomPass (subtle realistic highlights) -> OutputPass
-    this.composer = new EffectComposer(this.renderer);
+    // Hardware WebGL2 4x MSAA Multisampled HDR RenderTarget + Optical Bloom + OutputPass + SMAA!
+    // Fixes EffectComposer's default 0-sample FBO that previously disabled all hardware anti-aliasing!
+    const maxSamples = this.renderer.capabilities.maxSamples || 0;
+    const msaaSamples = this.renderer.capabilities.isWebGL2 ? Math.min(maxSamples, 4) : 0;
+    const renderTarget = new THREE.WebGLRenderTarget(
+      Math.max(1, Math.floor(initW * dpr)),
+      Math.max(1, Math.floor(initH * dpr)),
+      {
+        type: THREE.HalfFloatType,
+        samples: msaaSamples,
+      }
+    );
+
+    this.composer = new EffectComposer(this.renderer, renderTarget);
+    this.composer.setPixelRatio(dpr);
+    this.composer.setSize(initW, initH);
     this.composer.addPass(new RenderPass(this.scene, this.cameraController.camera));
+
     const bloomScale = isMobile ? 0.5 : 1.0;
     this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth * bloomScale, window.innerHeight * bloomScale),
+      new THREE.Vector2(initW * bloomScale, initH * bloomScale),
       0.26, // strength - authentic camera lens bloom on headlights, taillights & streetlamps
       0.34, // radius
       0.90  // threshold - preserves crisp daylight/dusk speculars without neon haze
     );
     this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
+
+    // Post-tonemap SMAA pass removes remaining specular/clearcoat & high-contrast line aliasing
+    const smaaPass = new SMAAPass(Math.floor(initW * dpr), Math.floor(initH * dpr));
+    this.composer.addPass(smaaPass);
 
     // Procedural Realistic Twilight + Streetlamp HDR Reflection Probe
     this.scene.environment = createProceduralEnvMap(this.renderer);
@@ -597,8 +620,10 @@ export class GameEngine {
     const h = Math.round(window.visualViewport?.height ?? window.innerHeight);
     const isMobile =
       window.matchMedia?.('(pointer: coarse)').matches || Math.min(w, h) <= 720;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.75));
+    const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.75 : 2.0);
+    this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h);
+    this.composer.setPixelRatio(dpr);
     this.composer.setSize(w, h);
     const bloomScale = isMobile ? 0.5 : 1.0;
     this.bloomPass.setSize(w * bloomScale, h * bloomScale);

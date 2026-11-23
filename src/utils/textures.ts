@@ -181,6 +181,7 @@ export function createConcreteTexture(): THREE.CanvasTexture {
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
   return tex;
 }
 
@@ -199,6 +200,7 @@ export function createCurbTexture(): THREE.CanvasTexture {
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
   return tex;
 }
 
@@ -238,6 +240,7 @@ export function createBoostPadTexture(): THREE.CanvasTexture {
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
   return tex;
 }
 
@@ -297,6 +300,7 @@ export function createRampTexture(): THREE.CanvasTexture {
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
   return tex;
 }
 
@@ -558,11 +562,13 @@ export function createBuildingPBRTextures(): {
   map.wrapS = THREE.RepeatWrapping;
   map.wrapT = THREE.RepeatWrapping;
   map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
 
   const emissiveMap = new THREE.CanvasTexture(emissC);
   emissiveMap.wrapS = THREE.RepeatWrapping;
   emissiveMap.wrapT = THREE.RepeatWrapping;
   emissiveMap.colorSpace = THREE.SRGBColorSpace;
+  emissiveMap.anisotropy = 8;
 
   return { map, emissiveMap };
 }

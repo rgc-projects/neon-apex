@@ -23,9 +23,9 @@ export class DestructibleProps {
     const cfg = spline.config;
 
     const baseGeo = new THREE.BoxGeometry(0.84, 0.12, 0.84);
-    const coneGeo = new THREE.ConeGeometry(0.32, 1.18, 12);
-    const bandLowGeo = new THREE.CylinderGeometry(0.185, 0.24, 0.18, 12, 1, true);
-    const bandHighGeo = new THREE.CylinderGeometry(0.115, 0.155, 0.14, 12, 1, true);
+    const coneGeo = new THREE.ConeGeometry(0.32, 1.18, 18);
+    const bandLowGeo = new THREE.CylinderGeometry(0.185, 0.24, 0.18, 18, 1, true);
+    const bandHighGeo = new THREE.CylinderGeometry(0.115, 0.155, 0.14, 18, 1, true);
 
     const rubberBaseMat = new THREE.MeshStandardMaterial({
       color: 0x181b21,
