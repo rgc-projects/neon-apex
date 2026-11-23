@@ -1,0 +1,25 @@
+{
+  "name": "neon-apex",
+  "version": "1.0.0",
+  "description": "NEON APEX — 3D Cyber Arcade Racing Game built with Three.js, WebGL Bloom, Web Audio Synthwave Engine, and Cloudflare Workers Static Assets",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "cf:dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:dry": "npm run build && wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.3",
+    "wrangler": "^4.0.0"
+  },
+  "license": "MIT"
+}
