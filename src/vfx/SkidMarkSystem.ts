@@ -38,7 +38,7 @@ export class SkidMarkSystem {
     this.mat = new THREE.MeshBasicMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.64,
       side: THREE.DoubleSide,
       depthWrite: false,
       polygonOffset: true,
@@ -66,8 +66,8 @@ export class SkidMarkSystem {
     const pL = this.prevLeft.get(racerId);
     const pR = this.prevRight.get(racerId);
 
-    // Subtle dark scorched rubber tinted with heated neon glow at high drift tiers
-    const tint = driftTier === 3 ? 0x6b146e : driftTier === 2 ? 0x5c360b : driftTier === 1 ? 0x0a3e4d : 0x090b14;
+    // Realistic scorched black rubber tracks on damp asphalt (warmer rubber edge at deep slip)
+    const tint = driftTier === 3 ? 0x1d1614 : driftTier === 2 ? 0x161312 : 0x0b0d12;
     this._col.setHex(tint);
 
     if (pL && pR) {

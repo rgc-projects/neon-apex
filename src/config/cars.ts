@@ -4,21 +4,21 @@ export const CAR_SPECS: CarSpec[] = [
   {
     id: 'apex-v12',
     name: 'APEX-V12',
-    subtitle: 'NEON INTERCEPTOR',
+    subtitle: 'GT3 CORSA',
     archetype: 'BALANCED',
     archetypeZh: '均衡型',
-    description: '全能未来旗舰超跑，兼顾高速稳定性、精准转向与流畅漂移手感。',
-    primaryColor: 0x1e56a8,
-    secondaryColor: 0x2c72d4,
-    neonColor: 0x00f2ff,
-    neonHex: '#00f2ff',
-    primaryHex: '#1a437e',
+    description: '全能 GT3 赛车调校，兼顾高速直道下压力、精准转向与流畅可控的漂移平衡。',
+    primaryColor: 0xb91c1c, // Realistic Rosso Corsa Metallic Ferrari Red
+    secondaryColor: 0x7f1d1d,
+    neonColor: 0x38bdf8,
+    neonHex: '#38bdf8',
+    primaryHex: '#b91c1c',
     bodyStyle: 'interceptor',
-    maxSpeed: 100,        // ~360 km/h base, ~445 km/h super nitro
+    maxSpeed: 100,
     acceleration: 52,
     handling: 1.04,
-    driftControl: 1.05,
-    driftChargeRate: 1.05,
+    driftControl: 1.06,
+    driftChargeRate: 1.06,
     nitroPower: 1.05,
     nitroCapacity: 1.05,
     stats: {
@@ -31,21 +31,21 @@ export const CAR_SPECS: CarSpec[] = [
   {
     id: 'phantom-x',
     name: 'PHANTOM-X',
-    subtitle: 'HYPER VELOCITY GT',
+    subtitle: 'LE MANS SPEC',
     archetype: 'TOP SPEED',
     archetypeZh: '极速型',
-    description: '低风阻长尾极速猛兽，拥有全场最高极速与狂暴的超级氮气推进力。',
-    primaryColor: 0x991b6e,
-    secondaryColor: 0xc2278e,
-    neonColor: 0xff2a9d,
-    neonHex: '#ff2a9d',
-    primaryHex: '#5c146e',
+    description: '低风阻耐力赛极速猛兽，拥有全场最高极速与狂暴的涡轮氮气推进力。',
+    primaryColor: 0x1d4ed8, // Deep Metallic Sapphire Racing Blue
+    secondaryColor: 0x1e3a8a,
+    neonColor: 0x60a5fa,
+    neonHex: '#60a5fa',
+    primaryHex: '#1d4ed8',
     bodyStyle: 'phantom',
-    maxSpeed: 107,        // ~385 km/h base, ~478 km/h super nitro
+    maxSpeed: 107,
     acceleration: 48,
-    handling: 0.94,
-    driftControl: 0.92,
-    driftChargeRate: 0.96,
+    handling: 0.96,
+    driftControl: 0.94,
+    driftChargeRate: 0.98,
     nitroPower: 1.18,
     nitroCapacity: 1.12,
     stats: {
@@ -58,17 +58,17 @@ export const CAR_SPECS: CarSpec[] = [
   {
     id: 'drift-k',
     name: 'KATANA-RS',
-    subtitle: 'CYBER DRIFT SPEC',
+    subtitle: 'TOUGE DRIFT GT',
     archetype: 'DRIFT MASTER',
     archetypeZh: '漂移型',
-    description: '轻量化弯道大师，极致响应的甩尾操控与闪电般极速漂移集气能力。',
-    primaryColor: 0xb3680a,
-    secondaryColor: 0xd98214,
-    neonColor: 0xffb800,
-    neonHex: '#ffb800',
-    primaryHex: '#7c4a0a',
+    description: '轻量化山道漂移战车，超大鹅颈尾翼配极速甩尾响应与闪电集气能力。',
+    primaryColor: 0xd97706, // Metallic Giallo Modena / Solar Amber Gold
+    secondaryColor: 0x92400e,
+    neonColor: 0xfbbf24,
+    neonHex: '#fbbf24',
+    primaryHex: '#d97706',
     bodyStyle: 'katana',
-    maxSpeed: 96,         // ~345 km/h base, super fast out of corners with constant boost!
+    maxSpeed: 96,
     acceleration: 56,
     handling: 1.16,
     driftControl: 1.24,
@@ -90,18 +90,18 @@ export interface AIRacerProfile {
   overridePrimary: number;
   overrideNeon: number;
   overrideNeonHex: string;
-  skill: number;        // 0.90..1.04
-  aggression: number;   // 0..1
-  preferredLine: number;// -0.45..0.45 fraction of half-width
+  skill: number;
+  aggression: number;
+  preferredLine: number;
 }
 
 export const AI_PROFILES: AIRacerProfile[] = [
   {
     name: 'VEX-01',
     carSpecIndex: 1,
-    overridePrimary: 0x260818,
-    overrideNeon: 0xff2e63,
-    overrideNeonHex: '#ff2e63',
+    overridePrimary: 0xe2e8f0, // Metallic Pearl Silver
+    overrideNeon: 0x38bdf8,
+    overrideNeonHex: '#38bdf8',
     skill: 1.02,
     aggression: 0.85,
     preferredLine: -0.22,
@@ -109,9 +109,9 @@ export const AI_PROFILES: AIRacerProfile[] = [
   {
     name: 'KIRA-9',
     carSpecIndex: 2,
-    overridePrimary: 0x05211c,
-    overrideNeon: 0x00ffaa,
-    overrideNeonHex: '#00ffaa',
+    overridePrimary: 0x065f46, // British Racing Metallic Emerald
+    overrideNeon: 0x10b981,
+    overrideNeonHex: '#10b981',
     skill: 0.99,
     aggression: 0.72,
     preferredLine: 0.25,
@@ -119,9 +119,9 @@ export const AI_PROFILES: AIRacerProfile[] = [
   {
     name: 'NOVA-X',
     carSpecIndex: 0,
-    overridePrimary: 0x130a2e,
-    overrideNeon: 0xa855f7,
-    overrideNeonHex: '#a855f7',
+    overridePrimary: 0x334155, // Gunmetal Titanium Grey
+    overrideNeon: 0xf43f5e,
+    overrideNeonHex: '#f43f5e',
     skill: 0.96,
     aggression: 0.65,
     preferredLine: -0.1,
@@ -129,9 +129,9 @@ export const AI_PROFILES: AIRacerProfile[] = [
   {
     name: 'SOLAR',
     carSpecIndex: 2,
-    overridePrimary: 0x261505,
-    overrideNeon: 0xff7b00,
-    overrideNeonHex: '#ff7b00',
+    overridePrimary: 0xc2410c, // Burnt Copper Metallic Orange
+    overrideNeon: 0xf97316,
+    overrideNeonHex: '#f97316',
     skill: 0.93,
     aggression: 0.78,
     preferredLine: 0.14,
@@ -139,9 +139,9 @@ export const AI_PROFILES: AIRacerProfile[] = [
   {
     name: 'ZERO-K',
     carSpecIndex: 1,
-    overridePrimary: 0x091a2e,
-    overrideNeon: 0x38bdf8,
-    overrideNeonHex: '#38bdf8',
+    overridePrimary: 0x1e293b, // Stealth Obsidian Carbon
+    overrideNeon: 0x60a5fa,
+    overrideNeonHex: '#60a5fa',
     skill: 0.90,
     aggression: 0.55,
     preferredLine: 0.0,

@@ -31,6 +31,10 @@ export class HUD {
   private readonly startRpmFill = document.getElementById('start-rpm-fill')!;
 
   private readonly wrongWayEl = document.getElementById('wrong-way-alert')!;
+  private readonly cornerCalloutEl = document.getElementById('corner-callout')!;
+  private readonly cornerArrowEl = document.getElementById('corner-arrow')!;
+  private readonly cornerTypeEl = document.getElementById('corner-type')!;
+  private readonly cornerDistEl = document.getElementById('corner-dist')!;
   private readonly slipstreamEl = document.getElementById('slipstream-indicator')!;
   private readonly calloutStack = document.getElementById('callout-stack')!;
 
@@ -151,21 +155,43 @@ export class HUD {
       this.nitroStatus.textContent = 'DRIFT TO CHARGE';
     }
 
-    // Live Drift Charge HUD (also displays active road banking angle on tilted corners!)
+    // Live Drift Charge HUD (shows live slip angle + road banking angle!)
     if (telemetry.isDrifting) {
       this.driftHud.classList.remove('hidden');
-      const bankTag = telemetry.bankAngleDeg >= 14 ? ` · BANK ${telemetry.bankAngleDeg}°` : '';
+      const bankTag = telemetry.bankAngleDeg >= 12 ? ` · BANK ${telemetry.bankAngleDeg}°` : '';
+      const angleTag = telemetry.driftAngleDeg >= 10 ? ` ${telemetry.driftAngleDeg}°` : '';
       this.driftMeters.textContent = `${telemetry.driftDistance}m${bankTag}`;
       this.driftFill.style.width = `${Math.round(telemetry.driftChargeNorm * 100)}%`;
 
-      const labels = ['DRIFTING...', 'MINI BOOST READY', 'SUPER DRIFT READY!', '★ ULTRA DRIFT ★'];
+      const labels = ['DRIFTING', 'MINI BOOST', 'SUPER DRIFT!', '★ ULTRA DRIFT ★'];
       const cols = ['#7dd3fc', '#00f2ff', '#ffb800', '#ff2aff'];
-      this.driftLabel.textContent = labels[telemetry.driftTier];
+      this.driftLabel.textContent = `${labels[telemetry.driftTier]}${angleTag}`;
       this.driftLabel.style.color = cols[telemetry.driftTier];
       this.driftFill.style.background = cols[telemetry.driftTier];
       this.driftFill.style.boxShadow = `0 0 14px ${cols[telemetry.driftTier]}`;
     } else {
       this.driftHud.classList.add('hidden');
+    }
+
+    // Upcoming Sharp Corner Telegraph Callout (like Forza / DiRT / GT)
+    const uc = telemetry.upcomingCorner;
+    if (uc && !telemetry.isWrongWay && telemetry.speedKmh > 90) {
+      this.cornerCalloutEl.classList.remove('hidden');
+      this.cornerCalloutEl.classList.toggle('hairpin', uc.isHairpin);
+      this.cornerCalloutEl.classList.toggle('urgent', uc.distanceMeters <= 75);
+      this.cornerArrowEl.textContent = uc.isHairpin
+        ? uc.direction > 0
+          ? '↷'
+          : '↶'
+        : uc.direction > 0
+          ? '↱'
+          : '↰';
+      const dirTxt = uc.direction > 0 ? '右弯' : '左弯';
+      const bankTxt = uc.bankDeg >= 18 ? ` · 倾角 ${uc.bankDeg}°` : '';
+      this.cornerTypeEl.textContent = uc.isHairpin ? `U型发卡${dirTxt}${bankTxt}` : `90° ${dirTxt}${bankTxt}`;
+      this.cornerDistEl.textContent = `${uc.distanceMeters}m · DRIFT`;
+    } else {
+      this.cornerCalloutEl.classList.add('hidden');
     }
 
     // Alerts

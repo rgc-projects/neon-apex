@@ -22,48 +22,65 @@ export class DestructibleProps {
   constructor(spline: TrackSpline) {
     const cfg = spline.config;
 
-    const baseGeo = new THREE.BoxGeometry(0.95, 0.16, 0.95);
-    const coneGeo = new THREE.ConeGeometry(0.36, 1.35, 8);
-    const bandGeo = new THREE.CylinderGeometry(0.18, 0.27, 0.28, 8);
+    const baseGeo = new THREE.BoxGeometry(0.84, 0.12, 0.84);
+    const coneGeo = new THREE.ConeGeometry(0.32, 1.18, 12);
+    const bandLowGeo = new THREE.CylinderGeometry(0.185, 0.24, 0.18, 12, 1, true);
+    const bandHighGeo = new THREE.CylinderGeometry(0.115, 0.155, 0.14, 12, 1, true);
 
-    const darkMat = new THREE.MeshStandardMaterial({
-      color: 0x16192c,
-      metalness: 0.7,
-      roughness: 0.35,
+    const rubberBaseMat = new THREE.MeshStandardMaterial({
+      color: 0x181b21,
+      metalness: 0.08,
+      roughness: 0.88,
     });
-    const neonMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(0xff7700).multiplyScalar(2.1),
-      toneMapped: false,
+    const trafficOrangeMat = new THREE.MeshStandardMaterial({
+      color: 0xf95715,
+      emissive: 0x451203,
+      emissiveIntensity: 0.45,
+      metalness: 0.06,
+      roughness: 0.42,
     });
-    const cyanBandMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(0x00f2ff).multiplyScalar(1.9),
-      toneMapped: false,
+    const reflectiveBandMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc,
+      emissive: 0xdce7f5,
+      emissiveIntensity: 0.65,
+      metalness: 0.25,
+      roughness: 0.22,
     });
 
-    this.disposables.push(baseGeo, coneGeo, bandGeo, darkMat, neonMat, cyanBandMat);
+    this.disposables.push(
+      baseGeo,
+      coneGeo,
+      bandLowGeo,
+      bandHighGeo,
+      rubberBaseMat,
+      trafficOrangeMat,
+      reflectiveBandMat
+    );
 
     const basis = new THREE.Matrix4();
 
     for (const cluster of cfg.coneClusters) {
       const baseS = cluster.t * spline.totalLength;
-      const d = cluster.side * (spline.halfWidth - 2.35);
+      const d = cluster.side * (spline.halfWidth - 2.45);
 
       for (let i = 0; i < cluster.count; i++) {
-        const s = (baseS + i * 5.2) % spline.totalLength;
+        const s = (baseS + i * 6.2) % spline.totalLength;
         const f = spline.getFrameAtDistance(s);
         const homePos = f.pos.clone().addScaledVector(f.right, d);
         basis.makeBasis(f.right, f.up, f.tangent.clone().negate());
         const homeQuat = new THREE.Quaternion().setFromRotationMatrix(basis);
 
         const coneGroup = new THREE.Group();
-        const base = new THREE.Mesh(baseGeo, darkMat);
-        base.position.y = 0.08;
-        const body = new THREE.Mesh(coneGeo, neonMat);
-        body.position.y = 0.78;
-        const band = new THREE.Mesh(bandGeo, cyanBandMat);
-        band.position.y = 0.76;
+        const base = new THREE.Mesh(baseGeo, rubberBaseMat);
+        base.position.y = 0.06;
+        const body = new THREE.Mesh(coneGeo, trafficOrangeMat);
+        body.position.y = 0.66;
+        const bandLow = new THREE.Mesh(bandLowGeo, reflectiveBandMat);
+        bandLow.position.y = 0.56;
+        const bandHigh = new THREE.Mesh(bandHighGeo, reflectiveBandMat);
+        bandHigh.position.y = 0.84;
 
-        coneGroup.add(base, body, band);
+        coneGroup.add(base, body, bandLow, bandHigh);
         coneGroup.position.copy(homePos);
         coneGroup.quaternion.copy(homeQuat);
         this.group.add(coneGroup);

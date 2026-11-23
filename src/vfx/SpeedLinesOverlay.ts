@@ -79,31 +79,33 @@ export class SpeedLinesOverlay {
       ctx.fillRect(0, 0, this.w, this.h);
     }
 
-    const activeCount = Math.floor(18 + intensity * 44);
+    const activeCount = Math.floor(12 + intensity * 28);
     ctx.lineCap = 'round';
 
     for (let i = 0; i < Math.min(activeCount, this.streaks.length); i++) {
       const s = this.streaks[i];
-      s.dist += s.speed * (0.9 + intensity * 1.8) * dt;
+      s.dist += s.speed * (0.9 + intensity * 1.65) * dt;
       if (s.dist > 1.25) {
-        s.dist = 0.28 + Math.random() * 0.22;
+        s.dist = 0.52 + Math.random() * 0.24;
         s.angle = Math.random() * Math.PI * 2;
       }
 
-      const r0 = Math.max(0.32, s.dist - s.len * (0.65 + intensity * 0.6)) * maxR;
+      // Keep center 54% of viewport crisp & unobstructed; frame only peripheral edges!
+      const r0 = Math.max(0.54, s.dist - s.len * (0.55 + intensity * 0.45)) * maxR;
       const r1 = s.dist * maxR;
+      if (r1 <= r0 + 2) continue;
       const cos = Math.cos(s.angle);
       const sin = Math.sin(s.angle);
 
-      const alpha = clamp(intensity * 0.55 * (1 - Math.abs(s.dist - 0.8) * 0.6), 0.04, 0.65);
+      const alpha = clamp(intensity * 0.36 * (1 - Math.abs(s.dist - 0.85) * 0.6), 0.03, 0.42);
       if (isSuperNitro && i % 2 === 0) {
-        ctx.strokeStyle = `rgba(255, 70, 230, ${alpha})`;
+        ctx.strokeStyle = `rgba(147, 197, 253, ${alpha})`;
       } else if (isNitro && i % 2 === 0) {
-        ctx.strokeStyle = `rgba(0, 242, 255, ${alpha})`;
+        ctx.strokeStyle = `rgba(251, 191, 36, ${alpha * 0.88})`;
       } else {
-        ctx.strokeStyle = `rgba(224, 248, 255, ${alpha * 0.85})`;
+        ctx.strokeStyle = `rgba(226, 232, 240, ${alpha * 0.72})`;
       }
-      ctx.lineWidth = s.width * (0.7 + intensity * 0.55);
+      ctx.lineWidth = s.width * (0.55 + intensity * 0.38);
 
       ctx.beginPath();
       ctx.moveTo(cx + cos * r0, cy + sin * r0);

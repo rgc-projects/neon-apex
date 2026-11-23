@@ -82,11 +82,11 @@
       <footer class="menu-footer">
         <div class="quick-keys">
           <span><kbd>W/A/S/D</kbd> 或 <kbd>↑↓←→</kbd> 驾驶</span>
-          <span><kbd>SPACE</kbd> 漂移集气</span>
-          <span><kbd>SHIFT</kbd> 氮气爆发</span>
+          <span><kbd>SPACE</kbd> 或 <kbd>轻点S</kbd> 漂移</span>
+          <span><kbd>SHIFT</kbd> / <kbd>E</kbd> 氮气喷射</span>
           <span><kbd>C</kbd> 视角</span>
           <span><kbd>R</kbd> 复位</span>
-          <span class="credit-note">3D Car: Ferrari 458 (vicent091036, CC BY 4.0) + Cyber GT Aero</span>
+          <span class="credit-note">3D Car: Ferrari 458 (vicent091036, CC BY 4.0) + GT3 Carbon Aero</span>
         </div>
       </footer>
     </div>
@@ -101,14 +101,14 @@
         </div>
         <div class="controls-grid">
           <div class="ctrl-item"><kbd>W / ↑</kbd><div><strong>油门加速</strong><p>倒计时结束瞬间在绿区踩油门触发「完美起步」</p></div></div>
-          <div class="ctrl-item"><kbd>S / ↓</kbd><div><strong>刹车 / 倒车</strong><p>尾灯自动高亮，高速急弯可轻点控速</p></div></div>
-          <div class="ctrl-item"><kbd>A / D / ← / →</kbd><div><strong>精准转向</strong><p>漂移中往弯心打方向可收紧线路并加速集气</p></div></div>
-          <div class="ctrl-item"><kbd>SPACE</kbd><div><strong>街机漂移 (按住)</strong><p>火花升级 蓝→金→紫，松开瞬间触发小喷并狂涨氮气！</p></div></div>
-          <div class="ctrl-item"><kbd>SHIFT</kbd><div><strong>氮气 / 超级氮气</strong><p>氮气≥85% 释放将触发紫色火焰超级氮气爆发</p></div></div>
+          <div class="ctrl-item"><kbd>S / ↓</kbd><div><strong>点刹起漂 / 刹车</strong><p>高速打方向时轻点 S 即可像极品飞车一样丝滑甩尾入弯！</p></div></div>
+          <div class="ctrl-item"><kbd>A / D / ← / →</kbd><div><strong>内切收线 / 反打修正</strong><p>漂移中往弯心打方向收紧走线，反打外侧可稳住大角度横滑</p></div></div>
+          <div class="ctrl-item"><kbd>SPACE</kbd><div><strong>手刹漂移 (按住)</strong><p>结合弯道 150m/100m/50m 路牌提早起漂，松开即享小喷加速！</p></div></div>
+          <div class="ctrl-item"><kbd>SHIFT / E / N</kbd><div><strong>主动氮气喷射（独立按键）</strong><p>与漂移完全分开！氮气≥82% 释放将触发蓝焰超级氮气爆发</p></div></div>
           <div class="ctrl-item"><kbd>C / R / M / ESC</kbd><div><strong>辅助功能</strong><p>C 切换追尾/引擎盖视角 · R 复位 · M 静音 · ESC 暂停</p></div></div>
         </div>
         <div class="pro-tips">
-          <strong>进阶玩法：</strong> 紧跟对手车尾触发 <span>尾流加速 (SLIPSTREAM)</span> · 驶过霓虹箭头触发 <span>地面加速带</span> · 冲上跳台获取 <span>滞空特技加分</span> · 撞飞路边发光路障！<br />
+          <strong>进阶玩法：</strong> 留意屏幕顶部 <span>弯道预警提示</span> 与赛道边 <span>150m/100m/50m</span> 刹车牌，在弯前果断起漂并借倾斜坡度控时长 · 紧跟对手车尾触发 <span>尾流加速</span> · 冲上跳台获取 <span>滞空特技加分</span>！<br />
           <strong>📱 手机触屏操作：</strong> 手机打开自动开启触屏（也可点击顶部 <span>📱</span> 手动切换）；左手滑移转向、右手按住 <span>DRIFT</span> 漂移集气与 <span>NITRO</span> 喷射氮气，默认开启 <span>AUTO GAS 自动油门</span>。
         </div>
       </div>
@@ -170,6 +170,13 @@
       </div>
 
       <div id="wrong-way-alert" class="wrong-way hidden">⚠ WRONG WAY // 逆行警告 (按 R 复位)</div>
+      <div id="corner-callout" class="corner-callout hidden">
+        <span id="corner-arrow" class="corner-arrow">↱</span>
+        <div class="corner-meta">
+          <span id="corner-type" class="corner-type">90° RIGHT</span>
+          <span id="corner-dist" class="corner-dist mono">120m</span>
+        </div>
+      </div>
       <div id="slipstream-indicator" class="slipstream-badge hidden">⚡ SLIPSTREAM BOOST</div>
       <div id="callout-stack" class="callout-stack"></div>
 
@@ -195,10 +202,10 @@
 
       <!-- Bottom Center: Keybind Strip -->
       <div class="hud-keybinds">
-        <span><kbd>SPACE</kbd> DRIFT</span>
-        <span><kbd>SHIFT</kbd> NITRO</span>
-        <span><kbd>C</kbd> CAM</span>
-        <span><kbd>R</kbd> RESET</span>
+        <span><kbd>SPACE</kbd> / <kbd>点刹S</kbd> 漂移</span>
+        <span><kbd>SHIFT</kbd> / <kbd>E</kbd> 氮气喷射</span>
+        <span><kbd>C</kbd> 视角</span>
+        <span><kbd>R</kbd> 复位</span>
       </div>
 
       <!-- Bottom Right: Speedometer + Nitro Gauge -->

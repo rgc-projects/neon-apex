@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { TrackSpline } from './TrackSpline';
 import {
-  createBuildingTexture,
-  createCyberGridTexture,
-  createSkyTexture,
+  createBuildingPBRTextures,
+  createConcreteTexture,
+  createOceanNormalTexture,
+  createRealisticSkyTexture,
 } from '../utils/textures';
-import { createSeededRandom } from '../utils/math';
+import { clamp, createSeededRandom, smoothstep } from '../utils/math';
 
 export interface SceneryBuildResult {
   group: THREE.Group;
@@ -13,15 +14,29 @@ export interface SceneryBuildResult {
   dispose: () => void;
 }
 
+/**
+ * Modern Photorealistic Scenery Builder for all 4 circuits:
+ * - city: Multi-tier architectural glass skyscrapers, concrete viaduct piers & Tokyo Bay dark water
+ * - bridge: Animated normal-mapped golden-dusk ocean, A-frame concrete/steel cable-stayed towers & harbor skyline
+ * - tunnel: Curved concrete arch highway tunnel vault, ceiling linear LEDs & jet ventilation fans
+ * - mountain: Real sculpted 3D FBM terrain ridges, 350+ instanced layered pine trees & vermilion Torii gates
+ */
 export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   const group = new THREE.Group();
   const disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[] = [];
   const cfg = spline.config;
-  const rand = createSeededRandom(cfg.id.length * 9137 + 42);
+  const rand = createSeededRandom(cfg.id.length * 9137 + 109);
 
-  // 1. Procedural Synthwave Sky Dome (follows camera XZ so horizon stays infinitely epic)
-  const skyTex = createSkyTexture(cfg.skyTopHex, cfg.skyMidHex, cfg.skyHorizonHex, cfg.sunColorHex);
-  const skyGeo = new THREE.SphereGeometry(2200, 40, 24);
+  // 1. Photorealistic Atmospheric Sky Dome (natural clouds, twilight scattering & subtle stars)
+  const isDusk = cfg.theme === 'bridge';
+  const skyTex = createRealisticSkyTexture(
+    cfg.skyTopHex,
+    cfg.skyMidHex,
+    cfg.skyHorizonHex,
+    cfg.sunColorHex,
+    isDusk
+  );
+  const skyGeo = new THREE.SphereGeometry(3200, 48, 28);
   const skyMat = new THREE.MeshBasicMaterial({
     map: skyTex,
     side: THREE.BackSide,
@@ -33,97 +48,124 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   group.add(skyDome);
   disposables.push(skyTex, skyGeo, skyMat);
 
-  // 2. Vast Cyber Horizon Grid / Shimmering Neon Ocean Plane
-  const gridColor =
-    cfg.theme === 'bridge'
-      ? '#00e5ff'
-      : cfg.theme === 'tunnel'
-        ? '#9333ea'
-        : cfg.theme === 'mountain'
-          ? '#00ffaa'
-          : '#ff2a9d';
-  const gridBg =
-    cfg.theme === 'bridge'
-      ? '#03122a'
-      : cfg.theme === 'tunnel'
-        ? '#070312'
-        : cfg.theme === 'mountain'
-          ? '#070414'
-          : '#090418';
-  const groundTex = createCyberGridTexture(gridColor, gridBg);
-  const groundGeo = new THREE.PlaneGeometry(5200, 5200);
+  // 2. Base Ground / Realistic Shimmering Ocean Water Plane
+  const oceanNormal = createOceanNormalTexture();
+  disposables.push(oceanNormal);
+
+  const groundGeo = new THREE.PlaneGeometry(7600, 7600);
   groundGeo.rotateX(-Math.PI / 2);
-  const groundMat = new THREE.MeshBasicMaterial({
-    map: groundTex,
-    transparent: true,
-    opacity: cfg.theme === 'bridge' ? 0.92 : 0.72,
-  });
+
+  let groundMat: THREE.MeshStandardMaterial;
+  if (cfg.theme === 'bridge' || cfg.theme === 'city') {
+    groundMat = new THREE.MeshStandardMaterial({
+      color: cfg.theme === 'bridge' ? 0x0b2038 : 0x09101c,
+      normalMap: oceanNormal,
+      normalScale: new THREE.Vector2(cfg.theme === 'bridge' ? 0.85 : 0.45, cfg.theme === 'bridge' ? 0.85 : 0.45),
+      roughness: cfg.theme === 'bridge' ? 0.14 : 0.24,
+      metalness: 0.68,
+      envMapIntensity: cfg.theme === 'bridge' ? 1.85 : 1.15,
+    });
+  } else {
+    groundMat = new THREE.MeshStandardMaterial({
+      color: cfg.theme === 'mountain' ? 0x0c1317 : 0x0b0f17,
+      roughness: 0.92,
+      metalness: 0.05,
+    });
+  }
   const groundPlane = new THREE.Mesh(groundGeo, groundMat);
   groundPlane.position.y =
-    cfg.theme === 'bridge' ? -1.5 : cfg.theme === 'tunnel' ? -46 : cfg.theme === 'mountain' ? -12 : -18;
+    cfg.theme === 'bridge' ? -2 : cfg.theme === 'tunnel' ? -56 : cfg.theme === 'mountain' ? -18 : -22;
   group.add(groundPlane);
-  disposables.push(groundTex, groundGeo, groundMat);
+  disposables.push(groundGeo, groundMat);
 
-  // 3. Track Tunnel Hexagonal Neon Ribs (for all tracks that have tunnelZones!)
+  // 3. Concrete Highway Arch Tunnel Vaults (for tunnel zones!)
   if (cfg.tunnelZones.length > 0) {
-    buildTunnelRibs(spline, group, disposables);
+    buildRealisticConcreteTunnel(spline, group, disposables);
   }
 
-  // 4. Support Pillars under elevated track sections (city, bridge & mountain switchbacks)
+  // 4. Realistic Concrete Viaduct Support Piers with T-Cap Crossbeams
   if (cfg.theme === 'city' || cfg.theme === 'bridge' || cfg.theme === 'mountain') {
-    const pillarPositions: { x: number; yTop: number; z: number; h: number }[] = [];
     const floorY = groundPlane.position.y;
-    for (let i = 0; i < spline.sampleCount; i += 24) {
+    const pierList: { pos: THREE.Vector3; quat: THREE.Quaternion; h: number }[] = [];
+    const basis = new THREE.Matrix4();
+
+    for (let i = 0; i < spline.sampleCount; i += 32) {
       const f = spline.samples[i];
-      const h = f.pos.y - floorY - 2.2;
+      const h = f.pos.y - floorY - 3.0;
       if (h > 4) {
-        pillarPositions.push({ x: f.pos.x, yTop: f.pos.y - 2.2, z: f.pos.z, h });
+        basis.makeBasis(f.flatRight, new THREE.Vector3(0, 1, 0), f.tangent.clone().negate());
+        pierList.push({
+          pos: f.pos.clone(),
+          quat: new THREE.Quaternion().setFromRotationMatrix(basis),
+          h,
+        });
       }
     }
-    if (pillarPositions.length > 0) {
-      const pGeo = new THREE.BoxGeometry(3.2, 1, 3.2);
-      const pMat = new THREE.MeshStandardMaterial({
-        color: 0x0d1428,
-        metalness: 0.8,
-        roughness: 0.35,
+
+    if (pierList.length > 0) {
+      const concreteTex = createConcreteTexture();
+      const pierMat = new THREE.MeshStandardMaterial({
+        map: concreteTex,
+        color: 0x64748b,
+        roughness: 0.84,
+        metalness: 0.1,
       });
-      const pInst = new THREE.InstancedMesh(pGeo, pMat, pillarPositions.length);
+      const colGeo = new THREE.BoxGeometry(3.6, 1, 3.6);
+      const capGeo = new THREE.BoxGeometry(spline.roadWidth * 0.72, 2.2, 4.2);
+      const colInst = new THREE.InstancedMesh(colGeo, pierMat, pierList.length * 2);
+      const capInst = new THREE.InstancedMesh(capGeo, pierMat, pierList.length);
       const dummy = new THREE.Object3D();
-      pillarPositions.forEach((p, idx) => {
-        dummy.position.set(p.x, p.yTop - p.h * 0.5, p.z);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.set(1, p.h, 1);
+
+      pierList.forEach((p, idx) => {
+        // Twin concrete columns
+        for (let s = 0; s < 2; s++) {
+          const offset = (s === 0 ? -1 : 1) * (spline.roadWidth * 0.24);
+          const right = new THREE.Vector3(1, 0, 0).applyQuaternion(p.quat);
+          dummy.position
+            .set(p.pos.x, p.pos.y - 3.2 - p.h * 0.5, p.pos.z)
+            .addScaledVector(right, offset);
+          dummy.quaternion.copy(p.quat);
+          dummy.scale.set(1, p.h, 1);
+          dummy.updateMatrix();
+          colInst.setMatrixAt(idx * 2 + s, dummy.matrix);
+        }
+
+        // Top concrete T-cap crossbeam
+        dummy.position.set(p.pos.x, p.pos.y - 3.2, p.pos.z);
+        dummy.quaternion.copy(p.quat);
+        dummy.scale.set(1, 1, 1);
         dummy.updateMatrix();
-        pInst.setMatrixAt(idx, dummy.matrix);
+        capInst.setMatrixAt(idx, dummy.matrix);
       });
-      group.add(pInst);
-      disposables.push(pGeo, pMat);
+
+      group.add(colInst, capInst);
+      disposables.push(concreteTex, pierMat, colGeo, capGeo);
     }
   }
 
-  // 5. Theme-Specific World Architecture
-  const animatedRings: THREE.Mesh[] = [];
+  // 5. Theme-Specific Photorealistic World Architecture
+  const animatedFans: THREE.Object3D[] = [];
 
   if (cfg.theme === 'city') {
-    buildCyberCity(spline, group, disposables, rand, groundPlane.position.y, animatedRings);
+    buildRealisticCitySkyline(spline, group, disposables, rand, groundPlane.position.y);
   } else if (cfg.theme === 'bridge') {
-    buildSuspensionBridgeScenery(spline, group, disposables, rand, groundPlane.position.y);
+    buildRealisticSuspensionBridge(spline, group, disposables, rand, groundPlane.position.y);
   } else if (cfg.theme === 'mountain') {
-    buildTougeMountainScenery(spline, group, disposables, rand, groundPlane.position.y);
+    buildRealisticMountainPass(spline, group, disposables, rand, groundPlane.position.y);
   } else {
-    buildUndergroundCavernScenery(spline, group, disposables, rand, animatedRings);
+    buildRealisticSubterraneanCavern(spline, group, disposables, rand, animatedFans);
   }
 
   return {
     group,
     update: (dt: number, elapsed: number, camPos: THREE.Vector3) => {
       skyDome.position.set(camPos.x, 0, camPos.z);
-      if (cfg.theme === 'bridge') {
-        groundTex.offset.y += dt * 0.14;
-        groundTex.offset.x = Math.sin(elapsed * 0.4) * 0.12;
+      if (cfg.theme === 'bridge' || cfg.theme === 'city') {
+        oceanNormal.offset.y += dt * 0.08;
+        oceanNormal.offset.x = Math.sin(elapsed * 0.25) * 0.08;
       }
-      for (let i = 0; i < animatedRings.length; i++) {
-        animatedRings[i].rotation.z = elapsed * (i % 2 === 0 ? 0.5 : -0.4);
+      for (const fan of animatedFans) {
+        fan.rotation.z += dt * 7.5;
       }
     },
     dispose: () => {
@@ -132,214 +174,243 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   };
 }
 
-function buildTunnelRibs(
+/** Realistic arched concrete expressway tunnel vault + recessed linear industrial LED ceiling luminaires */
+function buildRealisticConcreteTunnel(
   spline: TrackSpline,
   group: THREE.Group,
   disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[]
 ): void {
-  const cfg = spline.config;
   const ribFrames: number[] = [];
-  const step = 4; // every ~8-10 meters
+  const step = 4; // tight spacing for continuous vaulted tunnel feel
   for (let i = 0; i < spline.sampleCount; i += step) {
-    const t = i / spline.sampleCount;
-    if (spline.isInTunnel(t)) {
+    if (spline.isInTunnel(i / spline.sampleCount)) {
       ribFrames.push(i);
     }
   }
   if (ribFrames.length === 0) return;
 
-  // Hexagonal arch rib geometry spanning across roadWidth
-  const radius = spline.halfWidth + 2.8;
+  const radius = spline.halfWidth + 2.4;
+  const outerR = radius + 1.8;
   const shape = new THREE.Shape();
-  const outerR = radius + 1.6;
-  const innerR = radius;
-  const angles = [-0.08, Math.PI * 0.22, Math.PI * 0.5, Math.PI * 0.78, Math.PI + 0.08];
+  const segs = 14;
 
-  shape.moveTo(Math.cos(angles[0]) * outerR, Math.sin(angles[0]) * outerR);
-  for (let i = 1; i < angles.length; i++) {
-    shape.lineTo(Math.cos(angles[i]) * outerR, Math.sin(angles[i]) * outerR);
+  for (let s = 0; s <= segs; s++) {
+    const a = -0.05 + (s / segs) * (Math.PI + 0.1);
+    const x = Math.cos(a) * outerR;
+    const y = Math.sin(a) * (outerR * 0.72);
+    if (s === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
   }
-  for (let i = angles.length - 1; i >= 0; i--) {
-    shape.lineTo(Math.cos(angles[i]) * innerR, Math.sin(angles[i]) * innerR);
+  for (let s = segs; s >= 0; s--) {
+    const a = -0.05 + (s / segs) * (Math.PI + 0.1);
+    shape.lineTo(Math.cos(a) * radius, Math.sin(a) * (radius * 0.72));
   }
   shape.closePath();
 
-  const ribGeo = new THREE.ExtrudeGeometry(shape, { depth: 1.5, bevelEnabled: false });
-  ribGeo.translate(0, 0, -0.75);
+  const segDepth = (spline.totalLength / spline.sampleCount) * step * 1.08;
+  const archGeo = new THREE.ExtrudeGeometry(shape, { depth: segDepth, bevelEnabled: false });
+  archGeo.translate(0, 0, -segDepth * 0.5);
 
-  const ribMat = new THREE.MeshStandardMaterial({
-    color: 0x0b0a1f,
-    metalness: 0.85,
-    roughness: 0.3,
+  const concreteTex = createConcreteTexture();
+  const archMat = new THREE.MeshStandardMaterial({
+    map: concreteTex,
+    color: 0x3f4754,
+    roughness: 0.76,
+    metalness: 0.12,
   });
 
-  // Inner glowing neon hex ring
-  const glowShape = new THREE.Shape();
-  const gOut = innerR + 0.1;
-  const gIn = innerR - 0.38;
-  glowShape.moveTo(Math.cos(angles[0]) * gOut, Math.sin(angles[0]) * gOut);
-  for (let i = 1; i < angles.length; i++) {
-    glowShape.lineTo(Math.cos(angles[i]) * gOut, Math.sin(angles[i]) * gOut);
-  }
-  for (let i = angles.length - 1; i >= 0; i--) {
-    glowShape.lineTo(Math.cos(angles[i]) * gIn, Math.sin(angles[i]) * gIn);
-  }
-  glowShape.closePath();
-
-  const glowGeo = new THREE.ExtrudeGeometry(glowShape, { depth: 0.45, bevelEnabled: false });
-  glowGeo.translate(0, 0, -0.225);
-
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(cfg.railLeftColor).multiplyScalar(1.25),
+  // Twin industrial overhead white-amber LED roof fixture tubes inside tunnel ceiling
+  const fixtureGeo = new THREE.BoxGeometry(0.45, 0.2, segDepth * 0.62);
+  const fixtureMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xfff1d6).multiplyScalar(1.45),
     toneMapped: false,
   });
 
-  const ribInst = new THREE.InstancedMesh(ribGeo, ribMat, ribFrames.length);
-  const glowInst = new THREE.InstancedMesh(glowGeo, glowMat, ribFrames.length);
+  // Tunnel cylindrical jet ventilation fan housings every 6th segment
+  const fanHousingGeo = new THREE.CylinderGeometry(0.95, 0.95, 2.8, 12);
+  fanHousingGeo.rotateX(Math.PI / 2);
+  const fanMat = new THREE.MeshStandardMaterial({
+    color: 0x334155,
+    metalness: 0.75,
+    roughness: 0.35,
+  });
+
+  const archInst = new THREE.InstancedMesh(archGeo, archMat, ribFrames.length);
+  const fixL = new THREE.InstancedMesh(fixtureGeo, fixtureMat, ribFrames.length);
+  const fixR = new THREE.InstancedMesh(fixtureGeo, fixtureMat, ribFrames.length);
+  const fanInst = new THREE.InstancedMesh(fanHousingGeo, fanMat, Math.ceil(ribFrames.length / 5) + 1);
 
   const dummy = new THREE.Object3D();
   const basisMat = new THREE.Matrix4();
   const q = new THREE.Quaternion();
+  let fanIdx = 0;
 
   ribFrames.forEach((sampleIdx, idx) => {
     const f = spline.samples[sampleIdx];
     basisMat.makeBasis(f.right, f.up, f.tangent.clone().negate());
     q.setFromRotationMatrix(basisMat);
+
     dummy.position.copy(f.pos);
     dummy.quaternion.copy(q);
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
-    ribInst.setMatrixAt(idx, dummy.matrix);
-    glowInst.setMatrixAt(idx, dummy.matrix);
-  });
+    archInst.setMatrixAt(idx, dummy.matrix);
 
-  group.add(ribInst, glowInst);
-  disposables.push(ribGeo, ribMat, glowGeo, glowMat);
+    const ceilH = radius * 0.66;
+    dummy.position.copy(f.pos).addScaledVector(f.right, -5.5).addScaledVector(f.up, ceilH);
+    dummy.updateMatrix();
+    fixL.setMatrixAt(idx, dummy.matrix);
+
+    dummy.position.copy(f.pos).addScaledVector(f.right, 5.5).addScaledVector(f.up, ceilH);
+    dummy.updateMatrix();
+    fixR.setMatrixAt(idx, dummy.matrix);
+
+    if (idx % 5 === 2 && fanIdx < fanInst.count) {
+      dummy.position.copy(f.pos).addScaledVector(f.up, ceilH - 0.6);
+      dummy.updateMatrix();
+      fanInst.setMatrixAt(fanIdx++, dummy.matrix);
+    }
+  });
+  fanInst.count = fanIdx;
+
+  group.add(archInst, fixL, fixR, fanInst);
+  disposables.push(archGeo, concreteTex, archMat, fixtureGeo, fixtureMat, fanHousingGeo, fanMat);
 }
 
-function buildCyberCity(
+/** Realistic Tokyo Bayshore Multi-Tier Glass Skyscraper Skyline */
+function buildRealisticCitySkyline(
   spline: TrackSpline,
   group: THREE.Group,
   disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[],
   rand: () => number,
-  floorY: number,
-  animatedRings: THREE.Mesh[]
+  floorY: number
 ): void {
-  const bldgTex = createBuildingTexture('#00f2ff', '#ff2a9d');
+  const bldgPBR = createBuildingPBRTextures();
   const bldgGeo = new THREE.BoxGeometry(1, 1, 1);
   const bldgMat = new THREE.MeshStandardMaterial({
-    map: bldgTex,
-    emissive: 0x3b1f66,
-    emissiveMap: bldgTex,
-    emissiveIntensity: 0.9,
-    roughness: 0.35,
-    metalness: 0.7,
+    map: bldgPBR.map,
+    emissive: 0xffe4b5,
+    emissiveMap: bldgPBR.emissiveMap,
+    emissiveIntensity: 0.95,
+    roughness: 0.22,
+    metalness: 0.72,
+    envMapIntensity: 1.4,
   });
 
-  const crownGeo = new THREE.BoxGeometry(1.04, 1.4, 1.04);
-  const crownMatA = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0x00f2ff).multiplyScalar(1.9),
+  const roofCapMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.6,
+    metalness: 0.45,
+  });
+  const beaconGeo = new THREE.SphereGeometry(0.95, 8, 8);
+  const beaconMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xef4444).multiplyScalar(1.9),
     toneMapped: false,
   });
-  const crownMatB = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0xff2a9d).multiplyScalar(1.9),
-    toneMapped: false,
-  });
-  disposables.push(bldgTex, bldgGeo, bldgMat, crownGeo, crownMatA, crownMatB);
+  const spireGeo = new THREE.CylinderGeometry(0.18, 0.45, 22, 6);
 
-  const placements: { x: number; z: number; w: number; d: number; h: number; alt: boolean }[] = [];
+  disposables.push(bldgPBR.map, bldgPBR.emissiveMap, bldgGeo, bldgMat, roofCapMat, beaconGeo, beaconMat, spireGeo);
 
-  // Scatter dense skyline all around and inside the track loop while maintaining safe road clearance
+  const placements: { x: number; z: number; w: number; d: number; h: number; tall: boolean }[] = [];
   let attempts = 0;
-  while (placements.length < 185 && attempts < 1400) {
+  while (placements.length < 220 && attempts < 2200) {
     attempts++;
-    const x = -280 + rand() * 1160;
-    const z = -740 + rand() * 1420;
+    const x = -520 + rand() * 1950;
+    const z = -1150 + rand() * 2250;
     const dist = spline.minHorizontalDistanceToTrack(x, z);
-    const w = 18 + rand() * 34;
-    const d = 18 + rand() * 34;
-    const clearance = spline.halfWidth + Math.max(w, d) * 0.72 + 12;
+    const w = 26 + rand() * 48;
+    const d = 26 + rand() * 48;
+    const clearance = spline.halfWidth + Math.max(w, d) * 0.75 + 18;
     if (dist < clearance) continue;
 
-    // Taller mega-towers further away, mid-rise closer for framing
-    const h = dist > 110 ? 75 + rand() * 175 : 42 + rand() * 105;
-    placements.push({ x, z, w, d, h, alt: rand() > 0.5 });
+    const h = dist > 150 ? 95 + rand() * 240 : 52 + rand() * 135;
+    placements.push({ x, z, w, d, h, tall: h > 165 });
   }
 
-  const bldgInst = new THREE.InstancedMesh(bldgGeo, bldgMat, placements.length);
-  const crownA = new THREE.InstancedMesh(crownGeo, crownMatA, placements.length);
-  const crownB = new THREE.InstancedMesh(crownGeo, crownMatB, placements.length);
+  const mainInst = new THREE.InstancedMesh(bldgGeo, bldgMat, placements.length);
+  const setbackInst = new THREE.InstancedMesh(bldgGeo, bldgMat, placements.length);
+  const mechInst = new THREE.InstancedMesh(bldgGeo, roofCapMat, placements.length);
+  const spireInst = new THREE.InstancedMesh(spireGeo, roofCapMat, placements.length);
+  const beaconInst = new THREE.InstancedMesh(beaconGeo, beaconMat, placements.length);
 
   const dummy = new THREE.Object3D();
-  let cA = 0, cB = 0;
+  let sCount = 0;
 
   placements.forEach((b, i) => {
+    // Base skyscraper shaft
     dummy.position.set(b.x, floorY + b.h * 0.5, b.z);
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(b.w, b.h, b.d);
     dummy.updateMatrix();
-    bldgInst.setMatrixAt(i, dummy.matrix);
+    mainInst.setMatrixAt(i, dummy.matrix);
 
-    dummy.position.set(b.x, floorY + b.h + 0.7, b.z);
-    dummy.scale.set(b.w, 1, b.d);
+    // Architectural stepped upper setback tier (authentic modern high-rise silhouette!)
+    const tierH = b.h * 0.24;
+    dummy.position.set(b.x, floorY + b.h + tierH * 0.5, b.z);
+    dummy.scale.set(b.w * 0.68, tierH, b.d * 0.68);
     dummy.updateMatrix();
-    if (b.alt) {
-      crownA.setMatrixAt(cA++, dummy.matrix);
-    } else {
-      crownB.setMatrixAt(cB++, dummy.matrix);
+    setbackInst.setMatrixAt(i, dummy.matrix);
+
+    // Rooftop mechanical penthouse
+    dummy.position.set(b.x, floorY + b.h + tierH + 3.2, b.z);
+    dummy.scale.set(b.w * 0.36, 6.4, b.d * 0.36);
+    dummy.updateMatrix();
+    mechInst.setMatrixAt(i, dummy.matrix);
+
+    if (b.tall) {
+      const topY = floorY + b.h + tierH + 6.4;
+      dummy.position.set(b.x, topY + 11, b.z);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      spireInst.setMatrixAt(sCount, dummy.matrix);
+
+      dummy.position.set(b.x, topY + 22.5, b.z);
+      dummy.updateMatrix();
+      beaconInst.setMatrixAt(sCount, dummy.matrix);
+      sCount++;
     }
   });
-  crownA.count = cA;
-  crownB.count = cB;
-  group.add(bldgInst, crownA, crownB);
-
-  // Giant Floating Cyber Halo Rings over iconic curves
-  const ringGeo = new THREE.TorusGeometry(28, 0.7, 10, 48);
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0xff2a9d).multiplyScalar(1.7),
-    toneMapped: false,
-  });
-  disposables.push(ringGeo, ringMat);
-
-  for (const t of [0.22, 0.52, 0.76]) {
-    const f = spline.getFrameAtDistance(t * spline.totalLength);
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.position.copy(f.pos).addScaledVector(f.up, 16);
-    const basis = new THREE.Matrix4().makeBasis(f.right, f.up, f.tangent.clone().negate());
-    ring.quaternion.setFromRotationMatrix(basis);
-    group.add(ring);
-    animatedRings.push(ring);
-  }
+  spireInst.count = sCount;
+  beaconInst.count = sCount;
+  group.add(mainInst, setbackInst, mechInst, spireInst, beaconInst);
 }
 
-function buildSuspensionBridgeScenery(
+/** Realistic Concrete & Steel A-Frame Cable-Stayed Suspension Bridge + Dusk Harbor Skyline */
+function buildRealisticSuspensionBridge(
   spline: TrackSpline,
   group: THREE.Group,
   disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[],
   rand: () => number,
   waterY: number
 ): void {
+  const concreteTex = createConcreteTexture();
   const towerMat = new THREE.MeshStandardMaterial({
-    color: 0x0e1d36,
+    map: concreteTex,
+    color: 0xcbd5e1,
+    metalness: 0.25,
+    roughness: 0.62,
+  });
+  const cableMat = new THREE.MeshStandardMaterial({
+    color: 0xe2e8f0,
     metalness: 0.85,
-    roughness: 0.25,
+    roughness: 0.22,
   });
-  const neonCyan = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0x00ffe5).multiplyScalar(1.25),
+  const aviationRed = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xef4444).multiplyScalar(2.0),
     toneMapped: false,
   });
-  const neonPink = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0xff4ecd).multiplyScalar(1.35),
+  const archGlow = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xfff1d6).multiplyScalar(1.3),
     toneMapped: false,
   });
-  disposables.push(towerMat, neonCyan, neonPink);
+  disposables.push(concreteTex, towerMat, cableMat, aviationRed, archGlow);
 
-  // Two colossal cable-stayed suspension pylons on the main bridge straight
-  const pylonTs = [0.055, 0.145];
-  const legGeo = new THREE.BoxGeometry(3.2, 118, 4.2);
-  const braceGeo = new THREE.BoxGeometry(spline.roadWidth + 10, 3.0, 3.0);
-  const beaconGeo = new THREE.SphereGeometry(2.2, 12, 12);
-  const cableGeo = new THREE.CylinderGeometry(0.18, 0.18, 1, 6);
+  // Two colossal realistic cable-stayed bridge towers framing the main bay straight & menu view
+  const pylonTs = [0.025, 0.115];
+  const legGeo = new THREE.BoxGeometry(4.2, 148, 5.2);
+  const braceGeo = new THREE.BoxGeometry(spline.roadWidth + 12, 3.8, 3.6);
+  const beaconGeo = new THREE.SphereGeometry(1.8, 10, 10);
+  const cableGeo = new THREE.CylinderGeometry(0.16, 0.16, 1, 6);
   disposables.push(legGeo, braceGeo, beaconGeo, cableGeo);
 
   for (const pt of pylonTs) {
@@ -349,36 +420,40 @@ function buildSuspensionBridgeScenery(
     const basis = new THREE.Matrix4().makeBasis(f.flatRight, new THREE.Vector3(0, 1, 0), f.tangent.clone().negate());
     pylonGroup.quaternion.setFromRotationMatrix(basis);
 
-    const halfSpan = spline.halfWidth + 3.2;
+    const halfSpan = spline.halfWidth + 4.2;
     const leftLeg = new THREE.Mesh(legGeo, towerMat);
-    leftLeg.position.set(-halfSpan, 59, 0);
+    leftLeg.position.set(-halfSpan, 74, 0);
     const rightLeg = new THREE.Mesh(legGeo, towerMat);
-    rightLeg.position.set(halfSpan, 59, 0);
+    rightLeg.position.set(halfSpan, 74, 0);
 
     const brace1 = new THREE.Mesh(braceGeo, towerMat);
-    brace1.position.set(0, 46, 0);
-    const brace2 = new THREE.Mesh(braceGeo, neonCyan);
-    brace2.position.set(0, 88, 0);
+    brace1.position.set(0, 56, 0);
+    const brace2 = new THREE.Mesh(braceGeo, towerMat);
+    brace2.position.set(0, 108, 0);
     const brace3 = new THREE.Mesh(braceGeo, towerMat);
-    brace3.position.set(0, 114, 0);
+    brace3.position.set(0, 144, 0);
 
-    const b1 = new THREE.Mesh(beaconGeo, neonPink);
-    b1.position.set(-halfSpan, 120, 0);
-    const b2 = new THREE.Mesh(beaconGeo, neonPink);
-    b2.position.set(halfSpan, 120, 0);
+    const lightBar = new THREE.Mesh(new THREE.BoxGeometry(spline.roadWidth + 10, 0.45, 3.9), archGlow);
+    lightBar.position.set(0, 108, 0);
+    disposables.push(lightBar.geometry);
 
-    pylonGroup.add(leftLeg, rightLeg, brace1, brace2, brace3, b1, b2);
+    const b1 = new THREE.Mesh(beaconGeo, aviationRed);
+    b1.position.set(-halfSpan, 150, 0);
+    const b2 = new THREE.Mesh(beaconGeo, aviationRed);
+    b2.position.set(halfSpan, 150, 0);
 
-    // Diagonal illuminated stay cables fanning along bridge deck
+    pylonGroup.add(leftLeg, rightLeg, brace1, brace2, brace3, lightBar, b1, b2);
+
+    // Realistic steel stay cables fanning cleanly to the bridge deck
     const deckY = f.pos.y - waterY + 1.2;
     for (const side of [-1, 1]) {
-      for (let c = 1; c <= 6; c++) {
+      for (let c = 1; c <= 8; c++) {
         for (const dir of [-1, 1]) {
-          const topPt = new THREE.Vector3(side * halfSpan, 64 + c * 8, 0);
-          const botPt = new THREE.Vector3(side * (spline.halfWidth + 0.8), deckY, dir * c * 18);
+          const topPt = new THREE.Vector3(side * halfSpan, 78 + c * 8.2, 0);
+          const botPt = new THREE.Vector3(side * (spline.halfWidth + 1.0), deckY, dir * c * 22);
           const delta = botPt.clone().sub(topPt);
           const len = delta.length();
-          const cable = new THREE.Mesh(cableGeo, neonCyan);
+          const cable = new THREE.Mesh(cableGeo, cableMat);
           cable.scale.set(1, len, 1);
           cable.position.copy(topPt).addScaledVector(delta, 0.5);
           cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
@@ -386,33 +461,33 @@ function buildSuspensionBridgeScenery(
         }
       }
     }
-
     group.add(pylonGroup);
   }
 
-  // Distant coastal cyber city skyline + glowing ocean beacons
-  const bldgTex = createBuildingTexture('#00ffe5', '#5b7cff');
+  // Distant illuminated coastal harbor skyline
+  const bldgPBR = createBuildingPBRTextures();
   const bldgGeo = new THREE.BoxGeometry(1, 1, 1);
   const bldgMat = new THREE.MeshStandardMaterial({
-    map: bldgTex,
-    emissive: 0x0b2e5e,
-    emissiveMap: bldgTex,
-    emissiveIntensity: 0.95,
+    map: bldgPBR.map,
+    emissive: 0xffe4b5,
+    emissiveMap: bldgPBR.emissiveMap,
+    emissiveIntensity: 0.85,
+    roughness: 0.3,
+    metalness: 0.65,
   });
-  disposables.push(bldgTex, bldgGeo, bldgMat);
+  disposables.push(bldgPBR.map, bldgPBR.emissiveMap, bldgGeo, bldgMat);
 
-  const skylineCount = 95;
-  const skylineInst = new THREE.InstancedMesh(bldgGeo, bldgMat, skylineCount);
+  const skylineInst = new THREE.InstancedMesh(bldgGeo, bldgMat, 110);
   const dummy = new THREE.Object3D();
   let placed = 0;
-  for (let i = 0; i < 600 && placed < skylineCount; i++) {
+  for (let i = 0; i < 800 && placed < 110; i++) {
     const angle = rand() * Math.PI * 2;
-    const rad = 520 + rand() * 520;
-    const x = 220 + Math.cos(angle) * rad;
-    const z = -220 + Math.sin(angle) * rad;
-    if (spline.minHorizontalDistanceToTrack(x, z) < 120) continue;
-    const w = 24 + rand() * 44;
-    const h = 45 + rand() * 195;
+    const rad = 820 + rand() * 780;
+    const x = 350 + Math.cos(angle) * rad;
+    const z = -340 + Math.sin(angle) * rad;
+    if (spline.minHorizontalDistanceToTrack(x, z) < 180) continue;
+    const w = 34 + rand() * 58;
+    const h = 55 + rand() * 230;
     dummy.position.set(x, waterY + h * 0.5, z);
     dummy.scale.set(w, h, w);
     dummy.rotation.set(0, 0, 0);
@@ -421,62 +496,259 @@ function buildSuspensionBridgeScenery(
   }
   skylineInst.count = placed;
   group.add(skylineInst);
-
-  // Floating ocean light buoys
-  const buoyGeo = new THREE.OctahedronGeometry(2.6, 0);
-  const buoyInst = new THREE.InstancedMesh(buoyGeo, neonCyan, 70);
-  let bIdx = 0;
-  for (let i = 0; i < 300 && bIdx < 70; i++) {
-    const x = -220 + rand() * 980;
-    const z = -900 + rand() * 1350;
-    const d = spline.minHorizontalDistanceToTrack(x, z);
-    if (d < 36 || d > 260) continue;
-    dummy.position.set(x, waterY + 2.4, z);
-    dummy.scale.set(1, 1.8, 1);
-    dummy.rotation.set(0, rand() * Math.PI, 0);
-    dummy.updateMatrix();
-    buoyInst.setMatrixAt(bIdx++, dummy.matrix);
-  }
-  buoyInst.count = bIdx;
-  group.add(buoyInst);
-  disposables.push(buoyGeo);
 }
 
-function buildUndergroundCavernScenery(
+/** Realistic Sculpted 3D Mountain Terrain + 350 Instanced Layered Pine Trees + Traditional Vermilion Torii Gates */
+function buildRealisticMountainPass(
   spline: TrackSpline,
   group: THREE.Group,
   disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[],
   rand: () => number,
-  animatedRings: THREE.Mesh[]
+  floorY: number
 ): void {
-  // Glowing reactor monoliths & energy conduits inside subterranean caverns
-  const monoGeo = new THREE.BoxGeometry(1, 1, 1);
-  const monoMat = new THREE.MeshStandardMaterial({
-    color: 0x0e0a24,
-    emissive: 0x260c4d,
-    emissiveIntensity: 0.65,
-    metalness: 0.85,
-    roughness: 0.25,
-  });
-  const stripGeo = new THREE.BoxGeometry(1.06, 0.9, 1.06);
-  const stripMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0x00ffaa).multiplyScalar(1.85),
-    toneMapped: false,
-  });
-  disposables.push(monoGeo, monoMat, stripGeo, stripMat);
+  // 1. Real Sculpted 3D FBM Mountain Terrain Heightfield around the entire 3.7km mountain pass!
+  // Compute track bounding box
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const s of spline.samples) {
+    if (s.pos.x < minX) minX = s.pos.x;
+    if (s.pos.x > maxX) maxX = s.pos.x;
+    if (s.pos.z < minZ) minZ = s.pos.z;
+    if (s.pos.z > maxZ) maxZ = s.pos.z;
+  }
+  const margin = 460;
+  const widthX = maxX - minX + margin * 2;
+  const depthZ = maxZ - minZ + margin * 2;
+  const centerX = (minX + maxX) * 0.5;
+  const centerZ = (minZ + maxZ) * 0.5;
 
-  const monos: { x: number; y: number; z: number; w: number; h: number }[] = [];
-  for (let i = 0; i < 900 && monos.length < 130; i++) {
-    const x = -720 + rand() * 920;
-    const z = -620 + rand() * 1180;
-    const d = spline.minHorizontalDistanceToTrack(x, z);
-    if (d < spline.halfWidth + 22) continue;
-    const w = 14 + rand() * 24;
-    const h = 75 + rand() * 140;
-    monos.push({ x, y: -44 + h * 0.5, z, w, h });
+  const segX = 96;
+  const segZ = 96;
+  const terrainGeo = new THREE.PlaneGeometry(widthX, depthZ, segX, segZ);
+  terrainGeo.rotateX(-Math.PI / 2);
+
+  // Smooth trigonometric multi-octave FBM ridge noise (zero jagged artifacts)
+  const fbm = (x: number, z: number): number => {
+    const n1 = Math.sin(x * 0.0042 + 1.1) * Math.cos(z * 0.0038 - 0.7);
+    const n2 = Math.sin(x * 0.0095 - z * 0.0072 + 2.3) * 0.5;
+    const n3 = Math.cos(x * 0.019 + z * 0.017) * 0.22;
+    return (n1 + n2 + n3) * 0.5 + 0.5; // ~0..1
+  };
+
+  // Pre-downsample spline points for super-fast terrain clearance carving
+  const coarsePts: THREE.Vector3[] = [];
+  for (let i = 0; i < spline.sampleCount; i += 6) {
+    coarsePts.push(spline.samples[i].pos);
   }
 
-  const monoInst = new THREE.InstancedMesh(monoGeo, monoMat, monos.length);
+  const posAttr = terrainGeo.attributes.position as THREE.BufferAttribute;
+  const colors = new Float32Array(posAttr.count * 3);
+  const col = new THREE.Color();
+
+  for (let i = 0; i < posAttr.count; i++) {
+    const vx = posAttr.getX(i) + centerX;
+    const vz = posAttr.getZ(i) + centerZ;
+
+    // Find nearest road sample to carve a clean natural mountain roadbed beneath the highway
+    let minD2 = Infinity;
+    let nearestY = floorY;
+    for (let k = 0; k < coarsePts.length; k++) {
+      const p = coarsePts[k];
+      const dx = vx - p.x;
+      const dz = vz - p.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < minD2) {
+        minD2 = d2;
+        nearestY = p.y;
+      }
+    }
+    const dist = Math.sqrt(minD2);
+
+    // Base sculpted mountain ridge elevation
+    const ridgeNoise = fbm(vx, vz);
+    const rawMountainY = floorY - 4 + ridgeNoise * 165 + Math.max(0, (dist - 120) * 0.22);
+
+    // Carve smooth embankment directly under & beside the highway (always >= 4.5m below road deck!)
+    const roadClearance = spline.halfWidth + 14;
+    const blend = smoothstep(roadClearance, roadClearance + 78, dist);
+    const carvedY = nearestY - 5.2;
+    const finalY = carvedY * (1 - blend) + rawMountainY * blend;
+
+    posAttr.setXYZ(i, vx, finalY, vz);
+
+    // Realistic dark nocturnal Japanese cedar-forest & volcanic basalt slope shading
+    const elevNorm = clamp((finalY - floorY) / 170, 0, 1);
+    const grain = ((Math.sin(vx * 0.14) * Math.cos(vz * 0.14)) * 0.5 + 0.5) * 0.025;
+    if (elevNorm < 0.42) {
+      col.setRGB(0.02 + grain * 0.5, 0.045 + grain, 0.032 + grain * 0.5); // deep cedar valley
+    } else if (elevNorm < 0.78) {
+      col.setRGB(0.03 + grain, 0.05 + grain, 0.045 + grain); // forested basalt mountainside
+    } else {
+      col.setRGB(0.055 + grain, 0.068 + grain, 0.088 + grain); // twilight alpine granite ridge
+    }
+    colors[i * 3] = col.r;
+    colors[i * 3 + 1] = col.g;
+    colors[i * 3 + 2] = col.b;
+  }
+
+  terrainGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  terrainGeo.computeVertexNormals();
+
+  // Procedural alpine forest & basalt cliff texture so slopes never look like smooth grey clay
+  const terrainTex = createConcreteTexture();
+  terrainTex.repeat.set(36, 36);
+  const terrainMat = new THREE.MeshStandardMaterial({
+    map: terrainTex,
+    vertexColors: true,
+    roughness: 0.96,
+    metalness: 0.02,
+    envMapIntensity: 0.16,
+  });
+  group.add(new THREE.Mesh(terrainGeo, terrainMat));
+  disposables.push(terrainTex, terrainGeo, terrainMat);
+
+  // 2. 520 Dense Japanese Cedar / Pine Trees lining the Mountain Pass (InstancedMesh!)
+  const trunkGeo = new THREE.CylinderGeometry(0.32, 0.55, 4.5, 6);
+  const foliageGeo1 = new THREE.ConeGeometry(3.4, 8.0, 7);
+  const foliageGeo2 = new THREE.ConeGeometry(2.6, 7.0, 7);
+  const foliageGeo3 = new THREE.ConeGeometry(1.7, 5.5, 7);
+
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2b1e16, roughness: 0.95, envMapIntensity: 0.2 });
+  const pineMatDark = new THREE.MeshStandardMaterial({ color: 0x0b2219, roughness: 0.92, envMapIntensity: 0.22 });
+  const pineMatMid = new THREE.MeshStandardMaterial({ color: 0x113024, roughness: 0.9, envMapIntensity: 0.22 });
+  disposables.push(trunkGeo, foliageGeo1, foliageGeo2, foliageGeo3, trunkMat, pineMatDark, pineMatMid);
+
+  const trees: { x: number; y: number; z: number; s: number }[] = [];
+  for (let i = 0; i < 2400 && trees.length < 520; i++) {
+    // Cluster trees organically alongside the mountain pass road!
+    const sample = spline.samples[Math.floor(rand() * spline.sampleCount)];
+    const side = rand() > 0.5 ? 1 : -1;
+    const offset = spline.halfWidth + 8 + rand() * 58;
+    const tx = sample.pos.x + sample.flatRight.x * side * offset + (rand() - 0.5) * 14;
+    const tz = sample.pos.z + sample.flatRight.z * side * offset + (rand() - 0.5) * 14;
+
+    if (spline.minHorizontalDistanceToTrack(tx, tz) < spline.halfWidth + 6.5) continue;
+    // Place naturally along embankment height
+    const ty = sample.pos.y - 4.5 + (rand() - 0.35) * 6;
+    trees.push({ x: tx, y: Math.max(floorY, ty), z: tz, s: 0.85 + rand() * 1.1 });
+  }
+
+  const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, trees.length);
+  const fol1Inst = new THREE.InstancedMesh(foliageGeo1, pineMatDark, trees.length);
+  const fol2Inst = new THREE.InstancedMesh(foliageGeo2, pineMatMid, trees.length);
+  const fol3Inst = new THREE.InstancedMesh(foliageGeo3, pineMatDark, trees.length);
+  const dummy = new THREE.Object3D();
+
+  trees.forEach((tr, i) => {
+    const rotY = rand() * Math.PI * 2;
+    dummy.rotation.set(0, rotY, 0);
+
+    dummy.position.set(tr.x, tr.y + 2.2 * tr.s, tr.z);
+    dummy.scale.setScalar(tr.s);
+    dummy.updateMatrix();
+    trunkInst.setMatrixAt(i, dummy.matrix);
+
+    dummy.position.set(tr.x, tr.y + 6.8 * tr.s, tr.z);
+    dummy.updateMatrix();
+    fol1Inst.setMatrixAt(i, dummy.matrix);
+
+    dummy.position.set(tr.x, tr.y + 10.6 * tr.s, tr.z);
+    dummy.updateMatrix();
+    fol2Inst.setMatrixAt(i, dummy.matrix);
+
+    dummy.position.set(tr.x, tr.y + 13.8 * tr.s, tr.z);
+    dummy.updateMatrix();
+    fol3Inst.setMatrixAt(i, dummy.matrix);
+  });
+  group.add(trunkInst, fol1Inst, fol2Inst, fol3Inst);
+
+  // 3. Authentic Traditional Japanese Vermilion Shrine Torii Gates straddling Pass Overlooks
+  const vermilionMat = new THREE.MeshStandardMaterial({
+    color: 0xb91c1c,
+    roughness: 0.52,
+    metalness: 0.1,
+  });
+  const blackEaveMat = new THREE.MeshStandardMaterial({
+    color: 0x111827,
+    roughness: 0.55,
+    metalness: 0.2,
+  });
+  const warmLanternMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xffd28a).multiplyScalar(1.45),
+    toneMapped: false,
+  });
+  const legGeo = new THREE.CylinderGeometry(0.65, 0.8, 14.5, 10);
+  const kasagiGeo = new THREE.BoxGeometry(spline.roadWidth + 10.5, 1.1, 1.6);
+  const capEaveGeo = new THREE.BoxGeometry(spline.roadWidth + 11.4, 0.45, 1.9);
+  const nukiGeo = new THREE.BoxGeometry(spline.roadWidth + 6.0, 0.72, 1.0);
+  const lanternGeo = new THREE.BoxGeometry(0.65, 1.1, 0.65);
+  disposables.push(vermilionMat, blackEaveMat, warmLanternMat, legGeo, kasagiGeo, capEaveGeo, nukiGeo, lanternGeo);
+
+  const basis = new THREE.Matrix4();
+  const hw = spline.halfWidth + 2.2;
+
+  for (const t of [0.06, 0.34, 0.68, 0.90]) {
+    const f = spline.getFrameAtDistance(t * spline.totalLength);
+    const gate = new THREE.Group();
+    gate.position.copy(f.pos);
+    basis.makeBasis(f.right, f.up, f.tangent.clone().negate());
+    gate.quaternion.setFromRotationMatrix(basis);
+
+    const lL = new THREE.Mesh(legGeo, vermilionMat);
+    lL.position.set(-hw, 7.25, 0);
+    const lR = new THREE.Mesh(legGeo, vermilionMat);
+    lR.position.set(hw, 7.25, 0);
+    const kasagi = new THREE.Mesh(kasagiGeo, vermilionMat);
+    kasagi.position.set(0, 14.4, 0);
+    const eave = new THREE.Mesh(capEaveGeo, blackEaveMat);
+    eave.position.set(0, 15.1, 0);
+    const nuki = new THREE.Mesh(nukiGeo, vermilionMat);
+    nuki.position.set(0, 11.8, 0);
+
+    const lanL = new THREE.Mesh(lanternGeo, warmLanternMat);
+    lanL.position.set(-hw + 1.2, 10.6, 0);
+    const lanR = new THREE.Mesh(lanternGeo, warmLanternMat);
+    lanR.position.set(hw - 1.2, 10.6, 0);
+
+    gate.add(lL, lR, kasagi, eave, nuki, lanL, lanR);
+    group.add(gate);
+  }
+}
+
+/** Realistic Concrete Subterranean Cavern & Industrial Infrastructure */
+function buildRealisticSubterraneanCavern(
+  spline: TrackSpline,
+  group: THREE.Group,
+  disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[],
+  rand: () => number,
+  animatedFans: THREE.Object3D[]
+): void {
+  const concreteTex = createConcreteTexture();
+  const pillarGeo = new THREE.BoxGeometry(1, 1, 1);
+  const pillarMat = new THREE.MeshStandardMaterial({
+    map: concreteTex,
+    color: 0x334155,
+    roughness: 0.78,
+    metalness: 0.2,
+  });
+  const stripGeo = new THREE.BoxGeometry(1.04, 0.5, 1.04);
+  const stripMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xf59e0b).multiplyScalar(1.3),
+    toneMapped: false,
+  });
+  disposables.push(concreteTex, pillarGeo, pillarMat, stripGeo, stripMat);
+
+  const monos: { x: number; y: number; z: number; w: number; h: number }[] = [];
+  for (let i = 0; i < 1200 && monos.length < 140; i++) {
+    const x = -1100 + rand() * 1450;
+    const z = -950 + rand() * 1850;
+    const d = spline.minHorizontalDistanceToTrack(x, z);
+    if (d < spline.halfWidth + 24) continue;
+    const w = 16 + rand() * 28;
+    const h = 85 + rand() * 165;
+    monos.push({ x, y: -56 + h * 0.5, z, w, h });
+  }
+
+  const monoInst = new THREE.InstancedMesh(pillarGeo, pillarMat, monos.length);
   const stripInst = new THREE.InstancedMesh(stripGeo, stripMat, monos.length);
   const dummy = new THREE.Object3D();
 
@@ -487,132 +759,40 @@ function buildUndergroundCavernScenery(
     dummy.updateMatrix();
     monoInst.setMatrixAt(idx, dummy.matrix);
 
-    dummy.position.set(m.x, m.y + m.h * 0.18, m.z);
-    dummy.scale.set(m.w, 1.8, m.w);
+    dummy.position.set(m.x, m.y + m.h * 0.14, m.z);
+    dummy.scale.set(m.w, 1.4, m.w);
     dummy.updateMatrix();
     stripInst.setMatrixAt(idx, dummy.matrix);
   });
   group.add(monoInst, stripInst);
 
-  // Rotating reactor energy rings around open cavern jump zones
-  const ringGeo = new THREE.TorusGeometry(24, 0.8, 8, 6);
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0xc026d3).multiplyScalar(1.9),
-    toneMapped: false,
-  });
-  disposables.push(ringGeo, ringMat);
-
-  for (const t of [0.31, 0.735]) {
-    const f = spline.getFrameAtDistance(t * spline.totalLength);
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.position.copy(f.pos).addScaledVector(f.up, 10);
-    const basis = new THREE.Matrix4().makeBasis(f.right, f.up, f.tangent.clone().negate());
-    ring.quaternion.setFromRotationMatrix(basis);
-    group.add(ring);
-    animatedRings.push(ring);
-  }
-}
-
-/** Cyber Touge Mountain Scenery: Wireframe synthwave peaks, neon Torii highway gates & glowing alpine beacons */
-function buildTougeMountainScenery(
-  spline: TrackSpline,
-  group: THREE.Group,
-  disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[],
-  rand: () => number,
-  floorY: number
-): void {
-  // 1. Stylized Low-Poly Synthwave Mountain Peaks with Neon Ridge Wireframes
-  const peakGeo = new THREE.ConeGeometry(1, 1, 5);
-  const peakMat = new THREE.MeshStandardMaterial({
-    color: 0x100826,
-    metalness: 0.45,
-    roughness: 0.65,
-    flatShading: true,
-  });
-  const wireMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0xff2a9d).multiplyScalar(1.18),
-    wireframe: true,
-    transparent: true,
-    opacity: 0.45,
-    toneMapped: false,
-  });
-  disposables.push(peakGeo, peakMat, wireMat);
-
-  const peaks: { x: number; z: number; r: number; h: number; rot: number }[] = [];
-  let tries = 0;
-  while (peaks.length < 90 && tries < 900) {
-    tries++;
-    const x = -360 + rand() * 1160;
-    const z = -660 + rand() * 1360;
-    const dist = spline.minHorizontalDistanceToTrack(x, z);
-    const r = 38 + rand() * 72;
-    if (dist < spline.halfWidth + r * 0.85 + 16) continue;
-    const h = 65 + rand() * 185;
-    peaks.push({ x, z, r, h, rot: rand() * Math.PI });
-  }
-
-  const peakInst = new THREE.InstancedMesh(peakGeo, peakMat, peaks.length);
-  const wireInst = new THREE.InstancedMesh(peakGeo, wireMat, peaks.length);
-  const dummy = new THREE.Object3D();
-
-  peaks.forEach((p, i) => {
-    dummy.position.set(p.x, floorY + p.h * 0.5, p.z);
-    dummy.rotation.set(0, p.rot, 0);
-    dummy.scale.set(p.r, p.h, p.r);
-    dummy.updateMatrix();
-    peakInst.setMatrixAt(i, dummy.matrix);
-
-    dummy.scale.set(p.r * 1.015, p.h * 1.01, p.r * 1.015);
-    dummy.updateMatrix();
-    wireInst.setMatrixAt(i, dummy.matrix);
-  });
-  group.add(peakInst, wireInst);
-
-  // 2. Iconic Illuminated Cyber Torii Gates straddling Touge Hairpin Entries!
-  const pillarMat = new THREE.MeshStandardMaterial({
-    color: 0x1b0820,
-    metalness: 0.75,
+  // Giant spinning industrial ventilation turbines framing cavern transitions
+  const ringGeo = new THREE.TorusGeometry(28, 1.2, 10, 32);
+  const bladeGeo = new THREE.BoxGeometry(52, 2.2, 0.5);
+  const steelMat = new THREE.MeshStandardMaterial({
+    color: 0x475569,
+    metalness: 0.8,
     roughness: 0.3,
   });
-  const toriiNeon = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0xff2a6d).multiplyScalar(1.38),
-    toneMapped: false,
-  });
-  const toriiAccent = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0x00ffaa).multiplyScalar(1.3),
-    toneMapped: false,
-  });
-  const legGeo = new THREE.BoxGeometry(1.1, 13.5, 1.1);
-  const topBeamGeo = new THREE.BoxGeometry(spline.roadWidth + 8.5, 1.15, 1.4);
-  const subBeamGeo = new THREE.BoxGeometry(spline.roadWidth + 4.5, 0.7, 0.9);
-  const neonStripGeo = new THREE.BoxGeometry(spline.roadWidth + 8.8, 0.25, 1.55);
-  disposables.push(pillarMat, toriiNeon, toriiAccent, legGeo, topBeamGeo, subBeamGeo, neonStripGeo);
+  disposables.push(ringGeo, bladeGeo, steelMat);
 
-  const basis = new THREE.Matrix4();
-  const q = new THREE.Quaternion();
-  const hw = spline.halfWidth + 1.8;
-
-  for (const t of [0.08, 0.26, 0.44, 0.62, 0.78, 0.92]) {
+  for (const t of [0.30, 0.72]) {
     const f = spline.getFrameAtDistance(t * spline.totalLength);
-    const gate = new THREE.Group();
-    gate.position.copy(f.pos);
-    basis.makeBasis(f.right, f.up, f.tangent.clone().negate());
-    q.setFromRotationMatrix(basis);
-    gate.quaternion.copy(q);
+    const hub = new THREE.Group();
+    hub.position.copy(f.pos).addScaledVector(f.up, 28);
+    const basis = new THREE.Matrix4().makeBasis(f.right, f.up, f.tangent.clone().negate());
+    hub.quaternion.setFromRotationMatrix(basis);
 
-    const legL = new THREE.Mesh(legGeo, pillarMat);
-    legL.position.set(-hw, 6.75, 0);
-    const legR = new THREE.Mesh(legGeo, pillarMat);
-    legR.position.set(hw, 6.75, 0);
-
-    const topBeam = new THREE.Mesh(topBeamGeo, toriiNeon);
-    topBeam.position.set(0, 13.6, 0);
-    const subBeam = new THREE.Mesh(subBeamGeo, pillarMat);
-    subBeam.position.set(0, 11.2, 0);
-    const accent = new THREE.Mesh(neonStripGeo, toriiAccent);
-    accent.position.set(0, 11.2, 0);
-
-    gate.add(legL, legR, topBeam, subBeam, accent);
-    group.add(gate);
+    const frameRing = new THREE.Mesh(ringGeo, steelMat);
+    const rotor = new THREE.Group();
+    const b1 = new THREE.Mesh(bladeGeo, steelMat);
+    const b2 = new THREE.Mesh(bladeGeo, steelMat);
+    b2.rotation.z = Math.PI / 3;
+    const b3 = new THREE.Mesh(bladeGeo, steelMat);
+    b3.rotation.z = (Math.PI * 2) / 3;
+    rotor.add(b1, b2, b3);
+    hub.add(frameRing, rotor);
+    group.add(hub);
+    animatedFans.push(rotor);
   }
 }

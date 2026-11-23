@@ -1,16 +1,22 @@
 import * as THREE from 'three';
 import { CarSpec } from '../types';
-import { createHeadlightBeamTexture, createParticleGlowTexture } from '../utils/textures';
+import {
+  createContactShadowTexture,
+  createHeadlightBeamTexture,
+  createParticleGlowTexture,
+} from '../utils/textures';
 import { supercarAssets } from './SupercarLoader';
 
-let sharedUnderglowTex: THREE.CanvasTexture | null = null;
+let sharedShadowTex: THREE.CanvasTexture | null = null;
+let sharedGlowTex: THREE.CanvasTexture | null = null;
 let sharedBeamTex: THREE.CanvasTexture | null = null;
 
 /**
- * High-detail Cyber GT Supercar Model.
+ * Photorealistic GT3 / Street Hypercar Model.
  * Mounts the locally bundled open-source supercar GLB (Ferrari 458 Italia by vicent091036, CC BY 4.0)
- * customized with metallic clearcoat racing paint, distinct cyber aero kits (GT wings, fins, splitters),
- * glowing neon rim rings, articulated front steering wheels, reactive brake lights, and dual/quad nitro thrusters.
+ * customized with automotive metallic clearcoat paint, matte carbon-fiber GT3 aero kits,
+ * stationary Brembo-style calipers with glowing carbon-ceramic brake discs, articulated front wheels,
+ * realistic ground AO contact shadow, reactive taillights, and realistic afterburner exhaust flames.
  */
 export class CarModel {
   public readonly root = new THREE.Group();
@@ -29,10 +35,11 @@ export class CarModel {
   private readonly paintMat: THREE.MeshPhysicalMaterial;
   private readonly carbonMat: THREE.MeshStandardMaterial;
   private readonly glassMat: THREE.MeshPhysicalMaterial;
-  private readonly neonMat: THREE.MeshBasicMaterial;
+  private readonly caliperMat: THREE.MeshStandardMaterial;
+  private readonly brakeDiscMat: THREE.MeshStandardMaterial;
   private readonly headlightMat: THREE.MeshBasicMaterial;
   private readonly brakeLightMat: THREE.MeshStandardMaterial;
-  private readonly underglowMat: THREE.MeshBasicMaterial;
+  private readonly rearBounceMat: THREE.MeshBasicMaterial;
 
   private readonly nitroFlameGroup = new THREE.Group();
   private readonly flameInnerMats: THREE.MeshBasicMaterial[] = [];
@@ -43,18 +50,19 @@ export class CarModel {
   // Local anchor positions (matching ~1.12x scaled real supercar)
   private readonly rearLeftContact = new THREE.Vector3(-0.96, 0.06, 1.66);
   private readonly rearRightContact = new THREE.Vector3(0.96, 0.06, 1.66);
-  private readonly exhaustLeftLocal = new THREE.Vector3(-0.42, 0.34, 2.52);
-  private readonly exhaustRightLocal = new THREE.Vector3(0.42, 0.34, 2.52);
+  private readonly exhaustLeftLocal = new THREE.Vector3(-0.36, 0.34, 2.52);
+  private readonly exhaustRightLocal = new THREE.Vector3(0.36, 0.34, 2.52);
   private readonly hoodCamLocal = new THREE.Vector3(0, 1.18, -0.35);
 
   private readonly disposables: (THREE.BufferGeometry | THREE.Material)[] = [];
   private flamePhase = Math.random() * 10;
+  private brakeHeat = 0;
   private disposed = false;
 
   constructor(
     public readonly spec: CarSpec,
     overridePrimary?: number,
-    overrideNeon?: number,
+    overrideAccent?: number,
     private readonly isPlayer = false
   ) {
     this.root.add(this.driftYawPivot);
@@ -62,110 +70,144 @@ export class CarModel {
     this.driftYawPivot.add(this.wheelContainer);
     this.chassis.add(this.bodySlot, this.aeroSlot);
 
-    if (!sharedUnderglowTex) sharedUnderglowTex = createParticleGlowTexture();
+    if (!sharedShadowTex) sharedShadowTex = createContactShadowTexture();
+    if (!sharedGlowTex) sharedGlowTex = createParticleGlowTexture();
     if (!sharedBeamTex) sharedBeamTex = createHeadlightBeamTexture();
 
     const bodyHex = overridePrimary ?? spec.primaryColor;
-    const neonHex = overrideNeon ?? spec.neonColor;
+    const accentHex = overrideAccent ?? spec.neonColor;
 
-    // Automotive Metallic Clearcoat Paint
+    // Deep Automotive Metallic Clearcoat Paint (GT7 / Forza Horizon style)
     this.paintMat = new THREE.MeshPhysicalMaterial({
       color: bodyHex,
-      metalness: 0.84,
-      roughness: 0.16,
+      metalness: 0.82,
+      roughness: 0.15,
       clearcoat: 1.0,
-      clearcoatRoughness: 0.05,
-      envMapIntensity: 1.85,
+      clearcoatRoughness: 0.04,
+      envMapIntensity: 1.95,
     });
 
+    // Dry-Weave Satin Motorsport Carbon Fiber
     this.carbonMat = new THREE.MeshStandardMaterial({
-      color: 0x10141f,
-      metalness: 0.55,
-      roughness: 0.36,
-      envMapIntensity: 1.2,
+      color: 0x161921,
+      metalness: 0.42,
+      roughness: 0.44,
+      envMapIntensity: 1.15,
     });
 
+    // Tinted Laminated Automotive Cockpit Glass
     this.glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0x071326,
-      metalness: 0.25,
+      color: 0x09111c,
+      metalness: 0.15,
       roughness: 0.05,
       clearcoat: 1.0,
       transparent: true,
-      opacity: 0.78,
-      envMapIntensity: 2.2,
+      opacity: 0.82,
+      envMapIntensity: 2.25,
     });
 
-    this.neonMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(neonHex).multiplyScalar(1.36),
-      toneMapped: false,
+    // Painted Performance Brake Calipers & Brushed Anodized Trim
+    this.caliperMat = new THREE.MeshStandardMaterial({
+      color: accentHex,
+      metalness: 0.58,
+      roughness: 0.28,
+      envMapIntensity: 1.35,
     });
 
+    // Ventilated Carbon-Ceramic Brake Rotors (glow subtly cherry-orange under hard braking!)
+    this.brakeDiscMat = new THREE.MeshStandardMaterial({
+      color: 0x525866,
+      emissive: 0xff3b0a,
+      emissiveIntensity: 0,
+      metalness: 0.88,
+      roughness: 0.32,
+    });
+
+    // Crisp Xenon / Laser Headlight Projectors
     this.headlightMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(0xe6ffff).multiplyScalar(1.75),
+      color: new THREE.Color(0xf4f8ff).multiplyScalar(1.6),
       toneMapped: false,
     });
 
+    // Realistic Deep LED Crimson Taillights
     this.brakeLightMat = new THREE.MeshStandardMaterial({
-      color: 0xcc0a2c,
-      emissive: 0xff1144,
-      emissiveIntensity: 1.15,
-      roughness: 0.2,
-      metalness: 0.2,
+      color: 0xb80d22,
+      emissive: 0xff162c,
+      emissiveIntensity: 1.1,
+      roughness: 0.18,
+      metalness: 0.15,
       toneMapped: false,
     });
 
-    this.underglowMat = new THREE.MeshBasicMaterial({
-      map: sharedUnderglowTex,
-      color: new THREE.Color(neonHex).multiplyScalar(1.25),
+    // Subtle crimson taillight reflection wash on damp asphalt behind car
+    this.rearBounceMat = new THREE.MeshBasicMaterial({
+      map: sharedGlowTex,
+      color: 0xff1f2d,
       transparent: true,
-      opacity: 0.52,
+      opacity: 0.12,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      side: THREE.DoubleSide,
-      toneMapped: false,
+    });
+
+    // Grounded Dark Ambient-Occlusion Contact Shadow under chassis (eliminates "floating car" look)
+    const shadowMat = new THREE.MeshBasicMaterial({
+      map: sharedShadowTex,
+      transparent: true,
+      opacity: 0.88,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
     });
 
     this.disposables.push(
       this.paintMat,
       this.carbonMat,
       this.glassMat,
-      this.neonMat,
+      this.caliperMat,
+      this.brakeDiscMat,
       this.headlightMat,
       this.brakeLightMat,
-      this.underglowMat
+      this.rearBounceMat,
+      shadowMat
     );
 
-    // Underglow soft radial halo
-    const glowPlaneGeo = new THREE.PlaneGeometry(3.8, 6.4);
-    glowPlaneGeo.rotateX(-Math.PI / 2);
-    const underglow = new THREE.Mesh(glowPlaneGeo, this.underglowMat);
-    underglow.position.set(0, 0.07, 0.08);
-    this.chassis.add(underglow);
-    this.disposables.push(glowPlaneGeo);
+    const shadowGeo = new THREE.PlaneGeometry(3.05, 5.75);
+    shadowGeo.rotateX(-Math.PI / 2);
+    const contactShadow = new THREE.Mesh(shadowGeo, shadowMat);
+    contactShadow.position.set(0, 0.045, 0.08);
+    this.driftYawPivot.add(contactShadow);
+    this.disposables.push(shadowGeo);
 
-    // Player tapered headlight beams on road surface
+    const bounceGeo = new THREE.PlaneGeometry(3.6, 4.4);
+    bounceGeo.rotateX(-Math.PI / 2);
+    const rearBounce = new THREE.Mesh(bounceGeo, this.rearBounceMat);
+    rearBounce.position.set(0, 0.07, 3.15);
+    this.chassis.add(rearBounce);
+    this.disposables.push(bounceGeo);
+
+    // Player tapered xenon headlight beams on damp tarmac
     if (isPlayer) {
-      const beamGeo = new THREE.PlaneGeometry(3.1, 16);
+      const beamGeo = new THREE.PlaneGeometry(3.5, 20);
       beamGeo.rotateX(-Math.PI / 2);
       const beamMat = new THREE.MeshBasicMaterial({
         map: sharedBeamTex,
-        color: 0xc8fbff,
+        color: 0xeef5ff,
         transparent: true,
-        opacity: 0.34,
+        opacity: 0.36,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
       const beamL = new THREE.Mesh(beamGeo, beamMat);
-      beamL.position.set(-0.74, 0.1, -10.3);
+      beamL.position.set(-0.76, 0.09, -12.1);
       const beamR = new THREE.Mesh(beamGeo, beamMat);
-      beamR.position.set(0.74, 0.1, -10.3);
+      beamR.position.set(0.76, 0.09, -12.1);
       this.chassis.add(beamL, beamR);
       this.disposables.push(beamGeo, beamMat);
     }
 
-    // Build custom Cyber GT Aero Kit & Nitro Thrusters
-    this.buildCyberAeroKit();
-    this.nitroPointLight = new THREE.PointLight(0x00e5ff, 0, 16, 1.5);
+    // Build custom GT3 Carbon Aero Kit & Afterburner Exhaust Thrusters
+    this.buildGTAeroKit();
+    this.nitroPointLight = new THREE.PointLight(0xff9a3c, 0, 15, 1.6);
     this.buildNitroThrusters();
 
     // Mount real supercar GLB immediately if cached, else mount fallback & swap seamlessly on load
@@ -188,7 +230,6 @@ export class CarModel {
   }
 
   private mountRealSupercar(template: THREE.Group): void {
-    // Clear any temporary fallback
     this.bodySlot.clear();
     this.wheelContainer.clear();
     this.wheelSpinNodes = [];
@@ -200,7 +241,6 @@ export class CarModel {
     const modelScale = 1.12;
     clone.scale.setScalar(modelScale);
 
-    // Collect wheel nodes before detaching them into independent suspension/steering container
     const wheelMap: Record<string, THREE.Object3D> = {};
 
     clone.traverse((obj) => {
@@ -227,21 +267,21 @@ export class CarModel {
         } else if (matName.includes('carbon_fiber') || name.includes('carbon')) {
           obj.material = this.carbonMat;
         } else if (matName.includes('metal_chrome') || matName.includes('metal_gray')) {
-          const shinyMat = new THREE.MeshStandardMaterial({
-            color: name.includes('rim') ? 0xdbeafe : 0x8da2b8,
-            metalness: 0.94,
-            roughness: 0.14,
+          const alloyMat = new THREE.MeshStandardMaterial({
+            color: name.includes('rim') ? 0xcfd6df : 0x7c8796,
+            metalness: 0.92,
+            roughness: name.includes('rim') ? 0.2 : 0.28,
             envMapIntensity: 1.8,
           });
-          obj.material = shinyMat;
-          this.disposables.push(shinyMat);
+          obj.material = alloyMat;
+          this.disposables.push(alloyMat);
         } else if (matName.includes('yellow') || name === 'yellow_trim') {
-          obj.material = this.neonMat;
+          obj.material = this.caliperMat;
         } else if (matName.includes('tires')) {
           const tireMat = new THREE.MeshStandardMaterial({
-            color: 0x11131a,
-            roughness: 0.78,
-            metalness: 0.15,
+            color: 0x17191e,
+            roughness: 0.86,
+            metalness: 0.06,
           });
           obj.material = tireMat;
           this.disposables.push(tireMat);
@@ -249,10 +289,11 @@ export class CarModel {
       }
     });
 
-    // Attach neon glowing rim halo to all 4 wheels and wrap front wheels in steering pivots!
-    const rimHaloGeo = new THREE.TorusGeometry(0.255, 0.017, 8, 28);
-    rimHaloGeo.rotateY(Math.PI / 2);
-    this.disposables.push(rimHaloGeo);
+    // Ventilated carbon-ceramic brake discs & stationary painted Brembo-style calipers
+    const discGeo = new THREE.CylinderGeometry(0.19, 0.19, 0.032, 24);
+    discGeo.rotateZ(Math.PI / 2);
+    const caliperGeo = new THREE.BoxGeometry(0.075, 0.15, 0.11);
+    this.disposables.push(discGeo, caliperGeo);
 
     clone.updateMatrixWorld(true);
 
@@ -260,24 +301,22 @@ export class CarModel {
       const wheel = wheelMap[key];
       if (!wheel) return;
 
-      // Capture wheel's scaled local position in car frame
       const worldPos = new THREE.Vector3();
       wheel.getWorldPosition(worldPos);
-
-      // Detach from cloned hierarchy and place in wheelContainer (so chassis body-roll tilts realistically above wheels!)
       wheel.removeFromParent();
 
       const pivot = new THREE.Group();
       pivot.position.copy(worldPos);
       pivot.scale.setScalar(modelScale);
 
-      // Reset wheel position inside pivot while preserving its GLTF orientation
       wheel.position.set(0, 0, 0);
 
-      // Attach razor-crisp neon LED rim halo ring to outer face of wheel
-      const halo = new THREE.Mesh(rimHaloGeo, this.neonMat);
-      halo.position.set(side * 0.132, 0, 0);
-      wheel.add(halo);
+      // Stationary brake disc + caliper inside wheel barrel (pivots with steering, does NOT spin with tire!)
+      const disc = new THREE.Mesh(discGeo, this.brakeDiscMat);
+      disc.position.set(side * 0.035, 0, 0);
+      const caliper = new THREE.Mesh(caliperGeo, this.caliperMat);
+      caliper.position.set(side * 0.055, 0.03, isFront ? 0.13 : -0.13);
+      pivot.add(disc, caliper);
 
       pivot.add(wheel);
       this.wheelContainer.add(pivot);
@@ -297,109 +336,93 @@ export class CarModel {
     this.bodySlot.add(clone);
   }
 
-  /** Distinct custom Cyber GT race aero packages mounted to the supercar silhouette */
-  private buildCyberAeroKit(): void {
+  /** Authentic Motorsport GT3 Dry-Carbon Aero Packages */
+  private buildGTAeroKit(): void {
     const style = this.spec.bodyStyle;
 
-    // 1. Custom GT Carbon Rear Wing (sized & positioned cleanly on rear deck of the 1.12x supercar)
-    const wingW = style === 'katana' ? 2.28 : style === 'phantom' ? 2.12 : 1.98;
-    const wingY = style === 'katana' ? 1.32 : style === 'phantom' ? 1.18 : 1.22;
-    const wingZ = style === 'phantom' ? 2.24 : 2.12;
+    // 1. Swan-Neck / Twin-Strut Carbon GT3 Rear Wing
+    const wingW = style === 'katana' ? 2.24 : style === 'phantom' ? 2.1 : 1.96;
+    const wingY = style === 'katana' ? 1.3 : style === 'phantom' ? 1.18 : 1.21;
+    const wingZ = style === 'phantom' ? 2.22 : 2.12;
 
-    const mainBladeGeo = new THREE.BoxGeometry(wingW, 0.055, 0.36);
+    const mainBladeGeo = new THREE.BoxGeometry(wingW, 0.048, 0.34);
     const mainBlade = new THREE.Mesh(mainBladeGeo, this.carbonMat);
     mainBlade.position.set(0, wingY, wingZ);
-    mainBlade.rotation.x = style === 'katana' ? 0.14 : 0.08;
-
-    const wingEdgeGeo = new THREE.BoxGeometry(wingW + 0.04, 0.028, 0.045);
-    const wingEdge = new THREE.Mesh(wingEdgeGeo, this.neonMat);
-    wingEdge.position.set(0, wingY + 0.025, wingZ + 0.17);
+    mainBlade.rotation.x = style === 'katana' ? 0.13 : 0.07;
 
     const strutH = wingY - 0.88;
-    const strutGeo = new THREE.BoxGeometry(0.055, strutH, 0.24);
+    const strutGeo = new THREE.BoxGeometry(0.048, strutH, 0.22);
     const strutL = new THREE.Mesh(strutGeo, this.carbonMat);
-    strutL.position.set(-0.52, 0.88 + strutH * 0.5, wingZ - 0.02);
+    strutL.position.set(-0.5, 0.88 + strutH * 0.5, wingZ - 0.02);
     const strutR = new THREE.Mesh(strutGeo, this.carbonMat);
-    strutR.position.set(0.52, 0.88 + strutH * 0.5, wingZ - 0.02);
+    strutR.position.set(0.5, 0.88 + strutH * 0.5, wingZ - 0.02);
 
-    const endH = style === 'katana' ? 0.36 : 0.26;
-    const endGeo = new THREE.BoxGeometry(0.045, endH, 0.46);
+    const endH = style === 'katana' ? 0.34 : 0.25;
+    const endGeo = new THREE.BoxGeometry(0.04, endH, 0.44);
     const endL = new THREE.Mesh(endGeo, this.paintMat);
     endL.position.set(-wingW * 0.5, wingY - 0.02, wingZ);
     const endR = new THREE.Mesh(endGeo, this.paintMat);
     endR.position.set(wingW * 0.5, wingY - 0.02, wingZ);
 
-    this.aeroSlot.add(mainBlade, wingEdge, strutL, strutR, endL, endR);
-    this.disposables.push(mainBladeGeo, wingEdgeGeo, strutGeo, endGeo);
+    this.aeroSlot.add(mainBlade, strutL, strutR, endL, endR);
+    this.disposables.push(mainBladeGeo, strutGeo, endGeo);
 
-    // 2. Archetype-specific extra GT aero pieces
+    // 2. Archetype-specific authentic GT aero components
     if (style === 'phantom') {
-      // Le Mans dorsal shark fin + twin upper wing flap
-      const finGeo = new THREE.BoxGeometry(0.05, 0.34, 1.48);
+      // Le Mans dorsal stabilizer fin + upper biplane wing element
+      const finGeo = new THREE.BoxGeometry(0.042, 0.3, 1.42);
       const fin = new THREE.Mesh(finGeo, this.carbonMat);
-      fin.position.set(0, 1.15, 1.18);
-      const finNeonGeo = new THREE.BoxGeometry(0.06, 0.028, 1.44);
-      const finNeon = new THREE.Mesh(finNeonGeo, this.neonMat);
-      finNeon.position.set(0, 1.32, 1.18);
+      fin.position.set(0, 1.13, 1.16);
 
-      const flapGeo = new THREE.BoxGeometry(wingW - 0.14, 0.04, 0.18);
+      const flapGeo = new THREE.BoxGeometry(wingW - 0.14, 0.036, 0.17);
       const flap = new THREE.Mesh(flapGeo, this.carbonMat);
-      flap.position.set(0, wingY + 0.12, wingZ + 0.1);
-      flap.rotation.x = 0.22;
+      flap.position.set(0, wingY + 0.11, wingZ + 0.1);
+      flap.rotation.x = 0.2;
 
-      this.aeroSlot.add(fin, finNeon, flap);
-      this.disposables.push(finGeo, finNeonGeo, flapGeo);
+      this.aeroSlot.add(fin, flap);
+      this.disposables.push(finGeo, flapGeo);
     } else if (style === 'katana') {
-      // Aggressive rear diffuser vortex fins + front drift canards
-      const canardGeo = new THREE.BoxGeometry(0.24, 0.03, 0.36);
+      // Front carbon dive-plane canards (touge / GT3 spec)
+      const canardGeo = new THREE.BoxGeometry(0.22, 0.028, 0.34);
       const cL = new THREE.Mesh(canardGeo, this.carbonMat);
-      cL.position.set(-1.02, 0.36, -2.18);
-      cL.rotation.z = 0.28;
+      cL.position.set(-1.01, 0.36, -2.16);
+      cL.rotation.z = 0.26;
       const cR = new THREE.Mesh(canardGeo, this.carbonMat);
-      cR.position.set(1.02, 0.36, -2.18);
-      cR.rotation.z = -0.28;
+      cR.position.set(1.01, 0.36, -2.16);
+      cR.rotation.z = -0.26;
       this.aeroSlot.add(cL, cR);
       this.disposables.push(canardGeo);
     }
 
-    // 3. Sleek Carbon Side Skirts with Neon Ground-Effect Light Blades
-    const skirtGeo = new THREE.BoxGeometry(0.12, 0.055, 2.38);
+    // 3. Dry-Carbon Side Skirts, Front Splitter & 4-Strake Rear Venturi Diffuser
+    const skirtGeo = new THREE.BoxGeometry(0.11, 0.048, 2.34);
     const skirtL = new THREE.Mesh(skirtGeo, this.carbonMat);
-    skirtL.position.set(-1.05, 0.17, 0.16);
+    skirtL.position.set(-1.04, 0.17, 0.16);
     const skirtR = new THREE.Mesh(skirtGeo, this.carbonMat);
-    skirtR.position.set(1.05, 0.17, 0.16);
+    skirtR.position.set(1.04, 0.17, 0.16);
 
-    const bladeGeo = new THREE.BoxGeometry(0.032, 0.028, 2.28);
-    const bladeL = new THREE.Mesh(bladeGeo, this.neonMat);
-    bladeL.position.set(-1.11, 0.18, 0.16);
-    const bladeR = new THREE.Mesh(bladeGeo, this.neonMat);
-    bladeR.position.set(1.11, 0.18, 0.16);
-
-    // Front carbon splitter lip with neon edge
-    const splitGeo = new THREE.BoxGeometry(2.08, 0.045, 0.42);
+    const splitGeo = new THREE.BoxGeometry(2.04, 0.04, 0.38);
     const splitter = new THREE.Mesh(splitGeo, this.carbonMat);
-    splitter.position.set(0, 0.16, -2.35);
+    splitter.position.set(0, 0.16, -2.32);
 
-    const splitNeonGeo = new THREE.BoxGeometry(1.86, 0.024, 0.036);
-    const splitNeon = new THREE.Mesh(splitNeonGeo, this.neonMat);
-    splitNeon.position.set(0, 0.17, -2.56);
+    const strakeGeo = new THREE.BoxGeometry(0.032, 0.18, 0.36);
+    for (const sx of [-0.62, -0.24, 0.24, 0.62]) {
+      const strake = new THREE.Mesh(strakeGeo, this.carbonMat);
+      strake.position.set(sx, 0.22, 2.34);
+      this.aeroSlot.add(strake);
+    }
 
-    // Rear lower diffuser accent strip
-    const rearNeonGeo = new THREE.BoxGeometry(1.52, 0.026, 0.035);
-    const rearNeon = new THREE.Mesh(rearNeonGeo, this.neonMat);
-    rearNeon.position.set(0, 0.24, 2.48);
-
-    this.aeroSlot.add(skirtL, skirtR, bladeL, bladeR, splitter, splitNeon, rearNeon);
-    this.disposables.push(skirtGeo, bladeGeo, splitGeo, splitNeonGeo, rearNeonGeo);
+    this.aeroSlot.add(skirtL, skirtR, splitter);
+    this.disposables.push(skirtGeo, splitGeo, strakeGeo);
   }
 
   private buildNitroThrusters(): void {
-    const flameOuterGeo = new THREE.ConeGeometry(0.19, 2.15, 10, 1, true);
+    const flameOuterGeo = new THREE.ConeGeometry(0.16, 1.85, 10, 1, true);
     flameOuterGeo.rotateX(Math.PI / 2);
-    flameOuterGeo.translate(0, 0, 1.08);
-    const flameInnerGeo = new THREE.ConeGeometry(0.095, 1.38, 8, 1, true);
+    flameOuterGeo.translate(0, 0, 0.92);
+    const flameInnerGeo = new THREE.ConeGeometry(0.085, 1.18, 8, 1, true);
     flameInnerGeo.rotateX(Math.PI / 2);
-    flameInnerGeo.translate(0, 0, 0.69);
+    flameInnerGeo.translate(0, 0, 0.59);
     this.disposables.push(flameOuterGeo, flameInnerGeo);
 
     const exhaustOffsets =
@@ -407,16 +430,16 @@ export class CarModel {
 
     for (const ex of exhaustOffsets) {
       const outerMat = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(0x00d9ff).multiplyScalar(1.55),
+        color: new THREE.Color(0xff8c2b).multiplyScalar(1.45),
         transparent: true,
-        opacity: 0.86,
+        opacity: 0.84,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         side: THREE.DoubleSide,
         toneMapped: false,
       });
       const innerMat = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(0xffffff).multiplyScalar(1.7),
+        color: new THREE.Color(0x93d5ff).multiplyScalar(1.65),
         transparent: true,
         opacity: 0.95,
         blending: THREE.AdditiveBlending,
@@ -439,7 +462,7 @@ export class CarModel {
     this.nitroFlameGroup.visible = false;
     this.chassis.add(this.nitroFlameGroup);
 
-    this.nitroPointLight.position.set(0, 0.55, 3.3);
+    this.nitroPointLight.position.set(0, 0.55, 3.2);
     if (this.isPlayer) {
       this.chassis.add(this.nitroPointLight);
     }
@@ -487,8 +510,8 @@ export class CarModel {
       w.rotation.x -= wheelDelta;
     }
 
-    // Articulate real front wheels (+ counter-steer naturally during drift!)
-    const wheelSteerRad = -steerVisual * 0.44 + visualSlipAngle * 0.58;
+    // Articulate real front wheels (+ natural counter-steer into the slide during drift!)
+    const wheelSteerRad = -steerVisual * 0.44 + visualSlipAngle * 0.64;
     if (this.frontLeftPivot) this.frontLeftPivot.rotation.y = wheelSteerRad;
     if (this.frontRightPivot) this.frontRightPivot.rotation.y = wheelSteerRad;
 
@@ -502,32 +525,37 @@ export class CarModel {
     this.chassis.rotation.x = bodyPitch;
     this.chassis.position.y = suspensionY;
 
-    // Reactive real Ferrari brake taillights (glow blazing red on brake/drift)
-    this.brakeLightMat.emissiveIntensity = isBraking ? 3.2 : isDrifting ? 2.1 : 1.05;
+    // Reactive real Ferrari brake taillights + wet-tarmac crimson bounce + glowing hot brake rotors!
+    this.brakeLightMat.emissiveIntensity = isBraking ? 3.2 : isDrifting ? 1.95 : 1.0;
+    this.rearBounceMat.opacity = isBraking ? 0.28 : isDrifting ? 0.18 : 0.09;
 
-    // Animated nitro / mini-boost exhaust flames
+    const targetHeat = isBraking && speed > 18 ? 1.8 : isDrifting ? 0.55 : 0;
+    this.brakeHeat += (targetHeat - this.brakeHeat) * Math.min(1, dt * (targetHeat > this.brakeHeat ? 5.5 : 2.2));
+    this.brakeDiscMat.emissiveIntensity = this.brakeHeat;
+
+    // Animated realistic afterburner exhaust flames
     if (boostIntensity > 0.05) {
-      this.flamePhase += dt * 44;
+      this.flamePhase += dt * 46;
       this.nitroFlameGroup.visible = true;
       const flicker = 0.85 + Math.sin(this.flamePhase) * 0.22 + Math.cos(this.flamePhase * 1.7) * 0.1;
-      const lenScale = (0.55 + boostIntensity * 1.15) * flicker;
-      const radScale = 0.72 + boostIntensity * 0.34;
+      const lenScale = (0.5 + boostIntensity * 1.1) * flicker;
+      const radScale = 0.72 + boostIntensity * 0.3;
 
-      const outerHex = isSuperNitro ? 0xc026ff : 0x00d9ff;
-      const innerHex = isSuperNitro ? 0xff99ff : 0xe0ffff;
+      const outerHex = isSuperNitro ? 0x3b82f6 : 0xff7a1a;
+      const innerHex = isSuperNitro ? 0xe0f2fe : 0xdbeafe;
 
       for (const m of this.flameOuterMats) {
-        m.color.setHex(outerHex).multiplyScalar(1.55);
+        m.color.setHex(outerHex).multiplyScalar(1.48);
       }
       for (const m of this.flameInnerMats) {
-        m.color.setHex(innerHex).multiplyScalar(1.7);
+        m.color.setHex(innerHex).multiplyScalar(1.68);
       }
       for (let i = 0; i < this.flameCones.length; i++) {
         this.flameCones[i].scale.set(radScale, radScale, lenScale);
       }
 
       this.nitroPointLight.color.setHex(outerHex);
-      this.nitroPointLight.intensity = 2.6 * boostIntensity * flicker;
+      this.nitroPointLight.intensity = 2.4 * boostIntensity * flicker;
     } else {
       this.nitroFlameGroup.visible = false;
       this.nitroPointLight.intensity = 0;

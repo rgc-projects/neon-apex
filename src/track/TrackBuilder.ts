@@ -3,8 +3,12 @@ import { TrackSpline } from './TrackSpline';
 import {
   createBoostPadTexture,
   createChevronBannerTexture,
+  createConcreteTexture,
+  createCurbTexture,
+  createDistanceBoardTexture,
+  createHighwaySignTexture,
   createRampTexture,
-  createRoadTexture,
+  createRoadPBRTextures,
   createStartFinishTexture,
 } from '../utils/textures';
 
@@ -13,7 +17,7 @@ export interface TrackBuildResult {
   boostTexture: THREE.CanvasTexture;
   countdownLights: THREE.MeshStandardMaterial[];
   update: (dt: number, elapsed: number) => void;
-  setCountdownState: (stage: number) => void; // 0=off, 1=red1, 2=red2, 3=red3, 4=GREEN GO
+  setCountdownState: (stage: number) => void;
   dispose: () => void;
 }
 
@@ -25,9 +29,12 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   const halfW = spline.halfWidth;
   const N = spline.sampleCount;
 
-  // 1. Road Surface Ribbon Mesh
-  const roadTex = createRoadTexture(cfg.asphaltTint, cfg.accentColorHex);
-  disposables.push(roadTex);
+  // 1. Photorealistic PBR Wet-Asphalt Road Ribbon + Concrete Viaduct Deck + Jersey Barriers + Steel W-Beam Guardrails
+  const roadPBR = createRoadPBRTextures(cfg.asphaltTint);
+  const concreteTex = createConcreteTexture();
+  concreteTex.repeat.set(80, 1);
+  const curbTex = createCurbTexture();
+  disposables.push(roadPBR.map, roadPBR.normalMap, roadPBR.roughnessMap, concreteTex, curbTex);
 
   const roadPositions: number[] = [];
   const roadNormals: number[] = [];
@@ -38,16 +45,26 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   const deckNormals: number[] = [];
   const deckIndices: number[] = [];
 
-  // Barrier walls + glowing neon rails along left and right edges
-  const railLeftPos: number[] = [];
-  const railRightPos: number[] = [];
-  const railIndices: number[] = [];
-
   const wallPos: number[] = [];
   const wallNormals: number[] = [];
+  const wallUvs: number[] = [];
   const wallIndices: number[] = [];
 
-  const tileLen = 22; // meters per UV repeat
+  const steelRailPos: number[] = [];
+  const steelRailNormals: number[] = [];
+  const steelRailIndices: number[] = [];
+
+  const accentLeftPos: number[] = [];
+  const accentRightPos: number[] = [];
+  const accentIndices: number[] = [];
+
+  // Raised FIA Red-and-White Apex Curbs on sharp corners
+  const curbPos: number[] = [];
+  const curbNormals: number[] = [];
+  const curbUvs: number[] = [];
+  const curbIndices: number[] = [];
+
+  const tileLen = 28;
   const vTmp = new THREE.Vector3();
 
   for (let i = 0; i <= N; i++) {
@@ -55,7 +72,6 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     const sDist = i === N ? spline.totalLength : sample.s;
     const vCoord = sDist / tileLen;
 
-    // Road top left & right
     const leftEdge = vTmp.copy(sample.pos).addScaledVector(sample.right, -halfW).clone();
     const rightEdge = vTmp.copy(sample.pos).addScaledVector(sample.right, halfW).clone();
 
@@ -65,15 +81,15 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     roadNormals.push(sample.up.x, sample.up.y, sample.up.z);
     roadUvs.push(0, vCoord, 1, vCoord);
 
-    // Solid under-deck cross section (4 vertices per slice: topL, topR, botR, botL)
-    const deckDepth = 2.6;
-    const deckInset = 1.4;
+    // Solid concrete box-girder viaduct under-deck
+    const deckDepth = 3.2;
+    const deckInset = 2.0;
     const botL = leftEdge.clone().addScaledVector(sample.right, deckInset).addScaledVector(sample.up, -deckDepth);
     const botR = rightEdge.clone().addScaledVector(sample.right, -deckInset).addScaledVector(sample.up, -deckDepth);
 
     deckPositions.push(
-      leftEdge.x, leftEdge.y - 0.05, leftEdge.z,
-      rightEdge.x, rightEdge.y - 0.05, rightEdge.z,
+      leftEdge.x, leftEdge.y - 0.04, leftEdge.z,
+      rightEdge.x, rightEdge.y - 0.04, rightEdge.z,
       botR.x, botR.y, botR.z,
       botL.x, botL.y, botL.z
     );
@@ -84,10 +100,10 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
       -sample.up.x, -sample.up.y, -sample.up.z
     );
 
-    // Outer low barrier wall (1.35m high) on both sides
-    const wallH = 1.35;
-    const lTop = leftEdge.clone().addScaledVector(sample.up, wallH);
-    const rTop = rightEdge.clone().addScaledVector(sample.up, wallH);
+    // Realistic concrete Jersey barrier walls (1.18m high, tapered slightly outward at top)
+    const wallH = 1.18;
+    const lTop = leftEdge.clone().addScaledVector(sample.right, -0.22).addScaledVector(sample.up, wallH);
+    const rTop = rightEdge.clone().addScaledVector(sample.right, 0.22).addScaledVector(sample.up, wallH);
     wallPos.push(
       leftEdge.x, leftEdge.y, leftEdge.z,
       lTop.x, lTop.y, lTop.z,
@@ -100,44 +116,91 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
       -sample.right.x, -sample.right.y, -sample.right.z,
       -sample.right.x, -sample.right.y, -sample.right.z
     );
+    wallUvs.push(vCoord * 0.5, 0, vCoord * 0.5, 1, vCoord * 0.5, 0, vCoord * 0.5, 1);
 
-    // Glowing neon light strip tubes sitting on top of barriers (ribbon strip)
-    const stripB = 0.92;
-    const stripT = 1.38;
-    const lStripB = leftEdge.clone().addScaledVector(sample.right, 0.12).addScaledVector(sample.up, stripB);
-    const lStripT = leftEdge.clone().addScaledVector(sample.right, 0.12).addScaledVector(sample.up, stripT);
-    const rStripB = rightEdge.clone().addScaledVector(sample.right, -0.12).addScaledVector(sample.up, stripB);
-    const rStripT = rightEdge.clone().addScaledVector(sample.right, -0.12).addScaledVector(sample.up, stripT);
+    // Galvanized steel W-beam highway guardrail mounted at mid-height (0.58m..0.88m)
+    const gB = 0.54;
+    const gT = 0.88;
+    const lGB = leftEdge.clone().addScaledVector(sample.right, 0.08).addScaledVector(sample.up, gB);
+    const lGT = leftEdge.clone().addScaledVector(sample.right, 0.08).addScaledVector(sample.up, gT);
+    const rGB = rightEdge.clone().addScaledVector(sample.right, -0.08).addScaledVector(sample.up, gB);
+    const rGT = rightEdge.clone().addScaledVector(sample.right, -0.08).addScaledVector(sample.up, gT);
+    steelRailPos.push(
+      lGB.x, lGB.y, lGB.z, lGT.x, lGT.y, lGT.z,
+      rGB.x, rGB.y, rGB.z, rGT.x, rGT.y, rGT.z
+    );
+    steelRailNormals.push(
+      sample.right.x, sample.right.y, sample.right.z,
+      sample.right.x, sample.right.y, sample.right.z,
+      -sample.right.x, -sample.right.y, -sample.right.z,
+      -sample.right.x, -sample.right.y, -sample.right.z
+    );
 
-    railLeftPos.push(lStripB.x, lStripB.y, lStripB.z, lStripT.x, lStripT.y, lStripT.z);
-    railRightPos.push(rStripB.x, rStripB.y, rStripB.z, rStripT.x, rStripT.y, rStripT.z);
+    // Thin tasteful architectural highway reflector strip tucked cleanly under top lip (0.09m thin!)
+    const sB = 1.06;
+    const sT = 1.15;
+    const lSB = leftEdge.clone().addScaledVector(sample.right, -0.14).addScaledVector(sample.up, sB);
+    const lST = leftEdge.clone().addScaledVector(sample.right, -0.14).addScaledVector(sample.up, sT);
+    const rSB = rightEdge.clone().addScaledVector(sample.right, 0.14).addScaledVector(sample.up, sB);
+    const rST = rightEdge.clone().addScaledVector(sample.right, 0.14).addScaledVector(sample.up, sT);
+    accentLeftPos.push(lSB.x, lSB.y, lSB.z, lST.x, lST.y, lST.z);
+    accentRightPos.push(rSB.x, rSB.y, rSB.z, rST.x, rST.y, rST.z);
 
     if (i < N) {
       const a = i * 2;
-      const b = a + 1;
-      const c = a + 2;
-      const d = a + 3;
-      roadIndices.push(a, b, c, b, d, c);
-      railIndices.push(a, b, c, b, d, c);
+      roadIndices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      accentIndices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
 
-      // Under-deck faces (left skirt, right skirt, bottom)
       const da = i * 4;
       const db = da + 4;
-      // left face: topL(0), botL(3)
       deckIndices.push(da + 0, db + 0, da + 3, db + 0, db + 3, da + 3);
-      // right face: topR(1), botR(2)
       deckIndices.push(da + 1, da + 2, db + 1, db + 1, da + 2, db + 2);
-      // bottom face: botL(3), botR(2)
       deckIndices.push(da + 3, db + 3, da + 2, db + 3, db + 2, da + 2);
 
-      // Barrier walls (double-sided)
-      const wa = i * 4;
-      const wb = wa + 4;
-      wallIndices.push(wa + 0, wa + 1, wb + 0, wa + 1, wb + 1, wb + 0);
-      wallIndices.push(wa + 2, wb + 2, wa + 3, wa + 3, wb + 2, wb + 3);
+      wallIndices.push(da + 0, da + 1, db + 0, da + 1, db + 1, db + 0);
+      wallIndices.push(da + 2, db + 2, da + 3, da + 3, db + 2, db + 3);
+
+      steelRailIndices.push(da + 0, da + 1, db + 0, da + 1, db + 1, db + 0);
+      steelRailIndices.push(da + 2, db + 2, da + 3, da + 3, db + 2, db + 3);
     }
   }
 
+  // Build FIA Red/White Raised Curbs along curved corner zones
+  let curbVertCount = 0;
+  for (let i = 0; i < N; i++) {
+    const f0 = spline.samples[i];
+    const f1 = spline.samples[(i + 1) % N];
+    if (Math.abs(f0.curvature) < 0.005) continue;
+
+    // Place apex curb on BOTH inside & outside edges of sharp corners
+    for (const side of [-1, 1] as const) {
+      const innerD = side * (halfW - 1.35);
+      const outerD = side * (halfW - 0.15);
+      const p0In = f0.pos.clone().addScaledVector(f0.right, innerD).addScaledVector(f0.up, 0.04);
+      const p0Out = f0.pos.clone().addScaledVector(f0.right, outerD).addScaledVector(f0.up, 0.15);
+      const p1In = f1.pos.clone().addScaledVector(f1.right, innerD).addScaledVector(f1.up, 0.04);
+      const p1Out = f1.pos.clone().addScaledVector(f1.right, outerD).addScaledVector(f1.up, 0.15);
+
+      const v0 = f0.s / 14;
+      const v1 = (f0.s + spline.totalLength / N) / 14;
+
+      curbPos.push(
+        p0In.x, p0In.y, p0In.z,
+        p0Out.x, p0Out.y, p0Out.z,
+        p1In.x, p1In.y, p1In.z,
+        p1Out.x, p1Out.y, p1Out.z
+      );
+      for (let k = 0; k < 4; k++) curbNormals.push(f0.up.x, f0.up.y, f0.up.z);
+      curbUvs.push(0, v0, 1, v0, 0, v1, 1, v1);
+
+      const b = curbVertCount;
+      if (side > 0) curbIndices.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
+      else curbIndices.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+      curbVertCount += 4;
+    }
+  }
+
+  // Road PBR Material (damp tire tracks reflect dusk sky, streetlights & brake lights!)
   const roadGeo = new THREE.BufferGeometry();
   roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(roadPositions, 3));
   roadGeo.setAttribute('normal', new THREE.Float32BufferAttribute(roadNormals, 3));
@@ -145,69 +208,101 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   roadGeo.setIndex(roadIndices);
 
   const roadMat = new THREE.MeshStandardMaterial({
-    map: roadTex,
-    roughness: 0.36,
-    metalness: 0.28,
+    map: roadPBR.map,
+    normalMap: roadPBR.normalMap,
+    normalScale: new THREE.Vector2(0.45, 0.45),
+    roughnessMap: roadPBR.roughnessMap,
+    roughness: 1.0,
+    metalness: 0.12,
+    envMapIntensity: 1.35,
   });
-  const roadMesh = new THREE.Mesh(roadGeo, roadMat);
-  roadMesh.receiveShadow = false;
-  group.add(roadMesh);
+  group.add(new THREE.Mesh(roadGeo, roadMat));
   disposables.push(roadGeo, roadMat);
 
-  // Under-deck structural chassis
+  if (curbVertCount > 0) {
+    const curbGeo = new THREE.BufferGeometry();
+    curbGeo.setAttribute('position', new THREE.Float32BufferAttribute(curbPos, 3));
+    curbGeo.setAttribute('normal', new THREE.Float32BufferAttribute(curbNormals, 3));
+    curbGeo.setAttribute('uv', new THREE.Float32BufferAttribute(curbUvs, 2));
+    curbGeo.setIndex(curbIndices);
+    const curbMat = new THREE.MeshStandardMaterial({
+      map: curbTex,
+      roughness: 0.55,
+      metalness: 0.08,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+    });
+    group.add(new THREE.Mesh(curbGeo, curbMat));
+    disposables.push(curbGeo, curbMat);
+  }
+
+  // Concrete Viaduct Box-Girder Under-Deck
   const deckGeo = new THREE.BufferGeometry();
   deckGeo.setAttribute('position', new THREE.Float32BufferAttribute(deckPositions, 3));
   deckGeo.setAttribute('normal', new THREE.Float32BufferAttribute(deckNormals, 3));
   deckGeo.setIndex(deckIndices);
   const deckMat = new THREE.MeshStandardMaterial({
-    color: 0x0b0f1e,
-    roughness: 0.5,
-    metalness: 0.7,
+    color: 0x262c36,
+    roughness: 0.78,
+    metalness: 0.18,
     side: THREE.DoubleSide,
   });
   group.add(new THREE.Mesh(deckGeo, deckMat));
   disposables.push(deckGeo, deckMat);
 
-  // Dark metallic side barriers
+  // Concrete Jersey Barriers
   const wallGeo = new THREE.BufferGeometry();
   wallGeo.setAttribute('position', new THREE.Float32BufferAttribute(wallPos, 3));
   wallGeo.setAttribute('normal', new THREE.Float32BufferAttribute(wallNormals, 3));
+  wallGeo.setAttribute('uv', new THREE.Float32BufferAttribute(wallUvs, 2));
   wallGeo.setIndex(wallIndices);
   const wallMat = new THREE.MeshStandardMaterial({
-    color: 0x11172b,
-    roughness: 0.35,
-    metalness: 0.8,
+    map: concreteTex,
+    roughness: 0.82,
+    metalness: 0.1,
     side: THREE.DoubleSide,
   });
   group.add(new THREE.Mesh(wallGeo, wallMat));
   disposables.push(wallGeo, wallMat);
 
-  // Glowing Left & Right Neon Rail Strips (crisp jewel-like HDR neon rails)
-  const makeRail = (positions: number[], hexColor: number) => {
+  // Galvanized Brushed Steel W-Beam Guardrails
+  const steelGeo = new THREE.BufferGeometry();
+  steelGeo.setAttribute('position', new THREE.Float32BufferAttribute(steelRailPos, 3));
+  steelGeo.setAttribute('normal', new THREE.Float32BufferAttribute(steelRailNormals, 3));
+  steelGeo.setIndex(steelRailIndices);
+  const steelMat = new THREE.MeshStandardMaterial({
+    color: 0x9aa5b4,
+    roughness: 0.34,
+    metalness: 0.82,
+    envMapIntensity: 1.4,
+    side: THREE.DoubleSide,
+  });
+  group.add(new THREE.Mesh(steelGeo, steelMat));
+  disposables.push(steelGeo, steelMat);
+
+  // Subtle architectural LED reflector strip along barrier crown (tasteful modern realism)
+  const makeAccent = (positions: number[], hexColor: number) => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geo.setIndex(railIndices);
+    geo.setIndex(accentIndices);
     geo.computeVertexNormals();
-    const col = new THREE.Color(hexColor).multiplyScalar(1.28);
     const mat = new THREE.MeshBasicMaterial({
-      color: col,
+      color: new THREE.Color(hexColor).multiplyScalar(1.05),
       side: THREE.DoubleSide,
-      toneMapped: false,
     });
     group.add(new THREE.Mesh(geo, mat));
     disposables.push(geo, mat);
   };
-  makeRail(railLeftPos, cfg.railLeftColor);
-  makeRail(railRightPos, cfg.railRightColor);
+  makeAccent(accentLeftPos, cfg.railLeftColor);
+  makeAccent(accentRightPos, cfg.railRightColor);
 
-  // 2. Boost Pads (animated scrolling neon chevron decks)
+  // 2. Embedded Optical Road Boost Pads
   const boostTexture = createBoostPadTexture();
   disposables.push(boostTexture);
   const boostMat = new THREE.MeshBasicMaterial({
     map: boostTexture,
     transparent: true,
-    opacity: 0.96,
-    toneMapped: false,
+    opacity: 0.66,
     side: THREE.DoubleSide,
     depthWrite: false,
     polygonOffset: true,
@@ -227,7 +322,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     for (let i = 0; i <= segs; i++) {
       const u = i / segs;
       const f = spline.getFrameAtDistance(sStart + u * pad.length);
-      const lift = 0.08;
+      const lift = 0.06;
       const pl = f.pos.clone().addScaledVector(f.right, pad.d - hw).addScaledVector(f.up, lift);
       const pr = f.pos.clone().addScaledVector(f.right, pad.d + hw).addScaledVector(f.up, lift);
       pPos.push(pl.x, pl.y, pl.z, pr.x, pr.y, pr.z);
@@ -245,20 +340,19 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     disposables.push(geo);
   }
 
-  // 3. Physical 3D Jump Ramps contoured to the spline
+  // 3. Realistic Steel-Deck Jump Ramps
   const rampTex = createRampTexture();
   disposables.push(rampTex);
-  const rampTopMat = new THREE.MeshBasicMaterial({
+  const rampTopMat = new THREE.MeshStandardMaterial({
     map: rampTex,
-    toneMapped: false,
+    roughness: 0.45,
+    metalness: 0.55,
     side: THREE.DoubleSide,
   });
   const rampSideMat = new THREE.MeshStandardMaterial({
-    color: 0x1a1030,
-    emissive: 0xff2a9d,
-    emissiveIntensity: 0.45,
-    metalness: 0.6,
-    roughness: 0.35,
+    color: 0x334155,
+    metalness: 0.72,
+    roughness: 0.4,
     side: THREE.DoubleSide,
   });
   disposables.push(rampTopMat, rampSideMat);
@@ -272,7 +366,6 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     const topPos: number[] = [];
     const topUv: number[] = [];
     const topIdx: number[] = [];
-
     const sidePos: number[] = [];
     const sideIdx: number[] = [];
 
@@ -288,11 +381,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
 
       topPos.push(tl.x, tl.y, tl.z, tr.x, tr.y, tr.z);
       topUv.push(0, u, 1, u);
-
-      sidePos.push(
-        bl.x, bl.y, bl.z, tl.x, tl.y, tl.z,
-        br.x, br.y, br.z, tr.x, tr.y, tr.z
-      );
+      sidePos.push(bl.x, bl.y, bl.z, tl.x, tl.y, tl.z, br.x, br.y, br.z, tr.x, tr.y, tr.z);
 
       if (i < segs) {
         const a = i * 2;
@@ -303,8 +392,6 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
         sideIdx.push(sa + 2, sb + 2, sa + 3, sa + 3, sb + 2, sb + 3);
       }
     }
-
-    // Back vertical face at the launch lip
     const lastIdx = segs * 4;
     sideIdx.push(lastIdx + 0, lastIdx + 2, lastIdx + 1, lastIdx + 1, lastIdx + 2, lastIdx + 3);
 
@@ -324,14 +411,15 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     disposables.push(sideGeo);
   }
 
-  // 4. Start / Finish Line Strip & Monumental Cyber Gantry
+  // 4. Realistic F1 / GT Circuit Start-Finish Line & Steel Truss Gantry
   const startFrame = spline.getFrameAtDistance(0);
   const startTex = createStartFinishTexture();
   disposables.push(startTex);
 
-  const finishLineGeo = new THREE.PlaneGeometry(cfg.roadWidth - 0.8, 5.2);
-  const finishLineMat = new THREE.MeshBasicMaterial({
+  const finishLineGeo = new THREE.PlaneGeometry(cfg.roadWidth - 1.2, 5.8);
+  const finishLineMat = new THREE.MeshStandardMaterial({
     map: startTex,
+    roughness: 0.45,
     polygonOffset: true,
     polygonOffsetFactor: -3,
   });
@@ -339,57 +427,55 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   const startQuat = new THREE.Quaternion().setFromRotationMatrix(
     new THREE.Matrix4().makeBasis(startFrame.right, startFrame.up, startFrame.tangent.clone().negate())
   );
-  finishLine.position.copy(startFrame.pos).addScaledVector(startFrame.up, 0.06);
+  finishLine.position.copy(startFrame.pos).addScaledVector(startFrame.up, 0.05);
   finishLine.quaternion.copy(startQuat);
   finishLine.rotateX(-Math.PI / 2);
   group.add(finishLine);
   disposables.push(finishLineGeo, finishLineMat);
 
-  // Gantry arch
   const gantry = new THREE.Group();
   gantry.position.copy(startFrame.pos);
   gantry.quaternion.copy(startQuat);
 
-  const pillarMat = new THREE.MeshStandardMaterial({
-    color: 0x0e1529,
-    metalness: 0.85,
-    roughness: 0.25,
+  const trussMat = new THREE.MeshStandardMaterial({
+    color: 0x334155,
+    metalness: 0.78,
+    roughness: 0.34,
   });
-  const neonTrimMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(cfg.railLeftColor).multiplyScalar(1.8),
-    toneMapped: false,
+  const housingMat = new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    metalness: 0.5,
+    roughness: 0.45,
   });
-  disposables.push(pillarMat, neonTrimMat);
+  disposables.push(trussMat, housingMat);
 
-  const gantryH = 12.5;
-  const pillarGeo = new THREE.BoxGeometry(1.8, gantryH, 2.2);
-  const leftPillar = new THREE.Mesh(pillarGeo, pillarMat);
-  leftPillar.position.set(-(halfW + 1.1), gantryH * 0.5, 0);
-  const rightPillar = new THREE.Mesh(pillarGeo, pillarMat);
-  rightPillar.position.set(halfW + 1.1, gantryH * 0.5, 0);
+  const gantryH = 12.8;
+  const pillarGeo = new THREE.BoxGeometry(1.5, gantryH, 1.8);
+  const leftPillar = new THREE.Mesh(pillarGeo, trussMat);
+  leftPillar.position.set(-(halfW + 1.2), gantryH * 0.5, 0);
+  const rightPillar = new THREE.Mesh(pillarGeo, trussMat);
+  rightPillar.position.set(halfW + 1.2, gantryH * 0.5, 0);
   gantry.add(leftPillar, rightPillar);
 
-  const crossbarGeo = new THREE.BoxGeometry(cfg.roadWidth + 4.4, 2.4, 2.6);
-  const crossbar = new THREE.Mesh(crossbarGeo, pillarMat);
-  crossbar.position.set(0, gantryH - 0.6, 0);
-  gantry.add(crossbar);
+  const bridgeGeo = new THREE.BoxGeometry(cfg.roadWidth + 4.4, 2.2, 2.2);
+  const bridge = new THREE.Mesh(bridgeGeo, trussMat);
+  bridge.position.set(0, gantryH - 0.6, 0);
+  gantry.add(bridge);
 
-  const trimGeo = new THREE.BoxGeometry(cfg.roadWidth + 4.6, 0.28, 2.8);
-  const trimTop = new THREE.Mesh(trimGeo, neonTrimMat);
-  trimTop.position.set(0, gantryH + 0.65, 0);
-  const trimBot = new THREE.Mesh(trimGeo, neonTrimMat);
-  trimBot.position.set(0, gantryH - 1.85, 0);
-  gantry.add(trimTop, trimBot);
-  disposables.push(pillarGeo, crossbarGeo, trimGeo);
+  // Dark matte F1 start-light pod housing box
+  const podBoxGeo = new THREE.BoxGeometry(14.5, 1.85, 0.7);
+  const podBox = new THREE.Mesh(podBoxGeo, housingMat);
+  podBox.position.set(0, gantryH - 0.6, 1.2);
+  gantry.add(podBox);
+  disposables.push(pillarGeo, bridgeGeo, podBoxGeo);
 
-  // 4 Overhead Countdown Race Light Pods
   const countdownLights: THREE.MeshStandardMaterial[] = [];
-  const podGeo = new THREE.CylinderGeometry(0.62, 0.62, 0.4, 16);
+  const podGeo = new THREE.CylinderGeometry(0.56, 0.56, 0.35, 18);
   podGeo.rotateX(Math.PI / 2);
   disposables.push(podGeo);
   for (let i = 0; i < 4; i++) {
     const podMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1a25,
+      color: 0x1a1a22,
       emissive: 0x000000,
       emissiveIntensity: 0,
       toneMapped: false,
@@ -397,105 +483,234 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     countdownLights.push(podMat);
     disposables.push(podMat);
     const pod = new THREE.Mesh(podGeo, podMat);
-    pod.position.set((i - 1.5) * 3.0, gantryH - 0.6, 1.38);
+    pod.position.set((i - 1.5) * 3.1, gantryH - 0.6, 1.48);
     gantry.add(pod);
   }
   group.add(gantry);
 
-  // 5. Instanced Roadside Neon Light Arches & High-Curvature Corner Chevrons
-  const archCount = 26;
-  const archPillarGeo = new THREE.BoxGeometry(0.65, 9.5, 0.8);
-  const archTopGeo = new THREE.BoxGeometry(cfg.roadWidth + 2.4, 0.55, 0.65);
-  const archPillarMat = new THREE.MeshStandardMaterial({
-    color: 0x121933,
-    metalness: 0.8,
-    roughness: 0.3,
-  });
-  const archGlowMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(cfg.accentColorHex).multiplyScalar(1.25),
-    toneMapped: false,
-  });
-  disposables.push(archPillarGeo, archTopGeo, archPillarMat, archGlowMat);
-
-  const leftArchInst = new THREE.InstancedMesh(archPillarGeo, archPillarMat, archCount);
-  const rightArchInst = new THREE.InstancedMesh(archPillarGeo, archPillarMat, archCount);
-  const topArchInst = new THREE.InstancedMesh(archTopGeo, archGlowMat, archCount);
-
+  // 5. Realistic Curved Highway Cobra-Head LED Streetlamps (InstancedMesh!)
   const dummy = new THREE.Object3D();
   const basisMat = new THREE.Matrix4();
-  const archQuat = new THREE.Quaternion();
-  let archIdx = 0;
+  const q = new THREE.Quaternion();
 
-  for (let i = 1; i <= archCount; i++) {
-    const t = i / (archCount + 1);
+  const lampInterval = 26; // every ~65m along highway
+  const lampSamples: number[] = [];
+  for (let i = 18; i < N - 18; i += lampInterval) {
+    if (spline.isInTunnel(i / N)) continue;
+    lampSamples.push(i);
+  }
+
+  const poleGeo = new THREE.CylinderGeometry(0.16, 0.24, 11.2, 8);
+  const armGeo = new THREE.BoxGeometry(4.6, 0.2, 0.22);
+  const headGeo = new THREE.BoxGeometry(1.5, 0.22, 0.58);
+  const lampPoleMat = new THREE.MeshStandardMaterial({
+    color: 0x64748b,
+    metalness: 0.78,
+    roughness: 0.34,
+  });
+  const isWarmLamp = cfg.theme === 'mountain' || cfg.theme === 'bridge';
+  const lampLensMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(isWarmLamp ? 0xffd28a : 0xe0f2fe).multiplyScalar(1.6),
+    toneMapped: false,
+  });
+  disposables.push(poleGeo, armGeo, headGeo, lampPoleMat, lampLensMat);
+
+  const totalLamps = lampSamples.length * 2;
+  const poleInst = new THREE.InstancedMesh(poleGeo, lampPoleMat, totalLamps);
+  const armInst = new THREE.InstancedMesh(armGeo, lampPoleMat, totalLamps);
+  const headInst = new THREE.InstancedMesh(headGeo, lampLensMat, totalLamps);
+
+  let lIdx = 0;
+  for (const sIdx of lampSamples) {
+    const f = spline.samples[sIdx];
+    basisMat.makeBasis(f.right, f.up, f.tangent.clone().negate());
+    q.setFromRotationMatrix(basisMat);
+
+    for (const side of [-1, 1] as const) {
+      // Pole sitting outside barrier
+      dummy.position.copy(f.pos).addScaledVector(f.right, side * (halfW + 0.9)).addScaledVector(f.up, 5.6);
+      dummy.quaternion.copy(q);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      poleInst.setMatrixAt(lIdx, dummy.matrix);
+
+      // Cantilevered arm leaning inward over the road
+      dummy.position.copy(f.pos).addScaledVector(f.right, side * (halfW - 1.2)).addScaledVector(f.up, 11.0);
+      dummy.updateMatrix();
+      armInst.setMatrixAt(lIdx, dummy.matrix);
+
+      // Illuminated luminaire head
+      dummy.position.copy(f.pos).addScaledVector(f.right, side * (halfW - 3.2)).addScaledVector(f.up, 10.85);
+      dummy.updateMatrix();
+      headInst.setMatrixAt(lIdx, dummy.matrix);
+
+      lIdx++;
+    }
+  }
+  group.add(poleInst, armInst, headInst);
+
+  // 6. Authentic Overhead Expressway Sign Gantries (Japanese/English Green Highway Signs!)
+  const signMeta: Record<string, [string, string, string]> = {
+    city: ['湾岸線  BAYSHORE', 'SHIBUYA / HANEDA AIRPORT', '#046a38'],
+    bridge: ['海湾大橋  BAY BRIDGE', 'HYPERION COASTAL EXPWY', '#035388'],
+    tunnel: ['地下幹線  SUB-ZERO', 'REACTOR EXPRESS TUNNEL', '#046a38'],
+    mountain: ['秋名峠  AKINA PASS', 'DOWNHILL HAIRPINS AHEAD', '#046a38'],
+  };
+  const [sL1, sL2, sBg] = signMeta[cfg.theme] ?? signMeta.city;
+  const signTex = createHighwaySignTexture(sL1, sL2, sBg);
+  const signMat = new THREE.MeshStandardMaterial({
+    map: signTex,
+    emissive: 0xffffff,
+    emissiveMap: signTex,
+    emissiveIntensity: 0.35,
+    roughness: 0.32,
+  });
+  const signBoardGeo = new THREE.BoxGeometry(14.5, 4.1, 0.3);
+  const gLegGeo = new THREE.BoxGeometry(0.95, 13.5, 0.95);
+  const gBeamGeo = new THREE.BoxGeometry(cfg.roadWidth + 3.8, 0.9, 0.9);
+  disposables.push(signTex, signMat, signBoardGeo, gLegGeo, gBeamGeo);
+
+  for (const t of [0.16, 0.48, 0.78]) {
     if (spline.isInTunnel(t)) continue;
     const f = spline.getFrameAtDistance(t * spline.totalLength);
+    const sg = new THREE.Group();
+    sg.position.copy(f.pos);
     basisMat.makeBasis(f.right, f.up, f.tangent.clone().negate());
-    archQuat.setFromRotationMatrix(basisMat);
+    sg.quaternion.setFromRotationMatrix(basisMat);
 
-    // Left post
-    dummy.position.copy(f.pos).addScaledVector(f.right, -(halfW + 0.9)).addScaledVector(f.up, 4.7);
-    dummy.quaternion.copy(archQuat);
-    dummy.scale.set(1, 1, 1);
-    dummy.updateMatrix();
-    leftArchInst.setMatrixAt(archIdx, dummy.matrix);
+    const legL = new THREE.Mesh(gLegGeo, trussMat);
+    legL.position.set(-(halfW + 1.3), 6.75, 0);
+    const legR = new THREE.Mesh(gLegGeo, trussMat);
+    legR.position.set(halfW + 1.3, 6.75, 0);
+    const beam = new THREE.Mesh(gBeamGeo, trussMat);
+    beam.position.set(0, 12.8, 0);
+    const board = new THREE.Mesh(signBoardGeo, signMat);
+    board.position.set(0, 11.4, 0.5);
 
-    // Right post
-    dummy.position.copy(f.pos).addScaledVector(f.right, halfW + 0.9).addScaledVector(f.up, 4.7);
-    dummy.updateMatrix();
-    rightArchInst.setMatrixAt(archIdx, dummy.matrix);
-
-    // Glowing overhead bar
-    dummy.position.copy(f.pos).addScaledVector(f.up, 9.5);
-    dummy.updateMatrix();
-    topArchInst.setMatrixAt(archIdx, dummy.matrix);
-
-    archIdx++;
+    sg.add(legL, legR, beam, board);
+    group.add(sg);
   }
-  leftArchInst.count = archIdx;
-  rightArchInst.count = archIdx;
-  topArchInst.count = archIdx;
-  group.add(leftArchInst, rightArchInst, topArchInst);
 
-  // Corner warning neon chevron boards on outside of sharp 90° bends & 180° hairpins
-  const chevronTex = createChevronBannerTexture('#ffae00');
-  const chevronMat = new THREE.MeshBasicMaterial({
+  // 7. Reflective Yellow/Black Steel Corner Chevron Posts + 150m / 100m / 50m Braking/Drift Distance Boards!
+  const chevronTex = createChevronBannerTexture();
+  const chevronMat = new THREE.MeshStandardMaterial({
     map: chevronTex,
-    toneMapped: false,
+    emissive: 0xfacc15,
+    emissiveMap: chevronTex,
+    emissiveIntensity: 0.32,
+    roughness: 0.3,
+    metalness: 0.25,
     side: THREE.DoubleSide,
   });
-  const chevronGeo = new THREE.PlaneGeometry(5.8, 2.25);
-  disposables.push(chevronTex, chevronMat, chevronGeo);
+  const chevronGeo = new THREE.PlaneGeometry(5.6, 2.2);
+  const stakeGeo = new THREE.CylinderGeometry(0.08, 0.08, 3.0, 6);
+  disposables.push(chevronTex, chevronMat, chevronGeo, stakeGeo);
 
-  const chevronBoards: { pos: THREE.Vector3; quat: THREE.Quaternion }[] = [];
-  for (let i = 0; i < N; i += 8) {
+  const chevronBoards: { pos: THREE.Vector3; quat: THREE.Quaternion; polePos: THREE.Vector3 }[] = [];
+  const cornerEntryIndices: { idx: number; turnSign: number }[] = [];
+  let inCornerZone = false;
+
+  for (let i = 0; i < N; i += 6) {
     const f = spline.samples[i];
-    if (Math.abs(f.curvature) > 0.0068) {
-      // Outside of turn: if turning right (curv > 0), outside is left (-right)
+    const absK = Math.abs(f.curvature);
+    if (absK > 0.006) {
+      if (!inCornerZone) {
+        inCornerZone = true;
+        cornerEntryIndices.push({ idx: i, turnSign: Math.sign(f.curvature) });
+      }
       const outSign = f.curvature > 0 ? -1 : 1;
       const pos = f.pos
         .clone()
-        .addScaledVector(f.right, outSign * (halfW + 0.55))
-        .addScaledVector(f.up, 2.4);
-      // Orient plane facing inward toward road
+        .addScaledVector(f.right, outSign * (halfW + 0.65))
+        .addScaledVector(f.up, 2.35);
+      const polePos = f.pos
+        .clone()
+        .addScaledVector(f.right, outSign * (halfW + 0.72))
+        .addScaledVector(f.up, 1.5);
       const normalIn = f.right.clone().multiplyScalar(-outSign);
       const planeX = f.tangent.clone().multiplyScalar(outSign > 0 ? 1 : -1);
       basisMat.makeBasis(planeX, f.up, normalIn);
-      const q = new THREE.Quaternion().setFromRotationMatrix(basisMat);
-      chevronBoards.push({ pos, quat: q });
+      const boardQ = new THREE.Quaternion().setFromRotationMatrix(basisMat);
+      chevronBoards.push({ pos, quat: boardQ, polePos });
+    } else if (absK < 0.0045) {
+      inCornerZone = false;
     }
   }
+
   if (chevronBoards.length > 0) {
     const chevronInst = new THREE.InstancedMesh(chevronGeo, chevronMat, chevronBoards.length);
+    const stakeInst = new THREE.InstancedMesh(stakeGeo, lampPoleMat, chevronBoards.length);
     chevronBoards.forEach((b, idx) => {
       dummy.position.copy(b.pos);
       dummy.quaternion.copy(b.quat);
       dummy.scale.set(1, 1, 1);
       dummy.updateMatrix();
       chevronInst.setMatrixAt(idx, dummy.matrix);
+
+      dummy.position.copy(b.polePos);
+      dummy.quaternion.identity();
+      dummy.updateMatrix();
+      stakeInst.setMatrixAt(idx, dummy.matrix);
     });
-    group.add(chevronInst);
+    group.add(chevronInst, stakeInst);
   }
+
+  // Place crisp 150m / 100m / 50m Braking/Drift Distance Markers on approach to every sharp corner!
+  const distMats: Record<number, THREE.MeshStandardMaterial> = {};
+  for (const m of [150, 100, 50]) {
+    const dtTex = createDistanceBoardTexture(m);
+    const dtMat = new THREE.MeshStandardMaterial({
+      map: dtTex,
+      emissive: 0xffffff,
+      emissiveMap: dtTex,
+      emissiveIntensity: 0.25,
+      roughness: 0.35,
+    });
+    distMats[m] = dtMat;
+    disposables.push(dtTex, dtMat);
+  }
+  const distBoardGeo = new THREE.BoxGeometry(2.8, 1.75, 0.14);
+  disposables.push(distBoardGeo);
+
+  for (const ce of cornerEntryIndices) {
+    const entryS = spline.samples[ce.idx].s;
+    const outSign = ce.turnSign > 0 ? -1 : 1; // place on outer braking side for optimal sightline!
+    for (const distBack of [150, 100, 50]) {
+      const f = spline.getFrameAtDistance(entryS - distBack);
+      if (Math.abs(f.curvature) > 0.008) continue; // skip if inside another corner
+      const board = new THREE.Mesh(distBoardGeo, distMats[distBack]);
+      board.position
+        .copy(f.pos)
+        .addScaledVector(f.right, outSign * (halfW + 1.5))
+        .addScaledVector(f.up, 2.4);
+      basisMat.makeBasis(f.right, f.up, f.tangent.clone().negate());
+      board.quaternion.setFromRotationMatrix(basisMat);
+      group.add(board);
+    }
+  }
+
+  // 8. Reflective Cat's-Eye Highway Shoulder Studs (InstancedMesh)
+  const studGeo = new THREE.BoxGeometry(0.28, 0.07, 0.42);
+  const studMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+  disposables.push(studGeo, studMat);
+  const studStep = 8;
+  const studCount = Math.floor(N / studStep) * 2;
+  const studInst = new THREE.InstancedMesh(studGeo, studMat, studCount);
+  let stIdx = 0;
+  for (let i = 0; i < N && stIdx + 1 < studCount; i += studStep) {
+    const f = spline.samples[i];
+    basisMat.makeBasis(f.right, f.up, f.tangent.clone().negate());
+    q.setFromRotationMatrix(basisMat);
+    for (const side of [-1, 1] as const) {
+      dummy.position.copy(f.pos).addScaledVector(f.right, side * (halfW - 1.15)).addScaledVector(f.up, 0.04);
+      dummy.quaternion.copy(q);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      studInst.setMatrixAt(stIdx++, dummy.matrix);
+    }
+  }
+  studInst.count = stIdx;
+  group.add(studInst);
 
   const setCountdownState = (stage: number) => {
     for (let i = 0; i < 4; i++) {
@@ -504,13 +719,13 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
       } else if (stage >= 4) {
-        mat.emissive.setHex(0x00ff88);
-        mat.emissiveIntensity = 3.2;
+        mat.emissive.setHex(0x22c55e);
+        mat.emissiveIntensity = 2.8;
       } else if (i < stage) {
-        mat.emissive.setHex(0xff1e56);
-        mat.emissiveIntensity = 3.0;
+        mat.emissive.setHex(0xef4444);
+        mat.emissiveIntensity = 2.8;
       } else {
-        mat.emissive.setHex(0x220810);
+        mat.emissive.setHex(0x220808);
         mat.emissiveIntensity = 0.2;
       }
     }
@@ -521,8 +736,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     boostTexture,
     countdownLights,
     update: (dt: number) => {
-      boostTexture.offset.y -= dt * 2.1;
-      chevronTex.offset.x -= dt * 1.4;
+      boostTexture.offset.y -= dt * 2.0;
     },
     setCountdownState,
     dispose: () => {

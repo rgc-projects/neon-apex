@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CarSpec, InputState, RacerHUDTelemetry } from '../types';
+import { CarSpec, InputState, RacerHUDTelemetry, UpcomingCornerInfo } from '../types';
 import { SplineSample, TrackSpline } from '../track/TrackSpline';
 import { clamp, damp, lerp, signedTrackDelta, wrapDistance } from '../utils/math';
 import { CarModel } from './CarModel';
@@ -16,6 +16,17 @@ export interface PhysicsEvents {
   onNitroStart?: (isSuper: boolean) => void;
 }
 
+/**
+ * Modern Sim-Cade Slip-Angle Drift Physics (Forza Horizon x OutRun 2 x NFS Heat):
+ * - Truly decouples Car Nose Heading (`headingYaw`) from Velocity Travel Direction (`yawOffset`).
+ * - Real slip angle `slipAngle = headingYaw - yawOffset` dynamically drives rear-end swing,
+ *   counter-steer catch, tire smoke/sparks, and front-wheel counter-steering!
+ * - Dual intuitive drift triggers:
+ *   1) Hold `Space` / `DRIFT` (Handbrake / Arcade Drift)
+ *   2) Tap `S` / `BRAKE` while turning at high speed (>125 km/h) -> Brake-to-Drift!
+ * - Track banking (`frame.bank`) applies genuine inward centripetal gravity assist so
+ *   steeply banked U-turns naturally sustain high-speed, long-duration drifts!
+ */
 export class RacerPhysics {
   public readonly id: string;
   public readonly name: string;
@@ -29,19 +40,27 @@ export class RacerPhysics {
   public d = 0;            // lateral offset from centerline (meters, +right, -left)
   public h = 0;            // height above base road surface (meters)
   public vy = 0;           // vertical velocity (m/s)
-  public speed = 0;        // forward velocity magnitude (m/s)
-  public yawOffset = 0;    // velocity travel heading offset vs road tangent (+right, -left)
+  public speed = 0;        // velocity magnitude (m/s)
 
-  // Arcade Drift & Boost states (Mario Kart x Ridge Racer x NFS hybrid)
+  // Decoupled heading vs velocity vectors (relative to road tangent: +right, -left)
+  public yawOffset = 0;    // Velocity travel direction relative to road tangent
+  public headingYaw = 0;   // Car nose orientation relative to road tangent
+  public slipAngle = 0;    // Real physical drift angle: headingYaw - yawOffset
+  private angularVel = 0;  // Yaw rotation rate (rad/s)
+
+  // Arcade Drift & Boost states
   public isDrifting = false;
   public driftDir: -1 | 0 | 1 = 0;
   public driftDuration = 0;
   public driftDistance = 0;
-  public driftCharge = 0; // 0..3
+  public driftCharge = 0;  // 0..3
   public driftTier: 0 | 1 | 2 | 3 = 0;
   public miniBoostTimer = 0;
   public miniBoostPower = 0;
   private exitStraightenTimer = 0;
+  private brakeTapTimer = 0;
+  private brakeDriftLatch = false;
+  private switchbackTimer = 0;
 
   public nitro = 40;       // 0..100
   public isNitroActive = false;
@@ -58,7 +77,7 @@ export class RacerPhysics {
   private lastRampSlope = 0;
   private airPitch = 0;
 
-  // Visual smoothing states (decoupled car nose slip angle vs travel vector!)
+  // Visual smoothing states
   public steerSmooth = 0;
   public visualSlipAngle = 0;
   public bodyRoll = 0;
@@ -86,8 +105,9 @@ export class RacerPhysics {
   public styleScore = 0;
   public isWrongWay = false;
   private prevWrappedS = 0;
+  public upcomingCorner: UpcomingCornerInfo | null = null;
 
-  // Cached world transform for cameras, AI, VFX, collisions
+  // Cached world transform
   public readonly worldPos = new THREE.Vector3();
   public readonly worldForward = new THREE.Vector3(0, 0, -1);
   public readonly worldRight = new THREE.Vector3(1, 0, 0);
@@ -143,13 +163,16 @@ export class RacerPhysics {
   public placeOnGrid(spline: TrackSpline, gridIndex: number): void {
     const row = Math.floor(gridIndex / 2);
     const col = gridIndex % 2 === 0 ? -1 : 1;
-    const startOffset = 14 + row * 11.5;
+    const startOffset = 16 + row * 12.0;
     this.s = wrapDistance(spline.totalLength - startOffset, spline.totalLength);
-    this.d = col * 3.8;
+    this.d = col * 4.2;
     this.h = 0;
     this.vy = 0;
     this.speed = 0;
     this.yawOffset = 0;
+    this.headingYaw = 0;
+    this.slipAngle = 0;
+    this.angularVel = 0;
     this.isDrifting = false;
     this.driftDir = 0;
     this.driftDuration = 0;
@@ -158,6 +181,9 @@ export class RacerPhysics {
     this.driftTier = 0;
     this.miniBoostTimer = 0;
     this.exitStraightenTimer = 0;
+    this.brakeTapTimer = 0;
+    this.brakeDriftLatch = false;
+    this.switchbackTimer = 0;
     this.boostPadTimer = 0;
     this.nitro = 40;
     this.isNitroActive = false;
@@ -189,6 +215,7 @@ export class RacerPhysics {
     this.totalAirTime = 0;
     this.styleScore = 0;
     this.isWrongWay = false;
+    this.upcomingCorner = null;
 
     this.syncWorldTransform(spline, 0.016, false);
   }
@@ -198,11 +225,15 @@ export class RacerPhysics {
     this.h = 0.2;
     this.vy = 0;
     this.yawOffset = 0;
+    this.headingYaw = 0;
+    this.slipAngle = 0;
+    this.angularVel = 0;
     this.speed = Math.min(this.speed, 28);
     this.isDrifting = false;
     this.driftDir = 0;
     this.driftCharge = 0;
     this.driftTier = 0;
+    this.brakeDriftLatch = false;
     this.exitStraightenTimer = 0;
     this.isAirborne = false;
     this.currentAirTime = 0;
@@ -213,7 +244,7 @@ export class RacerPhysics {
   public applyPerfectStart(): void {
     this.speed = Math.max(this.speed, 38);
     this.miniBoostTimer = 1.15;
-    this.miniBoostPower = 26;
+    this.miniBoostPower = 24;
     this.nitro = Math.min(100, this.nitro + 18);
     this.styleScore += 300;
   }
@@ -230,7 +261,7 @@ export class RacerPhysics {
     if (this.boostPadCooldown > 0) this.boostPadCooldown -= dt;
     if (this.exitStraightenTimer > 0) this.exitStraightenTimer = Math.max(0, this.exitStraightenTimer - dt);
 
-    // 1. Steering input smoothing (supports both digital keyboard and smooth analog touch/tilt)
+    // 1. Steering input smoothing (supports digital keyboard + proportional touch/tilt)
     const digitalSteer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     const rawSteer =
       digitalSteer !== 0
@@ -238,7 +269,7 @@ export class RacerPhysics {
         : input.steerAxis !== undefined
           ? clamp(input.steerAxis, -1, 1)
           : 0;
-    this.steerSmooth = damp(this.steerSmooth, rawSteer, 13.0, dt);
+    this.steerSmooth = damp(this.steerSmooth, rawSteer, 12.5, dt);
 
     // 2. Nitro activation & Super Nitro logic
     if (input.nitro && this.nitro > (this.isNitroActive ? 0.5 : 12)) {
@@ -247,7 +278,7 @@ export class RacerPhysics {
         events?.onNitroStart?.(this.isSuperNitro);
       }
       this.isNitroActive = true;
-      const drainRate = (this.isSuperNitro ? 28 : 22) / this.spec.nitroCapacity;
+      const drainRate = (this.isSuperNitro ? 26 : 20) / this.spec.nitroCapacity;
       this.nitro = Math.max(0, this.nitro - drainRate * dt);
       if (this.nitro <= 0.5) {
         this.isNitroActive = false;
@@ -256,35 +287,58 @@ export class RacerPhysics {
     } else {
       this.isNitroActive = false;
       this.isSuperNitro = false;
-      const passive = (this.speed > 55 ? 2.0 : 0.5) + (this.isSlipstreaming ? 8.5 : 0);
+      const passive = (this.speed > 55 ? 1.8 : 0.4) + (this.isSlipstreaming ? 8.5 : 0);
       this.nitro = Math.min(100, this.nitro + passive * dt);
     }
 
     if (this.miniBoostTimer > 0) this.miniBoostTimer = Math.max(0, this.miniBoostTimer - dt);
     if (this.boostPadTimer > 0) this.boostPadTimer = Math.max(0, this.boostPadTimer - dt);
 
-    // 3. Sample road frame & lookahead corner geometry
+    // 3. Road Frame & Upcoming Corner Telemetry Scan (for player HUD callouts!)
     spline.getFrameAtDistance(this.s, this.frame);
-    spline.getFrameAtDistance(this.s + 14, this._lookFrame);
+    spline.getFrameAtDistance(this.s + 18, this._lookFrame);
+    if (this.isPlayer) {
+      this.upcomingCorner = this.scanUpcomingCorner(spline);
+    }
 
-    // Effective corner curvature blends immediate road + slight lookahead so turn-in feels anticipatory!
-    const effCurv = this.frame.curvature * 0.62 + this._lookFrame.curvature * 0.38;
+    const effCurv = this.frame.curvature * 0.65 + this._lookFrame.curvature * 0.35;
     const effBank = this.frame.bank * 0.65 + this._lookFrame.bank * 0.35;
 
-    // 4. Mature Corner-Flow Arcade Drift State Machine
-    // Allow tiny micro-crest airtime (<0.18s) without cancelling an active drift!
+    // 4. Dual Drift Trigger: Hold `Space`/DRIFT OR NFS-style `Brake-Tap` while turning!
+    if (input.brake) {
+      this.brakeTapTimer += dt;
+    } else {
+      this.brakeTapTimer = 0;
+    }
+
     const groundedForDrift = !this.isAirborne || (this.isDrifting && this.currentAirTime < 0.18);
-    const canDrift = groundedForDrift && this.speed > 18 && input.drift;
+    const brakeTapInitiates =
+      this.isPlayer &&
+      input.brake &&
+      this.brakeTapTimer < 0.28 &&
+      Math.abs(rawSteer) > 0.35 &&
+      this.speed > 36;
+
+    // Brake-to-drift stays latched while you hold throttle & maintain slip/steering through the corner
+    if (this.brakeDriftLatch) {
+      const counterReleased = rawSteer * this.driftDir < -0.55 && Math.abs(this.slipAngle) < 0.14;
+      const onStraightNoSteer = Math.abs(effCurv) < 0.0035 && Math.abs(rawSteer) < 0.12 && this.driftDuration > 0.55;
+      if (!groundedForDrift || this.speed < 20 || counterReleased || onStraightNoSteer || input.drift) {
+        if (!input.drift) this.brakeDriftLatch = false;
+      }
+    }
+
+    const wantsDrift = input.drift || this.brakeDriftLatch || brakeTapInitiates;
+    const canDrift = groundedForDrift && this.speed > 18 && wantsDrift;
 
     if (canDrift) {
       if (!this.isDrifting) {
-        // Effortless initiation: uses player steer direction, OR auto-locks to upcoming corner direction if pressing Drift early!
         let initDir: -1 | 0 | 1 = 0;
         if (Math.abs(rawSteer) > 0.1) {
           initDir = rawSteer > 0 ? 1 : -1;
         } else if (Math.abs(this.steerSmooth) > 0.14) {
           initDir = this.steerSmooth > 0 ? 1 : -1;
-        } else if (Math.abs(effCurv) > 0.004) {
+        } else if (Math.abs(effCurv) > 0.0035) {
           initDir = effCurv > 0 ? 1 : -1;
         }
 
@@ -296,72 +350,118 @@ export class RacerPhysics {
           this.driftCharge = 0;
           this.driftTier = 0;
           this.exitStraightenTimer = 0;
-          // Playful Mario-Kart style initiation micro-hop!
-          this.suspensionVel = 1.45;
+          if (brakeTapInitiates && !input.drift) {
+            this.brakeDriftLatch = true;
+          }
+          // Authentic weight-transfer initiation kick (rear swings out cleanly!)
+          this.suspensionVel = 1.35;
+          this.angularVel += initDir * 1.45;
+          this.slipAngle = clamp(this.slipAngle + initDir * 0.14, -0.72, 0.72);
+          this.switchbackTimer = 0;
+        }
+      } else {
+        // Seamless S-curve Switchback Drift Transition!
+        // If you steer hard in the opposite direction while entering an opposite corner,
+        // cash in the current drift boost and smoothly flip into the next bend without fighting the lock!
+        const opposingSteer = rawSteer * this.driftDir < -0.7;
+        const opposingCorner = effCurv * this.driftDir < -0.0052;
+        if (opposingSteer && opposingCorner && this.driftDuration > 0.22) {
+          this.switchbackTimer += dt;
+          if (this.switchbackTimer >= 0.14) {
+            if (this.driftDistance > this.longestDriftMeters) {
+              this.longestDriftMeters = this.driftDistance;
+            }
+            if (this.driftTier >= 1) {
+              const tier = this.driftTier as 1 | 2 | 3;
+              const powers = [0, 10, 16, 23];
+              const durations = [0, 0.75, 1.18, 1.65];
+              const nitroBonus = [0, 14, 24, 38];
+              const points = [0, 180, 420, 780];
+              this.miniBoostPower = powers[tier];
+              this.miniBoostTimer = durations[tier];
+              this.nitro = Math.min(100, this.nitro + nitroBonus[tier]);
+              const totalPts = points[tier] + Math.round(this.driftDistance * 1.35);
+              this.styleScore += totalPts;
+              events?.onDriftBoost?.(tier, this.driftDistance, totalPts);
+            }
+            this.driftDir = (this.driftDir === 1 ? -1 : 1) as -1 | 1;
+            this.driftDuration = 0;
+            this.driftDistance = 0;
+            this.driftCharge = 0;
+            this.driftTier = 0;
+            this.switchbackTimer = 0;
+            this.suspensionVel = 1.25;
+            this.slipAngle = this.driftDir * 0.16;
+          }
+        } else {
+          this.switchbackTimer = 0;
         }
       }
     } else if (this.isDrifting) {
-      // Released drift -> Snap-Straight Exit Recovery + Drift Boost!
+      // Drift Exit! Award Boost & smoothly realign heading -> velocity -> exit straight
       if (this.driftDistance > this.longestDriftMeters) {
         this.longestDriftMeters = this.driftDistance;
       }
       if (this.driftTier >= 1) {
         const tier = this.driftTier as 1 | 2 | 3;
-        // Balanced arcade boost bursts: punchy & exhilarating without throwing you uncontrollably into the next bend
-        const powers = [0, 10, 16, 22];
-        const durations = [0, 0.72, 1.15, 1.6];
+        const powers = [0, 10, 16, 23];
+        const durations = [0, 0.75, 1.18, 1.65];
         const nitroBonus = [0, 14, 24, 38];
         const points = [0, 180, 420, 780];
 
         this.miniBoostPower = powers[tier];
         this.miniBoostTimer = durations[tier];
         this.nitro = Math.min(100, this.nitro + nitroBonus[tier]);
-        const distPoints = Math.round(this.driftDistance * 1.5);
+        const distPoints = Math.round(this.driftDistance * 1.35);
         const totalPts = points[tier] + distPoints;
         this.styleScore += totalPts;
         events?.onDriftBoost?.(tier, this.driftDistance, totalPts);
       }
       this.isDrifting = false;
+      this.brakeDriftLatch = false;
       this.driftDir = 0;
       this.driftDuration = 0;
       this.driftDistance = 0;
       this.driftCharge = 0;
       this.driftTier = 0;
-      this.exitStraightenTimer = 0.52;
+      // CRITICAL: Keep velocity vector continuous on exit — do NOT snap velocity toward sideways slip nose!
+      this.slipAngle = 0;
+      this.headingYaw = this.yawOffset;
+      this.angularVel = 0;
+      this.exitStraightenTimer = 0.55;
     }
 
-    // Inward bank angle aligned with active drift direction (>0 = banked inward like a bowl!)
+    // Track banking aligned with active drift direction (>0 = banked inward!)
     const inwardBankRad = this.isDrifting ? -effBank * this.driftDir : 0;
     const bankNorm = clamp(inwardBankRad / THREE.MathUtils.degToRad(34), 0, 1.15);
-    const matchingCorner = this.isDrifting && effCurv * this.driftDir > 0.0018;
-    const cornerSharpness = clamp((Math.abs(effCurv) - 0.0045) / 0.03, 0, 1);
+    const matchingCorner = this.isDrifting && effCurv * this.driftDir > 0.0014;
+    const cornerSharpness = clamp((Math.abs(effCurv) - 0.0038) / 0.024, 0, 1);
 
+    // Drift Charge & Nitro generation driven by ACTUAL physical slipAngle + banking!
     if (this.isDrifting) {
       this.driftDuration += dt;
       this.driftDistance += this.speed * dt;
 
-      // Steering into the apex charges faster; counter-steering widens line while keeping drift alive
-      const mod = this.steerSmooth * this.driftDir; // +1 into drift, -1 counter-steer
-      const steerBonus = mod > 0.2 ? 1.4 : mod < -0.2 ? 0.72 : 1.05;
-      const speedFactor = clamp(this.speed / 62, 0.65, 1.3);
-      const cornerBonus = matchingCorner ? 1.2 : 0.7;
+      const slipFactor = clamp(Math.abs(this.slipAngle) / 0.42, 0.45, 1.55);
+      const speedFactor = clamp(this.speed / 62, 0.62, 1.32);
+      const cornerBonus = matchingCorner ? 1.22 : 0.65;
 
-      // Track banking angle controls drift charge tempo & duration:
-      // - Flat 90° street corners (bankNorm ~ 0): brisk snap charge (1.42x) -> Tier 1/2 in ~0.9-1.4s!
-      // - Steep banked U-turn bowls (bankNorm ~ 1): stretched smooth pace (0.82x) across the full 180° bowl -> Tier 3 Purple + 50% bonus Nitro!
-      const bankChargePace = 1.42 - clamp(bankNorm, 0, 1) * 0.6;
-      this.driftCharge += dt * steerBonus * speedFactor * cornerBonus * bankChargePace * this.spec.driftChargeRate;
+      // Track banking controls drift duration & charge rhythm:
+      // - Flat 90° corners (bankNorm ~ 0): brisk snap-charge (1.38x) -> crisp Tier 1-2 boost on short 90° bend!
+      // - Steep banked U-turns (bankNorm ~ 1): smooth stretched charge (0.78x) across the long 180° bowl -> Tier 3 + 50% bonus Nitro!
+      const bankChargePace = 1.38 - clamp(bankNorm, 0, 1) * 0.6;
+      this.driftCharge += dt * slipFactor * speedFactor * cornerBonus * bankChargePace * this.spec.driftChargeRate;
 
       const bankNitroBonus = 1.0 + clamp(bankNorm, 0, 1) * 0.5;
-      this.nitro = Math.min(100, this.nitro + dt * 13.0 * steerBonus * bankNitroBonus * this.spec.driftChargeRate);
+      this.nitro = Math.min(100, this.nitro + dt * 12.0 * slipFactor * bankNitroBonus * this.spec.driftChargeRate);
 
       if (this.driftCharge >= 2.35) this.driftTier = 3;
       else if (this.driftCharge >= 1.28) this.driftTier = 2;
-      else if (this.driftCharge >= 0.44) this.driftTier = 1;
+      else if (this.driftCharge >= 0.42) this.driftTier = 1;
       else this.driftTier = 0;
     }
 
-    // 5. Longitudinal Speed, Banking-Tuned Drift Cornering Speed & Road Slope Gravity
+    // 5. Longitudinal Speed, Banking-Driven Corner Speed & Slope Gravity
     const baseMax = this.spec.maxSpeed * paceScale;
     let boostMaxAdd = 0;
     let boostAccelAdd = 0;
@@ -384,21 +484,17 @@ export class RacerPhysics {
       boostAccelAdd += 18 * this.slipstreamLevel;
     }
 
-    // Banking-controlled sweet-spot cornering speed while drifting:
-    // - Flat tight 90° / hairpin (bankNorm=0, sharp=1): scrubs smoothly to ~56 m/s (202 km/h) -> super crisp snap drift!
-    // - Moderate banked turn (bankNorm=0.5, sharp=1): ~68 m/s (245 km/h) -> rhythmic medium drift!
-    // - Steep 34° banked U-turn bowl (bankNorm=1, sharp=1): holds ~81 m/s (292 km/h) -> epic rollercoaster slingshot!
+    // Real slip-angle tire scrub reduced dramatically by steep inward banking!
     let effectiveMaxSpeed = baseMax + boostMaxAdd;
     if (this.isDrifting) {
-      const flatCornerCap = lerp(baseMax * 0.9, baseMax * 0.56, cornerSharpness);
-      const bankedCornerCap = lerp(baseMax * 0.96, baseMax * 0.82, cornerSharpness);
-      const nitroCornerAllowance = this.isNitroActive ? boostMaxAdd * 0.55 : boostMaxAdd * 0.25;
-      const driftCap = lerp(flatCornerCap, bankedCornerCap, clamp(bankNorm, 0, 1)) + nitroCornerAllowance;
+      const flatCornerCap = lerp(baseMax * 0.92, baseMax * 0.62, cornerSharpness);
+      const bankedCornerCap = lerp(baseMax * 0.97, baseMax * 0.87, cornerSharpness);
+      const nitroAllowance = this.isNitroActive ? boostMaxAdd * 0.58 : boostMaxAdd * 0.3;
+      const driftCap = lerp(flatCornerCap, bankedCornerCap, clamp(bankNorm, 0, 1)) + nitroAllowance;
       effectiveMaxSpeed = Math.min(effectiveMaxSpeed, driftCap);
     }
 
-    // Downhill / uphill slope acceleration (Mount Akina downhill hairpins!)
-    const roadSlopeAccel = -this.frame.tangent.y * 14.0;
+    const roadSlopeAccel = -this.frame.tangent.y * 14.5;
 
     if (!this.isAirborne) {
       if (input.throttle || this.isNitroActive || this.miniBoostTimer > 0 || this.boostPadTimer > 0) {
@@ -408,17 +504,18 @@ export class RacerPhysics {
         if (this.speed < effectiveMaxSpeed) {
           this.speed = Math.min(effectiveMaxSpeed, this.speed + Math.max(4, accel) * dt);
         } else {
-          // Crisp corner-entry speed scrub so even 380 km/h entries settle cleanly into a hairpin drift!
-          const scrubLambda = this.isDrifting && cornerSharpness > 0.25 ? 5.2 - clamp(bankNorm, 0, 1) * 1.8 : 2.6;
-          this.speed = damp(this.speed, effectiveMaxSpeed, Math.max(1.5, scrubLambda), dt);
+          const scrubLambda = this.isDrifting && cornerSharpness > 0.2 ? 4.4 - clamp(bankNorm, 0, 1) * 1.6 : 2.2;
+          this.speed = damp(this.speed, effectiveMaxSpeed, Math.max(1.2, scrubLambda), dt);
         }
       } else {
         this.speed = Math.max(0, this.speed - (11 + this.speed * 0.14 - roadSlopeAccel) * dt);
       }
 
-      if (input.brake) {
+      // Brake-tap initiating a drift shouldn't kill your momentum; sustained braking slows down cleanly
+      const hardBraking = input.brake && (!this.brakeDriftLatch || this.brakeTapTimer > 0.28);
+      if (hardBraking) {
         if (this.speed > 2) {
-          this.speed = Math.max(0, this.speed - 78 * dt);
+          this.speed = Math.max(0, this.speed - 76 * dt);
         } else {
           this.speed = Math.max(-18, this.speed - 24 * dt);
         }
@@ -427,13 +524,12 @@ export class RacerPhysics {
       this.speed = Math.max(10, this.speed - 2.2 * dt);
     }
 
-    // 6. Advance Along Spline & Apply Corner-Flow Drift Physics vs Grip Understeer!
+    // 6. Advance Along Spline Using TRUE Velocity Travel Vector (`yawOffset`)
     const cosYaw = Math.cos(this.yawOffset);
     const sinYaw = Math.sin(this.yawOffset);
     const vForwardTrack = this.speed * cosYaw;
     const vLateral = this.speed * sinYaw;
 
-    // Inside lane covers corners faster (true racing line geometry!)
     const radiusFactor = clamp(1 - this.d * this.frame.curvature, 0.42, 1.9);
     const ds = (vForwardTrack * dt) / radiusFactor;
 
@@ -443,100 +539,113 @@ export class RacerPhysics {
     this.s = wrapDistance(this.s + ds, spline.totalLength);
     this.d += vLateral * dt;
 
-    // Measure actual road rotation over ds
     spline.getFrameAtDistance(this.s, this.frame);
     const dTurnRight = Math.atan2(
       this.frame.tangent.dot(prevFlatRight),
       this.frame.tangent.dot(prevTangent)
     );
 
+    // Both nose heading and velocity travel angle naturally lose `dTurnRight` as road curves away
+    this.yawOffset -= dTurnRight;
+    this.headingYaw -= dTurnRight;
+
+    // 7. TRUE DECOUPLED HEADING vs VELOCITY VECTOR STEERING & DRIFT PHYSICS!
     if (this.isDrifting && !this.isAirborne) {
-      // === MATURE ARCADE CORNER-FLOW DRIFT STEERING (Ridge Racer x Mario Kart x OutRun) ===
-      const mod = this.steerSmooth * this.driftDir;
       const agility = this.spec.driftControl;
-      const apexLine = spline.halfWidth - 3.9;  // ideal inner apex lane (clean margin off inner curb)
-      const outerLine = spline.halfWidth - 3.6; // safe outer drift cushion
-      const signedD = this.d * this.driftDir;   // + = inside of corner, - = outside of corner
+      // mod: +1 steering deeper into drift, 0 neutral hold, -1 counter-steering outward
+      const mod = this.steerSmooth * this.driftDir;
 
-      if (matchingCorner) {
-        // Inside a matching corner: smooth arc magnetism absorbs centrifugal throw while letting player
-        // carve anywhere from the inner apex curb (+mod) to the outer lane (-mod)!
-        let targetTravelYaw = 0;
-        if (mod > 0.05) {
-          const distToApex = apexLine - signedD;
-          const diveRate = clamp(distToApex / 8.5, -0.18, 1.0);
-          targetTravelYaw = this.driftDir * diveRate * mod * (0.34 - clamp(bankNorm, 0, 1) * 0.04) * agility;
-        } else if (mod < -0.05) {
-          const distToOuter = outerLine + signedD;
-          const widenRate = clamp(distToOuter / 8.5, -0.15, 1.0);
-          targetTravelYaw = this.driftDir * widenRate * mod * 0.28 * agility;
-        } else {
-          // Neutral drift hold: ultra-smooth glide along your chosen lane
-          const edgeRecover = signedD < -outerLine ? clamp((-outerLine - signedD) / 4, 0, 1) * 0.18 : 0;
-          targetTravelYaw = this.driftDir * (0.015 + clamp(bankNorm, 0, 1) * 0.025 + edgeRecover);
-        }
+      // (A) Real Physical Slip Angle (`headingYaw - yawOffset`):
+      // Steering IN opens a heroic 36-42° drift angle; neutral holds ~24°; counter-steering catches to ~12°!
+      const desiredSlip = this.driftDir * clamp(0.40 + mod * 0.25 + cornerSharpness * 0.10, 0.14, 0.72);
+      this.slipAngle = damp(this.slipAngle, desiredSlip, mod < -0.1 ? 9.0 : 7.0, dt);
 
-        // Outer-bank catch: if drifting near the outer rail on a fast late entry, gently pull inward so you surf the outer edge instead of hitting the wall!
-        if (signedD < -(spline.halfWidth - 3.8) && mod >= -0.2) {
-          const catchBoost = clamp((-(spline.halfWidth - 3.8) - signedD) / 2.6, 0, 1);
-          targetTravelYaw += this.driftDir * catchBoost * 0.24;
-        }
+      // (B) Smooth Travel Vector Control (`yawOffset`) + Banking Centripetal Stability + Apex Curb Cushion:
+      const roadTurnRate = ds > 0.001 ? dTurnRight / dt : 0;
+      const sameDirCorner = roadTurnRate * this.driftDir > 0.04;
 
-        // Only apply a tiny centrifugal push if player is NOT actively steering into the turn
-        const centrifugalRatio = mod > 0.25 ? 0.0 : (1 - (0.93 + clamp(bankNorm, 0, 1) * 0.06));
-        this.yawOffset -= centrifugalRatio * dTurnRight;
+      // Smooth clearance ramps near inside apex & outside guardrail (lets you hug curbs cleanly without slamming!)
+      const signedD = this.d * this.driftDir; // + = inside apex side, - = outside edge
+      const innerClearance = clamp((spline.halfWidth - 2.6 - signedD) / 5.5, 0, 1);
+      const outerClearance = clamp((spline.halfWidth - 2.6 + signedD) / 5.5, 0, 1);
 
-        // Extra snappy turn-in catch during first 0.35s of drift so late entries bite cleanly!
-        const entrySnap = this.driftDuration < 0.35 ? 4.2 : 0;
-        const trackLambda = 8.4 + clamp(bankNorm, 0, 1) * 2.2 + entrySnap;
-        this.yawOffset = damp(this.yawOffset, targetTravelYaw, trackLambda, dt);
+      // Flat sharp corners carry mild outward centrifugal drift unless you steer in;
+      // steeply banked U-turns hold inward naturally via banking gravity!
+      const flatOutwardPush = sameDirCorner ? -0.055 * cornerSharpness * (1 - clamp(bankNorm, 0, 1)) : 0;
+      const bankInwardAssist = sameDirCorner ? 0.045 * clamp(bankNorm, 0, 1) : 0;
+
+      // Desired lateral travel angle relative to road tangent (in driftDir frame)
+      let rawSignedTargetYaw: number;
+      if (sameDirCorner) {
+        // Inside steer (+1) -> cut smoothly to apex (+0.175 rad); Neutral (0) -> hold arc; Counter (-1) -> widen out (-0.17 rad)
+        rawSignedTargetYaw = 0.025 + mod * 0.165 * agility + bankInwardAssist + flatOutwardPush;
       } else {
-        // Drifting on a straightaway (setting up early entry before Turn 1) or S-curve transition
-        this.yawOffset -= dTurnRight * 0.65;
-        const safeEdge = spline.halfWidth - 3.8;
-        const edgeRoom = clamp((safeEdge - signedD) / 7.5, -0.15, 1.0);
-        const rawStraightYaw = (0.07 + mod * 0.17) * agility;
-        const straightTargetYaw = this.driftDir * (rawStraightYaw > 0 ? rawStraightYaw * edgeRoom : rawStraightYaw);
-        this.yawOffset = damp(this.yawOffset, straightTargetYaw, 6.2, dt);
+        // Early drift initiation on straight / before bend -> responsive line setup without wall-slamming
+        rawSignedTargetYaw = 0.065 + mod * 0.135 * agility;
       }
+
+      // Apply smooth apex / outer-edge clearance taper so holding steer hugs the curb like silk!
+      if (rawSignedTargetYaw > 0) {
+        rawSignedTargetYaw *= innerClearance;
+      } else {
+        rawSignedTargetYaw *= outerClearance;
+      }
+
+      const targetYawOffset = clamp(this.driftDir * rawSignedTargetYaw, -0.32, 0.32);
+
+      // Banking boosts arc-tracking stability so high-speed banked bowls feel glued & effortless
+      const followRate = sameDirCorner
+        ? (5.2 + clamp(bankNorm, 0, 1) * 2.6) * agility
+        : 4.8 * agility;
+      const counterBoost = mod < -0.15 ? 1.35 : 1.0;
+
+      // Apply smooth velocity vector redirection toward target arc
+      this.yawOffset = damp(this.yawOffset, targetYawOffset, followRate * counterBoost, dt);
+      this.angularVel = (targetYawOffset - this.yawOffset) * followRate;
+
+      // Car nose heading = travel vector + physical slip angle!
+      this.headingYaw = this.yawOffset + this.slipAngle;
     } else {
       // === NORMAL GRIP STEERING ===
-      // Responsive on straights & gentle curves, realistic high-speed understeer on tight 90°/180° hairpins
-      // so using DRIFT is unmistakably faster and cleaner!
-      this.yawOffset -= dTurnRight;
-
+      // Crisp, rock-solid straight-line stability + authentic high-speed understeer on sharp bends
+      // so drifting (Space OR Brake-Tap) is genuinely faster & tighter through 90° and U-turns!
       const speedSteerScale =
         clamp(Math.abs(this.speed) / 20, 0.25, 1.0) *
-        (1.0 - clamp((this.speed - 45) / 70, 0, 0.58));
-      const airSteerScale = this.isAirborne ? 0.22 : 1.0;
+        (1.0 - clamp((this.speed - 48) / 74, 0, 0.56));
+      const airSteerScale = this.isAirborne ? 0.2 : 1.0;
       const revSign = this.speed >= -0.1 ? 1 : -1;
-      const gripYawRate = this.steerSmooth * 1.42 * this.spec.handling * speedSteerScale * airSteerScale * revSign;
-      this.yawOffset += gripYawRate * dt;
 
-      // Snap-Straight Exit Recovery right after releasing a drift (like Mario Kart / Burnout!)
+      const targetGripYawRate = this.steerSmooth * 1.48 * this.spec.handling * speedSteerScale * airSteerScale * revSign;
+      this.angularVel = damp(this.angularVel, targetGripYawRate, 15.0, dt);
+      this.yawOffset += this.angularVel * dt;
+      this.slipAngle = damp(this.slipAngle, 0, 12.0, dt);
+
+      // Mid-air stabilization, smooth post-drift exit straightening, and gentle straight-line centering
       if (this.isAirborne) {
-        // Gentle mid-air yaw stabilization so high-speed ramp jumps land cleanly down the road!
-        this.yawOffset = damp(this.yawOffset, 0, 2.6, dt);
-      } else if (this.exitStraightenTimer > 0 && Math.abs(rawSteer) < 0.25) {
-        this.yawOffset = damp(this.yawOffset, 0, 7.5, dt);
+        this.yawOffset = damp(this.yawOffset, 0, 2.8, dt);
+      } else if (this.exitStraightenTimer > 0 && Math.abs(rawSteer) < 0.28) {
+        this.yawOffset = damp(this.yawOffset, 0, 7.2, dt);
       } else if (Math.abs(rawSteer) < 0.05 && this.speed > 14) {
-        this.yawOffset = damp(this.yawOffset, 0, 2.0, dt);
+        this.yawOffset = damp(this.yawOffset, 0, 3.8, dt);
       }
+
+      this.headingYaw = this.yawOffset;
     }
 
-    this.yawOffset = clamp(this.yawOffset, -Math.PI * 0.68, Math.PI * 0.68);
+    this.yawOffset = clamp(this.yawOffset, -Math.PI * 0.65, Math.PI * 0.65);
+    this.headingYaw = clamp(this.headingYaw, -Math.PI * 0.72, Math.PI * 0.72);
     this.isWrongWay = Math.abs(this.yawOffset) > Math.PI * 0.56 && this.speed > 6;
 
-    // 7. Guardrail Collision & Smooth Drift Wall-Cushion (Zero Frustrating Pinball!)
-    const maxLat = spline.halfWidth - 1.38;
+    // 8. Guardrail Collision & Smooth Wall-Slide Forgiveness
+    const maxLat = spline.halfWidth - 1.42;
     if (Math.abs(this.d) > maxLat) {
       const side = Math.sign(this.d);
       this.d = side * maxLat;
       const impactIntensity = clamp(Math.abs(vLateral) / 28, 0.18, 1.0);
 
-      // Smoothly guide travel vector parallel to guardrail so car slides cleanly instead of bouncing/wedging
       if (side * this.yawOffset > 0) {
         this.yawOffset = -side * (this.isDrifting ? 0.02 : Math.min(0.08, Math.abs(this.yawOffset) * 0.25));
+        this.headingYaw = this.yawOffset + this.slipAngle;
       }
       this.speed *= 1 - (this.isDrifting ? 0.04 : 0.085) * impactIntensity;
 
@@ -550,7 +659,7 @@ export class RacerPhysics {
       }
     }
 
-    // 8. Jump Ramps, Gravity & Airborne Stunt Tracking
+    // 9. Jump Ramps, Gravity & Airborne Stunt Tracking
     const rampInfo = spline.getRampSurface(this.s, this.d);
     const groundHeight = rampInfo.height;
     const gravity = 34.0;
@@ -564,7 +673,6 @@ export class RacerPhysics {
       } else if (this.wasOnRamp && this.h > 0.35) {
         this.isAirborne = true;
         this.currentAirTime = 0;
-        // Capped heroic arcade leap (~0.9s..1.35s hangtime) so jumps never overshoot the next corner!
         this.vy = clamp(vForwardTrack * Math.max(this.lastRampSlope, 0.22), 12, 20.5);
         this.wasOnRamp = false;
         events?.onJumpLaunch?.();
@@ -595,7 +703,7 @@ export class RacerPhysics {
       }
     }
 
-    // 9. Boost Pad Detection
+    // 10. Boost Pad Detection
     if (!this.isAirborne && this.boostPadCooldown <= 0) {
       const pad = spline.getBoostPadAt(this.s, this.d);
       if (pad) {
@@ -608,7 +716,7 @@ export class RacerPhysics {
       }
     }
 
-    // 10. Lap & Race Progress Tracking
+    // 11. Lap & Race Progress Tracking
     const deltaWrapped = signedTrackDelta(this.prevWrappedS, this.s, spline.totalLength);
     this.totalProgress += deltaWrapped;
     this.prevWrappedS = this.s;
@@ -634,7 +742,7 @@ export class RacerPhysics {
       }
     }
 
-    // 11. Top Speed, Simulated 6-Speed Gearbox & RPM
+    // 12. Top Speed, 6-Speed Gearbox & RPM
     const speedKmh = Math.max(0, this.speed * 3.6);
     if (speedKmh > this.topSpeedKmh) this.topSpeedKmh = speedKmh;
 
@@ -652,20 +760,16 @@ export class RacerPhysics {
     const targetRpm = clamp((speedKmh - gMin * 0.72) / Math.max(gMax - gMin * 0.72, 1), 0.16, 1.0);
     this.rpmNorm = damp(this.rpmNorm, targetRpm, 12, dt);
 
-    // 12. Visual Body Dynamics (Expressive Decoupled Slip Angle + Countersteer + Body Roll!)
-    const modVis = this.isDrifting ? clamp(this.steerSmooth * this.driftDir, -0.5, 1.0) : 0;
-    const targetSlip = this.isDrifting
-      ? this.driftDir * (0.44 + modVis * 0.22 + cornerSharpness * 0.14)
-      : this.steerSmooth * 0.045;
-    this.visualSlipAngle = damp(this.visualSlipAngle, targetSlip, 9.5, dt);
+    // 13. Visual Body Dynamics driven directly by REAL physical `slipAngle`!
+    this.visualSlipAngle = damp(this.visualSlipAngle, this.slipAngle, 12.0, dt);
 
     const targetRoll =
-      (this.isDrifting ? this.driftDir * (0.095 + cornerSharpness * 0.03) : this.steerSmooth * 0.048) *
+      (this.isDrifting ? this.slipAngle * 0.22 : this.steerSmooth * 0.045) *
       clamp(this.speed / 65, 0.2, 1.15);
     this.bodyRoll = damp(this.bodyRoll, targetRoll, 10, dt);
 
     const isBoosting = this.isNitroActive || this.miniBoostTimer > 0 || this.boostPadTimer > 0;
-    const targetPitch = isBoosting ? 0.045 : input.brake ? -0.055 : input.throttle ? 0.022 : 0;
+    const targetPitch = isBoosting ? 0.04 : input.brake ? -0.055 : input.throttle ? 0.018 : 0;
     this.bodyPitch = damp(this.bodyPitch, targetPitch, 9, dt);
 
     const springK = 140;
@@ -680,8 +784,46 @@ export class RacerPhysics {
         : 0;
     this.airPitch = damp(this.airPitch, targetAirPitch, 10, dt);
 
-    // 13. Sync 3D Mesh Transform
+    // 14. Sync 3D Mesh Transform
     this.syncWorldTransform(spline, dt, input.brake);
+  }
+
+  /** Scans 35m..195m ahead for upcoming 90° turns & hairpins to telegraph corner entry cleanly */
+  private scanUpcomingCorner(spline: TrackSpline): UpcomingCornerInfo | null {
+    let peakAbsK = 0;
+    let peakSign: -1 | 1 = 1;
+    let firstDist = -1;
+    let peakBankDeg = 0;
+    let totalTurnRad = 0;
+
+    const step = 14;
+    for (let dist = 30; dist <= 210; dist += step) {
+      spline.getFrameAtDistance(this.s + dist, this._lookFrame);
+      const k = this._lookFrame.curvature;
+      const absK = Math.abs(k);
+      if (absK > 0.0052) {
+        if (firstDist < 0) firstDist = dist;
+        if (absK > peakAbsK) {
+          peakAbsK = absK;
+          peakSign = k >= 0 ? 1 : -1;
+        }
+        const bDeg = Math.abs(THREE.MathUtils.radToDeg(this._lookFrame.bank));
+        if (bDeg > peakBankDeg) peakBankDeg = bDeg;
+        if (Math.sign(k) === peakSign) {
+          totalTurnRad += absK * step;
+        }
+      } else if (firstDist >= 0 && dist - firstDist > 55) {
+        break;
+      }
+    }
+
+    if (firstDist < 0 || peakAbsK < 0.0062) return null;
+    return {
+      direction: peakSign,
+      distanceMeters: Math.round(firstDist),
+      isHairpin: totalTurnRad > 1.95,
+      bankDeg: Math.round(peakBankDeg),
+    };
   }
 
   public syncWorldTransform(spline: TrackSpline, dt: number, isBraking: boolean): void {
@@ -746,9 +888,11 @@ export class RacerPhysics {
       isSuperNitro: this.isSuperNitro,
       isDrifting: this.isDrifting,
       driftTier: this.driftTier,
-      driftChargeNorm: clamp(this.driftCharge / 2.3, 0, 1),
+      driftChargeNorm: clamp(this.driftCharge / 2.35, 0, 1),
       driftDistance: Math.round(this.driftDistance),
+      driftAngleDeg: Math.round(Math.abs(THREE.MathUtils.radToDeg(this.slipAngle))),
       bankAngleDeg: Math.round(THREE.MathUtils.radToDeg(Math.abs(this.frame.bank))),
+      upcomingCorner: this.upcomingCorner,
       isAirborne: this.isAirborne,
       airTime: this.currentAirTime,
       isSlipstreaming: this.isSlipstreaming,
@@ -773,14 +917,13 @@ export function resolveMultiCarInteractions(
 ): void {
   const L = spline.totalLength;
 
-  // 1. Slipstream detection
   for (const r of racers) {
     let drafting = false;
     if (r.speed > 45 && !r.isAirborne && !r.isWrongWay) {
       for (const other of racers) {
         if (other === r) continue;
         const ds = signedTrackDelta(r.s, other.s, L);
-        if (ds > 5.5 && ds < 44 && Math.abs(other.d - r.d) < 3.4 && Math.abs(other.h - r.h) < 2.2) {
+        if (ds > 5.5 && ds < 46 && Math.abs(other.d - r.d) < 3.6 && Math.abs(other.h - r.h) < 2.2) {
           drafting = true;
           break;
         }
@@ -790,7 +933,6 @@ export function resolveMultiCarInteractions(
     r.isSlipstreaming = r.slipstreamLevel > 0.35;
   }
 
-  // 2. Pairwise car-to-car collision resolution
   for (let i = 0; i < racers.length; i++) {
     for (let j = i + 1; j < racers.length; j++) {
       const a = racers[i];
@@ -809,8 +951,8 @@ export function resolveMultiCarInteractions(
           const push = overlapD * 0.55;
           a.d -= pushDir * push;
           b.d += pushDir * push;
-          a.yawOffset -= pushDir * 0.05;
-          b.yawOffset += pushDir * 0.05;
+          a.yawOffset -= pushDir * 0.04;
+          b.yawOffset += pushDir * 0.04;
         } else {
           const dir = ds >= 0 ? 1 : -1;
           const push = overlapS * 0.52;

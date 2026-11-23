@@ -28,7 +28,7 @@ export class TrackSpline {
   public readonly totalLength: number;
   public readonly roadWidth: number;
   public readonly halfWidth: number;
-  public readonly sampleCount = 1200;
+  public readonly sampleCount = 1500;
 
   private readonly _tmpA = new THREE.Vector3();
 

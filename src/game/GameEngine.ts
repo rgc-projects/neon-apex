@@ -60,6 +60,11 @@ export class GameEngine {
   private showcaseOrigin = new THREE.Vector3();
   private showcaseRingMesh: THREE.Mesh | null = null;
 
+  // Dynamic Realistic World Lighting
+  private readonly hemiLight: THREE.HemisphereLight;
+  private readonly dirKeyLight: THREE.DirectionalLight;
+  private readonly dirRimLight: THREE.DirectionalLight;
+
   // Race Entities
   private racers: RacerPhysics[] = [];
   private aiDrivers: Map<string, AIDriver> = new Map();
@@ -107,33 +112,33 @@ export class GameEngine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.75));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.toneMappingExposure = 1.15;
 
     this.cameraController = new CameraController(window.innerWidth / window.innerHeight);
 
-    // Post-Processing: Render -> UnrealBloomPass (half-res on mobile for locked 60 FPS) -> OutputPass
+    // Post-Processing: Render -> Optical Cinema UnrealBloomPass (subtle realistic highlights) -> OutputPass
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.cameraController.camera));
     const bloomScale = isMobile ? 0.5 : 1.0;
     this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth * bloomScale, window.innerHeight * bloomScale),
-      0.34, // strength - crisp jewel-like neon glow without white washout
-      0.28, // radius
-      0.86  // threshold
+      0.26, // strength - authentic camera lens bloom on headlights, taillights & streetlamps
+      0.34, // radius
+      0.90  // threshold - preserves crisp daylight/dusk speculars without neon haze
     );
     this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
 
-    // Procedural Environment Reflections for metallic hypercars
+    // Procedural Realistic Twilight + Streetlamp HDR Reflection Probe
     this.scene.environment = createProceduralEnvMap(this.renderer);
 
-    // Rich Three-Point Cyber Scene Lighting
-    const hemi = new THREE.HemisphereLight(0x6890ff, 0x1a0836, 1.05);
-    const dirKey = new THREE.DirectionalLight(0xffe0f5, 1.45);
-    dirKey.position.set(120, 220, 140);
-    const dirRim = new THREE.DirectionalLight(0x00f2ff, 0.95);
-    dirRim.position.set(-160, 90, -180);
-    this.scene.add(hemi, dirKey, dirRim);
+    // Three-Point Photorealistic Atmospheric Lighting (adapted per track theme in loadTrack)
+    this.hemiLight = new THREE.HemisphereLight(0x9bc0eb, 0x222938, 1.32);
+    this.dirKeyLight = new THREE.DirectionalLight(0xffddb5, 1.9);
+    this.dirKeyLight.position.set(140, 185, 120);
+    this.dirRimLight = new THREE.DirectionalLight(0x93c5fd, 1.0);
+    this.dirRimLight.position.set(-150, 95, -160);
+    this.scene.add(this.hemiLight, this.dirKeyLight, this.dirRimLight);
 
     this.scene.add(this.particles.group, this.skidMarks.mesh, this.showcaseGroup);
     this.buildShowcasePedestal();
@@ -244,28 +249,42 @@ export class GameEngine {
   }
 
   private buildShowcasePedestal(): void {
-    const discGeo = new THREE.CylinderGeometry(3.45, 3.85, 0.28, 36);
+    // Modern GT automotive studio turntable: dark honed basalt platform + brushed aluminum chamfer
+    const discGeo = new THREE.CylinderGeometry(3.48, 3.82, 0.24, 48);
     const discMat = new THREE.MeshStandardMaterial({
-      color: 0x0b1226,
-      metalness: 0.9,
-      roughness: 0.18,
+      color: 0x1b2029,
+      metalness: 0.45,
+      roughness: 0.36,
     });
     const disc = new THREE.Mesh(discGeo, discMat);
-    disc.position.y = 0.14;
+    disc.position.y = 0.12;
 
-    const ringGeo = new THREE.TorusGeometry(3.55, 0.08, 10, 48);
+    const bevelGeo = new THREE.TorusGeometry(3.52, 0.055, 12, 56);
+    bevelGeo.rotateX(Math.PI / 2);
+    const bevelMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.9,
+      roughness: 0.22,
+    });
+    const bevel = new THREE.Mesh(bevelGeo, bevelMat);
+    bevel.position.y = 0.24;
+
+    // Subtle thin warm-white recessed turntable rim LED (understated GT7 showroom style)
+    const ringGeo = new THREE.TorusGeometry(3.42, 0.02, 8, 56);
     ringGeo.rotateX(Math.PI / 2);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(0x00f2ff).multiplyScalar(1.35),
+      color: new THREE.Color(0xe2e8f0).multiplyScalar(1.1),
       toneMapped: false,
     });
     this.showcaseRingMesh = new THREE.Mesh(ringGeo, ringMat);
-    this.showcaseRingMesh.position.y = 0.29;
+    this.showcaseRingMesh.position.y = 0.255;
 
-    const spot = new THREE.PointLight(0xd8f3ff, 3.6, 18, 1.5);
-    spot.position.set(0, 4.6, 1.8);
+    const studioKey = new THREE.PointLight(0xfff4e6, 4.2, 20, 1.4);
+    studioKey.position.set(2.4, 5.2, 2.8);
+    const studioRim = new THREE.PointLight(0xbfdbfe, 2.8, 18, 1.5);
+    studioRim.position.set(-3.2, 3.4, -3.5);
 
-    this.showcaseGroup.add(disc, this.showcaseRingMesh, spot);
+    this.showcaseGroup.add(disc, bevel, this.showcaseRingMesh, studioKey, studioRim);
   }
 
   private rebuildShowcaseCar(): void {
@@ -275,12 +294,12 @@ export class GameEngine {
     }
     const spec = CAR_SPECS[this.selectedCarIndex];
     this.showcaseCar = new CarModel(spec, undefined, undefined, true);
-    this.showcaseCar.root.position.set(0, 0.28, 0);
+    this.showcaseCar.root.position.set(0, 0.24, 0);
     this.showcaseGroup.add(this.showcaseCar.root);
 
     if (this.showcaseRingMesh) {
       const mat = this.showcaseRingMesh.material as THREE.MeshBasicMaterial;
-      mat.color.setHex(spec.neonColor).multiplyScalar(1.35);
+      mat.color.setHex(spec.neonColor).lerp(new THREE.Color(0xffffff), 0.35).multiplyScalar(1.08);
     }
   }
 
@@ -310,6 +329,49 @@ export class GameEngine {
     const cfg = TRACK_CONFIGS[trackIndex];
     this.spline = new TrackSpline(cfg);
     this.scene.fog = new THREE.FogExp2(cfg.fogColor, cfg.fogDensity);
+
+    // Tailor realistic atmospheric sunlight & ambient sky bounce to each circuit's time-of-day
+    if (cfg.theme === 'bridge') {
+      // Golden-hour ocean sunset
+      this.hemiLight.color.setHex(0xffd2a6);
+      this.hemiLight.groundColor.setHex(0x283548);
+      this.hemiLight.intensity = 1.42;
+      this.dirKeyLight.color.setHex(0xffb870);
+      this.dirKeyLight.intensity = 2.25;
+      this.dirKeyLight.position.set(220, 115, 160);
+      this.dirRimLight.color.setHex(0x93c5fd);
+      this.dirRimLight.intensity = 0.95;
+    } else if (cfg.theme === 'tunnel') {
+      // Modern illuminated sub-surface expressway tunnel
+      this.hemiLight.color.setHex(0xcbd5e1);
+      this.hemiLight.groundColor.setHex(0x1f242e);
+      this.hemiLight.intensity = 1.25;
+      this.dirKeyLight.color.setHex(0xfef3c7);
+      this.dirKeyLight.intensity = 1.5;
+      this.dirKeyLight.position.set(80, 200, 90);
+      this.dirRimLight.color.setHex(0xbae6fd);
+      this.dirRimLight.intensity = 1.05;
+    } else if (cfg.theme === 'mountain') {
+      // Crisp Japanese alpine dusk pass
+      this.hemiLight.color.setHex(0xa8c5e8);
+      this.hemiLight.groundColor.setHex(0x202c26);
+      this.hemiLight.intensity = 1.38;
+      this.dirKeyLight.color.setHex(0xffd4a3);
+      this.dirKeyLight.intensity = 1.95;
+      this.dirKeyLight.position.set(160, 145, 130);
+      this.dirRimLight.color.setHex(0x94b8e8);
+      this.dirRimLight.intensity = 0.92;
+    } else {
+      // Tokyo Bayshore twilight-to-night expressway
+      this.hemiLight.color.setHex(0x96b8e6);
+      this.hemiLight.groundColor.setHex(0x1e2532);
+      this.hemiLight.intensity = 1.32;
+      this.dirKeyLight.color.setHex(0xffdfba);
+      this.dirKeyLight.intensity = 1.88;
+      this.dirKeyLight.position.set(140, 185, 120);
+      this.dirRimLight.color.setHex(0x93c5fd);
+      this.dirRimLight.intensity = 1.0;
+    }
 
     this.trackBuild = buildTrackMesh(this.spline);
     this.sceneryBuild = buildScenery(this.spline);
@@ -434,7 +496,7 @@ export class GameEngine {
     const gameCodes = new Set([
       'KeyW', 'KeyA', 'KeyS', 'KeyD',
       'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-      'Space', 'ShiftLeft', 'ShiftRight',
+      'Space', 'ShiftLeft', 'ShiftRight', 'KeyE', 'KeyN',
     ]);
 
     window.addEventListener('keydown', (e) => {
@@ -507,7 +569,12 @@ export class GameEngine {
     this.input.left = this.keys.has('KeyA') || this.keys.has('ArrowLeft') || touch.left;
     this.input.right = this.keys.has('KeyD') || this.keys.has('ArrowRight') || touch.right;
     this.input.drift = this.keys.has('Space') || touch.drift;
-    this.input.nitro = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || touch.nitro;
+    this.input.nitro =
+      this.keys.has('ShiftLeft') ||
+      this.keys.has('ShiftRight') ||
+      this.keys.has('KeyE') ||
+      this.keys.has('KeyN') ||
+      touch.nitro;
     this.input.steerAxis = touch.steerAxis ?? 0;
     return this.input;
   }

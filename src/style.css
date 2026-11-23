@@ -787,6 +787,64 @@ kbd {
   animation: pulse 0.6s infinite;
 }
 
+.corner-callout {
+  position: fixed;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  border-radius: 10px;
+  background: rgba(10, 14, 26, 0.78);
+  backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255, 184, 0, 0.65);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  z-index: 16;
+}
+
+.corner-callout.hairpin {
+  border-color: rgba(255, 68, 92, 0.85);
+}
+
+.corner-callout.urgent {
+  background: rgba(185, 28, 28, 0.78);
+  border-color: #fde047;
+  box-shadow: 0 0 24px rgba(255, 184, 0, 0.45);
+}
+
+.corner-arrow {
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+  color: #fde047;
+}
+
+.corner-callout.hairpin .corner-arrow {
+  color: #ff5c7c;
+}
+
+.corner-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.corner-type {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  color: #ffffff;
+}
+
+.corner-dist {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #fde047;
+}
+
 .slipstream-badge {
   position: fixed;
   top: 15%;
@@ -1833,6 +1891,20 @@ body.touch-mode .drift-hud {
     width: 180px;
   }
 
+  body.touch-mode .corner-callout {
+    top: calc(196px + env(safe-area-inset-top));
+    padding: 5px 11px;
+    gap: 7px;
+  }
+
+  body.touch-mode .corner-arrow {
+    font-size: 20px;
+  }
+
+  body.touch-mode .corner-type {
+    font-size: 11px;
+  }
+
   .start-rpm-meter {
     width: min(290px, 86vw);
   }
@@ -2011,6 +2083,24 @@ body.touch-mode .drift-hud {
   body.touch-mode .drift-hud {
     top: 64px;
     width: 176px;
+  }
+
+  body.touch-mode .corner-callout {
+    top: 56px;
+    padding: 4px 10px;
+    gap: 6px;
+  }
+
+  body.touch-mode .corner-arrow {
+    font-size: 18px;
+  }
+
+  body.touch-mode .corner-type {
+    font-size: 10.5px;
+  }
+
+  body.touch-mode .corner-dist {
+    font-size: 9px;
   }
 
   .touch-steer-pad {

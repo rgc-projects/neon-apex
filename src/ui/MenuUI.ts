@@ -106,10 +106,11 @@ export class MenuUI {
     CAR_SPECS.forEach((car, idx) => {
       const btn = document.createElement('button');
       btn.className = `select-card ${idx === this.selectedCar ? 'selected' : ''}`;
+      const paintHex = `#${car.primaryColor.toString(16).padStart(6, '0')}`;
       btn.innerHTML = `
         <div class="card-top">
           <div class="card-title-row">
-            <span class="color-swatch" style="background:${car.neonHex};color:${car.neonHex}"></span>
+            <span class="color-swatch" style="background:${paintHex};color:${paintHex}"></span>
             <span class="card-name">${car.name}</span>
           </div>
           <span class="card-badge">${car.archetypeZh}</span>

@@ -100,6 +100,13 @@ export interface InputState {
   steerAxis?: number;
 }
 
+export interface UpcomingCornerInfo {
+  direction: -1 | 1;     // -1 left, +1 right
+  distanceMeters: number;
+  isHairpin: boolean;
+  bankDeg: number;
+}
+
 export interface RacerHUDTelemetry {
   speedKmh: number;
   rpmNorm: number;       // 0..1
@@ -111,7 +118,9 @@ export interface RacerHUDTelemetry {
   driftTier: 0 | 1 | 2 | 3;
   driftChargeNorm: number;
   driftDistance: number;
+  driftAngleDeg: number; // live physical slip angle in degrees
   bankAngleDeg: number;  // current absolute road banking angle in degrees
+  upcomingCorner: UpcomingCornerInfo | null;
   isAirborne: boolean;
   airTime: number;
   isSlipstreaming: boolean;
