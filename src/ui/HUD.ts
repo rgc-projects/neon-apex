@@ -56,6 +56,8 @@ export class HUD {
     maxZ: number;
   } | null = null;
   private trackAccent = '#00f2ff';
+  private lastCalloutText = '';
+  private lastCalloutAt = 0;
 
   public setVisible(visible: boolean): void {
     this.root.classList.toggle('active', visible);
@@ -100,16 +102,30 @@ export class HUD {
   }
 
   public pushCallout(text: string, variant: 'cyan' | 'gold' | 'magenta' | 'green' = 'cyan'): void {
+    const now = performance.now();
+    // Deduplicate rapid repeated triggers (e.g. tapping NITRO repeatedly won't stack 3 banners!)
+    if (text === this.lastCalloutText && now - this.lastCalloutAt < 1400) {
+      return;
+    }
+    this.lastCalloutText = text;
+    this.lastCalloutAt = now;
+
+    const isTouch = document.body.classList.contains('touch-mode');
+    const displayText = isTouch ? text.replace('SUPER NITRO OVERDRIVE!', 'SUPER NITRO!') : text;
+
     const el = document.createElement('div');
     el.className = `callout-pill ${variant}`;
-    el.textContent = text;
+    el.textContent = displayText;
     this.calloutStack.appendChild(el);
-    while (this.calloutStack.children.length > 3) {
+
+    // On mobile touch mode, show AT MOST 1 sleek compact pill at a time so the road view stays wide open!
+    const maxVisible = isTouch ? 1 : 2;
+    while (this.calloutStack.children.length > maxVisible) {
       this.calloutStack.removeChild(this.calloutStack.firstChild!);
     }
     setTimeout(() => {
       el.remove();
-    }, 1580);
+    }, isTouch ? 1180 : 1580);
   }
 
   public update(telemetry: RacerHUDTelemetry, racers: RacerPhysics[], spline: TrackSpline): void {
@@ -194,9 +210,11 @@ export class HUD {
       this.cornerCalloutEl.classList.add('hidden');
     }
 
-    // Alerts
+    // Alerts (on mobile, suppress slipstream pill when a transient callout pill is active so they never collide)
     this.wrongWayEl.classList.toggle('hidden', !telemetry.isWrongWay);
-    this.slipstreamEl.classList.toggle('hidden', !telemetry.isSlipstreaming);
+    const suppressSlip =
+      document.body.classList.contains('touch-mode') && this.calloutStack.children.length > 0;
+    this.slipstreamEl.classList.toggle('hidden', !telemetry.isSlipstreaming || suppressSlip);
 
     // Live 2D Minimap
     this.drawMinimap(racers, spline);

@@ -1665,9 +1665,37 @@ body.touch-mode .hud-bottom-right {
 }
 
 body.touch-mode .drift-hud {
-  bottom: auto;
-  top: 82px;
-  width: 190px;
+  top: auto;
+  bottom: 14px;
+  width: 172px;
+  padding: 5px 10px;
+}
+
+/* Mobile-optimized ultra-compact transient popups (never block the highway!) */
+body.touch-mode .callout-pill {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  background: rgba(8, 12, 28, 0.72);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.38);
+  animation-duration: 1.15s;
+}
+
+body.touch-mode .slipstream-badge {
+  padding: 3px 11px;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+body.touch-mode .drift-title {
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  margin-bottom: 3px;
+}
+
+body.touch-mode .drift-bar-bg {
+  height: 5px;
 }
 
 /* ==================== MOBILE RESPONSIVE LAYOUTS ==================== */
@@ -1938,30 +1966,31 @@ body.touch-mode .drift-hud {
   }
 
   body.touch-mode .callout-stack {
-    top: 238px;
+    top: calc(288px + env(safe-area-inset-top));
   }
 
   body.touch-mode .slipstream-badge {
-    top: 210px;
+    top: calc(288px + env(safe-area-inset-top));
   }
 
   body.touch-mode .drift-hud {
-    top: 238px;
-    width: 180px;
+    top: auto;
+    bottom: calc(174px + env(safe-area-inset-bottom));
+    width: 168px;
   }
 
   body.touch-mode .corner-callout {
-    top: calc(250px + env(safe-area-inset-top));
-    padding: 5px 11px;
-    gap: 7px;
+    top: calc(248px + env(safe-area-inset-top));
+    padding: 4px 10px;
+    gap: 6px;
   }
 
   body.touch-mode .corner-arrow {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   body.touch-mode .corner-type {
-    font-size: 11px;
+    font-size: 10.5px;
   }
 
   .start-rpm-meter {
@@ -2042,6 +2071,10 @@ body.touch-mode .drift-hud {
   .menu-footer,
   .showcase-badge {
     display: none;
+  }
+
+  .menu-center-bottom {
+    padding-bottom: 16px;
   }
 
   .launch-btn {
@@ -2135,31 +2168,38 @@ body.touch-mode .drift-hud {
     transform: scale(0.54);
   }
 
-  body.touch-mode .callout-stack {
-    top: 64px;
-  }
-
-  body.touch-mode .drift-hud {
-    top: 64px;
-    width: 176px;
-  }
-
   body.touch-mode .corner-callout {
-    top: 54px;
-    padding: 4px 10px;
+    top: 50px;
+    padding: 3px 9px;
     gap: 6px;
   }
 
   body.touch-mode .corner-arrow {
-    font-size: 18px;
+    font-size: 15px;
   }
 
   body.touch-mode .corner-type {
-    font-size: 10.5px;
+    font-size: 9.5px;
   }
 
   body.touch-mode .corner-dist {
-    font-size: 9px;
+    font-size: 8.5px;
+  }
+
+  body.touch-mode .callout-stack {
+    top: 86px;
+  }
+
+  body.touch-mode .slipstream-badge {
+    top: 86px;
+  }
+
+  /* Move Drift Meter to open bottom-center corridor between Joystick and BRAKE so forward road stays 100% clear! */
+  body.touch-mode .drift-hud {
+    top: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: 160px;
+    padding: 4px 9px;
   }
 
   .touch-joystick-zone {
