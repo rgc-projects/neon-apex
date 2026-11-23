@@ -109,7 +109,7 @@
         </div>
         <div class="pro-tips">
           <strong>进阶玩法：</strong> 留意屏幕顶部 <span>弯道预警提示</span> 与赛道边 <span>150m/100m/50m</span> 刹车牌，在弯前果断起漂并借倾斜坡度控时长 · 紧跟对手车尾触发 <span>尾流加速</span> · 冲上跳台获取 <span>滞空特技加分</span>！<br />
-          <strong>📱 手机触屏操作：</strong> 手机打开自动开启触屏（也可点击顶部 <span>📱</span> 手动切换）；左手滑移转向、右手按住 <span>DRIFT</span> 漂移集气与 <span>NITRO</span> 喷射氮气，默认开启 <span>AUTO GAS 自动油门</span>。
+          <strong>📱 手机触屏操作：</strong> 手机打开自动开启触屏（也可点击顶部 <span>📱</span> 手动切换）；左手 <span>虚拟方向摇杆</span> 精准控向（支持跟手浮动）、右手按住 <span>DRIFT</span> 漂移集气与 <span>NITRO</span> 喷射氮气，默认开启 <span>AUTO GAS 自动油门</span>。
         </div>
       </div>
     </div>
@@ -252,18 +252,17 @@
       </div>
       <!-- Mobile / Touchscreen Arcade Controls -->
       <div id="touch-controls" class="touch-controls hidden">
-        <!-- Left Thumb: Continuous Slide Steering Pad -->
-        <div id="touch-steer-pad" class="touch-steer-pad" aria-label="左右转向">
-          <div id="steer-left-vis" class="steer-half left">
-            <span class="steer-arrow">◀</span>
-            <span class="steer-lbl">LEFT</span>
+        <!-- Left Thumb: Floating Virtual Analog Steering Joystick -->
+        <div id="touch-joystick-zone" class="touch-joystick-zone" aria-label="虚拟方向摇杆">
+          <div id="touch-joystick-base" class="joystick-base">
+            <div class="joystick-ring"></div>
+            <div class="joystick-crosshair"></div>
+            <span id="steer-left-vis" class="joy-dir left">◀</span>
+            <span id="steer-right-vis" class="joy-dir right">▶</span>
+            <div id="joystick-stick" class="joystick-stick">
+              <div class="joystick-cap"></div>
+            </div>
           </div>
-          <div class="steer-divider"></div>
-          <div id="steer-right-vis" class="steer-half right">
-            <span class="steer-arrow">▶</span>
-            <span class="steer-lbl">RIGHT</span>
-          </div>
-          <div id="steer-knob" class="steer-knob"></div>
         </div>
 
         <!-- Right Thumb: Drift, Nitro, Brake, Gas/Rev -->

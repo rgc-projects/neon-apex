@@ -6,19 +6,22 @@ interface DeviceOrientationEventIOS extends DeviceOrientationEvent {
 }
 
 /**
- * Mobile-First Multi-Touch + Gyroscope Arcade Controller:
+ * Mobile-First Multi-Touch Virtual Joystick + Gyroscope Arcade Controller:
  * - Native TouchEvent (`passive: false`) multi-touch engine for rock-solid iOS Safari / Android Chrome / WeChat support,
  *   plus mouse PointerEvent support so desktop users can also test touch controls.
- * - Proportional slide-steering pad with glowing thumb indicator (tap left/right or glide smoothly).
+ * - Floating Virtual Analog Steering Joystick on the lower-left thumb zone:
+ *   smoothly centers under your thumb when touched, tracks 360° tactile puck movement, and outputs
+ *   a progressive automotive analog steering curve (-1..+1) with center deadzone stability.
  * - Optional Gyroscope Tilt Steering (`TILT`) supporting portrait & landscape orientations + iOS permission flow.
  * - Independent multi-touch DRIFT, NITRO, BRAKE, GAS/REV pedals + Auto-Throttle (`AUTO`) + Haptic vibration feedback.
  */
 export class TouchControls {
   private readonly container = document.getElementById('touch-controls')!;
-  private readonly steerPad = document.getElementById('touch-steer-pad')!;
-  private readonly steerLeftZone = document.getElementById('steer-left-vis')!;
-  private readonly steerRightZone = document.getElementById('steer-right-vis')!;
-  private readonly steerKnob = document.getElementById('steer-knob')!;
+  private readonly joystickZone = document.getElementById('touch-joystick-zone')!;
+  private readonly joystickBase = document.getElementById('touch-joystick-base')!;
+  private readonly joystickStick = document.getElementById('joystick-stick')!;
+  private readonly steerLeftVis = document.getElementById('steer-left-vis')!;
+  private readonly steerRightVis = document.getElementById('steer-right-vis')!;
   private readonly driftBtn = document.getElementById('touch-drift')!;
   private readonly nitroBtn = document.getElementById('touch-nitro')!;
   private readonly brakeBtn = document.getElementById('touch-brake')!;
@@ -31,13 +34,16 @@ export class TouchControls {
   public autoThrottle = true;
   public tiltEnabled = false;
 
-  // Touch / mouse steering state
+  // Virtual analog joystick state
   private steerTouchId: number | null = null;
   private steerMouseActive = false;
+  private joyOriginX = 0;
+  private joyOriginY = 0;
+  private joyMaxRadius = 48;
   private touchSteerAxis = 0; // -1..+1
   private tiltSteerAxis = 0;  // -1..+1
 
-  // Multi-touch active button trackers (keys are 't:<touchId>' or 'm:mouse')
+  // Multi-touch active button trackers (keys are 't:<touchId>' or 'p:<pointerId>')
   private readonly activeHold = {
     drift: new Set<string>(),
     nitro: new Set<string>(),
@@ -93,7 +99,7 @@ export class TouchControls {
       { passive: false }
     );
 
-    this.bindSteeringPad();
+    this.bindVirtualJoystick();
     this.bindHoldButton(this.driftBtn, 'drift', 14);
     this.bindHoldButton(this.nitroBtn, 'nitro', 18);
     this.bindHoldButton(this.brakeBtn, 'brake', 10);
@@ -159,7 +165,9 @@ export class TouchControls {
     this.steerTouchId = null;
     this.steerMouseActive = false;
     this.touchSteerAxis = 0;
-    this.updateSteerVisuals(0);
+    this.joystickBase.classList.remove('dragging');
+    this.joystickBase.style.transform = 'translate3d(0px, 0px, 0px)';
+    this.updateJoystickStickVisual(0, 0, 0);
 
     this.activeHold.drift.clear();
     this.activeHold.nitro.clear();
@@ -181,7 +189,7 @@ export class TouchControls {
   private syncTiltUI(): void {
     this.tiltBtn.textContent = this.tiltEnabled ? 'TILT: ON' : 'TILT';
     this.tiltBtn.classList.toggle('active-pill', this.tiltEnabled);
-    this.steerPad.classList.toggle('tilt-active', this.tiltEnabled);
+    this.joystickBase.classList.toggle('tilt-active', this.tiltEnabled);
   }
 
   private async toggleTiltSteering(): Promise<void> {
@@ -190,7 +198,8 @@ export class TouchControls {
       this.tiltSteerAxis = 0;
       window.removeEventListener('deviceorientation', this.onDeviceOrientation);
       this.syncTiltUI();
-      this.onStatusMessage?.('TOUCH STEERING');
+      this.updateJoystickStickVisual(0, 0, 0);
+      this.onStatusMessage?.('JOYSTICK STEERING');
       return;
     }
 
@@ -228,13 +237,10 @@ export class TouchControls {
 
     let tiltDeg = 0;
     if (angle === 90) {
-      // Landscape-left (phone rotated counter-clockwise)
       tiltDeg = e.beta ?? 0;
     } else if (angle === 270 || angle === -90) {
-      // Landscape-right (phone rotated clockwise)
       tiltDeg = -(e.beta ?? 0);
     } else {
-      // Portrait
       tiltDeg = e.gamma ?? 0;
     }
 
@@ -248,9 +254,10 @@ export class TouchControls {
       this.tiltSteerAxis = sign * Math.pow(norm, 1.15);
     }
 
-    // Reflect live tilt on steering pad visual indicator if thumb isn't overriding
+    // Mirror live tilt on virtual joystick puck when thumb isn't touching it
     if (this.steerTouchId === null && !this.steerMouseActive) {
-      this.updateSteerVisuals(this.tiltSteerAxis);
+      const r = Math.max(this.joystickBase.offsetWidth * 0.36, 40);
+      this.updateJoystickStickVisual(this.tiltSteerAxis * r, 0, this.tiltSteerAxis);
     }
   };
 
@@ -282,35 +289,105 @@ export class TouchControls {
     }
   }
 
-  private updateSteerFromClientX(clientX: number): void {
-    const rect = this.steerPad.getBoundingClientRect();
-    const rel = clamp((clientX - rect.left) / Math.max(rect.width, 1), 0, 1); // 0..1
-    const centered = (rel - 0.5) * 2; // -1..+1
+  /**
+   * Starts a virtual joystick session:
+   * - If thumb lands inside the resting joystick center, keeps base anchored for quick steering;
+   * - If thumb lands elsewhere in the lower-left zone, floats the ring smoothly to meet the thumb!
+   */
+  private beginJoystickAt(clientX: number, clientY: number): void {
+    // Temporarily read resting base rect without active float transform
+    this.joystickBase.style.transform = 'translate3d(0px, 0px, 0px)';
+    const baseRect = this.joystickBase.getBoundingClientRect();
+    const zoneRect = this.joystickZone.getBoundingClientRect();
 
-    // Small deadzone in exact center, quick snap to strong cornering near edges!
-    if (Math.abs(centered) < 0.08) {
+    const homeCenterX = baseRect.left + baseRect.width * 0.5;
+    const homeCenterY = baseRect.top + baseRect.height * 0.5;
+    const baseHalf = baseRect.width * 0.5;
+    this.joyMaxRadius = Math.max(baseRect.width * 0.37, 42);
+
+    const distFromHome = Math.hypot(clientX - homeCenterX, clientY - homeCenterY);
+
+    if (distFromHome <= baseHalf * 0.85) {
+      // Finger landed directly on the resting joystick: keep base anchored & respond immediately!
+      this.joyOriginX = homeCenterX;
+      this.joyOriginY = homeCenterY;
+      this.joystickBase.classList.add('dragging');
+      this.updateJoystickMove(clientX, clientY);
+    } else {
+      // Finger landed in expanded comfort zone: smoothly float joystick base right under the thumb!
+      const minX = zoneRect.left + baseHalf + 8;
+      const maxX = zoneRect.right - baseHalf - 8;
+      const minY = zoneRect.top + baseHalf + 8;
+      const maxY = zoneRect.bottom - baseHalf - 8;
+
+      const clampedCenterX = clamp(clientX, minX, Math.max(minX, maxX));
+      const clampedCenterY = clamp(clientY, minY, Math.max(minY, maxY));
+
+      const shiftX = clampedCenterX - homeCenterX;
+      const shiftY = clampedCenterY - homeCenterY;
+      this.joystickBase.style.transform = `translate3d(${shiftX.toFixed(1)}px, ${shiftY.toFixed(1)}px, 0px)`;
+      this.joystickBase.classList.add('dragging');
+
+      this.joyOriginX = clampedCenterX;
+      this.joyOriginY = clampedCenterY;
+      this.updateJoystickMove(clientX, clientY);
+    }
+  }
+
+  private updateJoystickMove(clientX: number, clientY: number): void {
+    const dx = clientX - this.joyOriginX;
+    const dy = clientY - this.joyOriginY;
+    const dist = Math.hypot(dx, dy);
+    const maxR = this.joyMaxRadius;
+
+    // Tactile 360° circular puck clamp
+    let visX = dx;
+    let visY = dy;
+    if (dist > maxR && dist > 0.001) {
+      const scale = maxR / dist;
+      visX = dx * scale;
+      visY = dy * scale;
+    }
+
+    // Precision progressive analog steering curve from horizontal throw (-1..+1)
+    const normX = clamp(dx / maxR, -1, 1);
+    const absX = Math.abs(normX);
+    const deadzone = 0.07;
+
+    if (absX <= deadzone) {
       this.touchSteerAxis = 0;
     } else {
-      const sign = Math.sign(centered);
-      const mag = clamp((Math.abs(centered) - 0.08) / 0.62, 0.35, 1.0);
-      this.touchSteerAxis = sign * mag;
+      const sign = Math.sign(normX);
+      const t = clamp((absX - deadzone) / (0.92 - deadzone), 0, 1);
+      this.touchSteerAxis = sign * Math.pow(t, 1.18);
     }
-    this.updateSteerVisuals(this.touchSteerAxis);
+
+    this.updateJoystickStickVisual(visX, visY, this.touchSteerAxis);
   }
 
-  private updateSteerVisuals(axis: number): void {
-    this.steerLeftZone.classList.toggle('active', axis < -0.1);
-    this.steerRightZone.classList.toggle('active', axis > 0.1);
-    if (this.steerKnob) {
-      const pct = 50 + clamp(axis, -1, 1) * 38;
-      this.steerKnob.style.left = `${pct.toFixed(1)}%`;
-      this.steerKnob.classList.toggle('engaged', Math.abs(axis) > 0.08);
+  private endJoystick(): void {
+    this.touchSteerAxis = 0;
+    this.joystickBase.classList.remove('dragging');
+    this.joystickBase.style.transform = 'translate3d(0px, 0px, 0px)';
+
+    if (this.tiltEnabled) {
+      const r = Math.max(this.joystickBase.offsetWidth * 0.36, 40);
+      this.updateJoystickStickVisual(this.tiltSteerAxis * r, 0, this.tiltSteerAxis);
+    } else {
+      this.updateJoystickStickVisual(0, 0, 0);
     }
   }
 
-  private bindSteeringPad(): void {
+  private updateJoystickStickVisual(visX: number, visY: number, axis: number): void {
+    this.joystickStick.style.transform = `translate3d(${visX.toFixed(1)}px, ${visY.toFixed(1)}px, 0px)`;
+    this.joystickStick.classList.toggle('engaged', Math.abs(axis) > 0.07 || Math.hypot(visX, visY) > 6);
+    this.steerLeftVis.classList.toggle('active', axis < -0.1);
+    this.steerRightVis.classList.toggle('active', axis > 0.1);
+  }
+
+  private bindVirtualJoystick(): void {
     // 1. Native multi-touch TouchEvents (rock-solid on iOS Safari, Android Chrome, WeChat)
-    this.steerPad.addEventListener(
+    this.joystickZone.addEventListener(
       'touchstart',
       (e) => {
         e.preventDefault();
@@ -318,13 +395,14 @@ export class TouchControls {
         if (this.steerTouchId === null && e.changedTouches.length > 0) {
           const t = e.changedTouches[0];
           this.steerTouchId = t.identifier;
-          this.updateSteerFromClientX(t.clientX);
+          this.vibrate(8);
+          this.beginJoystickAt(t.clientX, t.clientY);
         }
       },
       { passive: false }
     );
 
-    this.steerPad.addEventListener(
+    this.joystickZone.addEventListener(
       'touchmove',
       (e) => {
         e.preventDefault();
@@ -332,7 +410,7 @@ export class TouchControls {
         for (let i = 0; i < e.changedTouches.length; i++) {
           const t = e.changedTouches[i];
           if (t.identifier === this.steerTouchId) {
-            this.updateSteerFromClientX(t.clientX);
+            this.updateJoystickMove(t.clientX, t.clientY);
             break;
           }
         }
@@ -345,44 +423,42 @@ export class TouchControls {
       for (let i = 0; i < e.changedTouches.length; i++) {
         if (e.changedTouches[i].identifier === this.steerTouchId) {
           this.steerTouchId = null;
-          this.touchSteerAxis = 0;
-          this.updateSteerVisuals(this.tiltEnabled ? this.tiltSteerAxis : 0);
+          this.endJoystick();
           break;
         }
       }
     };
-    this.steerPad.addEventListener('touchend', endTouchSteer, { passive: false });
-    this.steerPad.addEventListener('touchcancel', endTouchSteer, { passive: false });
+    this.joystickZone.addEventListener('touchend', endTouchSteer, { passive: false });
+    this.joystickZone.addEventListener('touchcancel', endTouchSteer, { passive: false });
 
     // 2. Mouse / stylus fallback via PointerEvent (ignored for pointerType === 'touch' to prevent double-firing)
-    this.steerPad.addEventListener('pointerdown', (e) => {
+    this.joystickZone.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'touch') return;
       e.preventDefault();
       this.onAnyInteract?.();
       this.steerMouseActive = true;
       try {
-        this.steerPad.setPointerCapture(e.pointerId);
+        this.joystickZone.setPointerCapture(e.pointerId);
       } catch {
         // Ignore synthetic events
       }
-      this.updateSteerFromClientX(e.clientX);
+      this.beginJoystickAt(e.clientX, e.clientY);
     });
 
-    this.steerPad.addEventListener('pointermove', (e) => {
+    this.joystickZone.addEventListener('pointermove', (e) => {
       if (e.pointerType === 'touch' || !this.steerMouseActive) return;
       e.preventDefault();
-      this.updateSteerFromClientX(e.clientX);
+      this.updateJoystickMove(e.clientX, e.clientY);
     });
 
     const endMouseSteer = (e: PointerEvent) => {
       if (e.pointerType === 'touch' || !this.steerMouseActive) return;
       this.steerMouseActive = false;
-      this.touchSteerAxis = 0;
-      this.updateSteerVisuals(0);
+      this.endJoystick();
     };
-    this.steerPad.addEventListener('pointerup', endMouseSteer);
-    this.steerPad.addEventListener('pointercancel', endMouseSteer);
-    this.steerPad.addEventListener('lostpointercapture', endMouseSteer);
+    this.joystickZone.addEventListener('pointerup', endMouseSteer);
+    this.joystickZone.addEventListener('pointercancel', endMouseSteer);
+    this.joystickZone.addEventListener('lostpointercapture', endMouseSteer);
   }
 
   private bindHoldButton(
@@ -468,7 +544,7 @@ export class TouchControls {
     const nitro = this.activeHold.nitro.size > 0;
     const drift = this.activeHold.drift.size > 0;
 
-    // Manual thumb steering overrides gyroscope tilt whenever finger is on the steer pad
+    // Virtual joystick overrides gyroscope tilt whenever finger is on the stick
     const hasTouchSteer = this.steerTouchId !== null || this.steerMouseActive;
     const steerAxis = hasTouchSteer
       ? this.touchSteerAxis
@@ -476,8 +552,6 @@ export class TouchControls {
         ? this.tiltSteerAxis
         : 0;
 
-    // During countdown, holding REV (or NITRO) revs the engine into the Perfect Start green zone.
-    // During racing, Auto-Throttle drives forward automatically unless BRAKE is held!
     const throttle = isCountdown
       ? manualGas || nitro
       : this.autoThrottle

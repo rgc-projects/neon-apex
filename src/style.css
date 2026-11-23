@@ -1348,80 +1348,123 @@ body.touch-mode .hud-keybinds {
   z-index: 15;
 }
 
-/* Left Thumb: Continuous Slide Steering Pad */
-.touch-steer-pad {
+/* Left Thumb: Floating Virtual Analog Steering Joystick */
+.touch-joystick-zone {
   position: fixed;
-  left: max(16px, env(safe-area-inset-left));
-  bottom: max(18px, env(safe-area-inset-bottom));
-  width: clamp(192px, 34vw, 254px);
-  height: clamp(86px, 16vh, 114px);
-  display: flex;
-  align-items: stretch;
-  border-radius: 18px;
-  background: rgba(6, 11, 28, 0.56);
+  left: 0;
+  bottom: 0;
+  width: clamp(200px, 44vw, 270px);
+  height: clamp(190px, 34vh, 250px);
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.joystick-base {
+  position: absolute;
+  left: max(22px, env(safe-area-inset-left));
+  bottom: max(22px, env(safe-area-inset-bottom));
+  width: clamp(128px, 26vw, 152px);
+  height: clamp(128px, 26vw, 152px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(10, 18, 38, 0.36) 0%, rgba(6, 11, 26, 0.64) 72%, rgba(0, 242, 255, 0.14) 100%);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1.5px solid rgba(0, 242, 255, 0.42);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), inset 0 0 20px rgba(0, 242, 255, 0.08);
-  pointer-events: auto;
-  touch-action: none;
-  overflow: hidden;
-}
-
-.steer-half {
-  flex: 1;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.48), inset 0 0 22px rgba(0, 242, 255, 0.1);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  color: rgba(226, 232, 240, 0.8);
-  transition: background 0.08s ease, color 0.08s ease;
-}
-
-.steer-half.active {
-  background: linear-gradient(180deg, rgba(0, 242, 255, 0.42), rgba(0, 242, 255, 0.16));
-  color: #ffffff;
-  text-shadow: 0 0 16px var(--cyan);
-}
-
-.steer-arrow {
-  font-size: clamp(24px, 4.4vw, 32px);
-  line-height: 1;
-}
-
-.steer-lbl {
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 1.8px;
-  opacity: 0.82;
-}
-
-.steer-divider {
-  width: 1.5px;
-  background: linear-gradient(180deg, transparent, rgba(0, 242, 255, 0.45), transparent);
-}
-
-.steer-knob {
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  width: 34px;
-  height: 5px;
-  border-radius: 999px;
-  transform: translateX(-50%);
-  background: rgba(255, 255, 255, 0.38);
   pointer-events: none;
-  transition: background 0.1s ease, box-shadow 0.1s ease;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.14s ease, box-shadow 0.14s ease;
+  will-change: transform;
 }
 
-.steer-knob.engaged {
-  background: var(--cyan);
-  box-shadow: 0 0 14px var(--cyan);
+.joystick-base.dragging {
+  transition: border-color 0.1s ease, box-shadow 0.1s ease;
+  border-color: rgba(0, 242, 255, 0.85);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55), 0 0 24px rgba(0, 242, 255, 0.28), inset 0 0 24px rgba(0, 242, 255, 0.16);
 }
 
-.touch-steer-pad.tilt-active {
-  border-color: rgba(0, 255, 157, 0.65);
+.joystick-base.tilt-active {
+  border-color: rgba(0, 255, 157, 0.72);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45), inset 0 0 18px rgba(0, 255, 157, 0.14);
+}
+
+.joystick-ring {
+  position: absolute;
+  inset: 14px;
+  border-radius: 50%;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  pointer-events: none;
+}
+
+.joystick-crosshair {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(0, 242, 255, 0.38), rgba(255, 255, 255, 0.14) 50%, rgba(0, 242, 255, 0.38));
+  pointer-events: none;
+}
+
+.joy-dir {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  font-weight: 900;
+  color: rgba(203, 213, 225, 0.48);
+  pointer-events: none;
+  transition: color 0.08s ease, text-shadow 0.08s ease, transform 0.08s ease;
+}
+
+.joy-dir.left {
+  left: 10px;
+}
+
+.joy-dir.right {
+  right: 10px;
+}
+
+.joy-dir.active {
+  color: #ffffff;
+  text-shadow: 0 0 14px var(--cyan);
+  transform: translateY(-50%) scale(1.22);
+}
+
+.joystick-stick {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.joystick-base.dragging .joystick-stick {
+  transition: none;
+}
+
+.joystick-cap {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, rgba(255, 255, 255, 0.85) 0%, rgba(56, 189, 248, 0.62) 26%, rgba(15, 23, 42, 0.92) 82%);
+  border: 2px solid rgba(0, 242, 255, 0.85);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65), 0 0 16px rgba(0, 242, 255, 0.38), inset 0 2px 6px rgba(255, 255, 255, 0.35);
+  transition: transform 0.1s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.joystick-stick.engaged .joystick-cap {
+  transform: scale(1.06);
+  border-color: #ffffff;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.72), 0 0 24px rgba(0, 242, 255, 0.78), inset 0 2px 8px rgba(255, 255, 255, 0.55);
 }
 
 /* Mobile Portrait Menu Tab Switcher (Hidden on Desktop & Landscape) */
@@ -2103,10 +2146,21 @@ body.touch-mode .drift-hud {
     font-size: 9px;
   }
 
-  .touch-steer-pad {
-    height: 76px;
+  .touch-joystick-zone {
     width: 210px;
-    bottom: 10px;
+    height: 156px;
+  }
+
+  .joystick-base {
+    width: 118px;
+    height: 118px;
+    left: max(16px, env(safe-area-inset-left));
+    bottom: 12px;
+  }
+
+  .joystick-stick {
+    width: 48px;
+    height: 48px;
   }
 
   .touch-action-cluster {
