@@ -146,13 +146,15 @@ export class CameraController {
       return;
     }
 
-    // Dynamic Arcade 3rd-Person Chase Camera
-    const backDist = 7.4 + speedRatio * 1.45 + boostAdd * 1.35;
-    const height = 2.75 + (racer.isAirborne ? 0.75 : 0) - boostAdd * 0.25;
-    const driftSwing = racer.visualSlipAngle * 2.15;
+    // Dynamic Arcade 3rd-Person Chase Camera with Corner-Apex Lookahead during Drift!
+    const backDist = 7.4 + speedRatio * 1.45 + boostAdd * 1.35 + (racer.isDrifting ? 0.75 : 0);
+    const height = 2.75 + (racer.isAirborne ? 0.75 : 0) - boostAdd * 0.25 + (racer.isDrifting ? 0.22 : 0);
+    // Swing camera slightly to the OUTSIDE of the drift while aiming lookAt INTO the apex!
+    const driftCamSwing = racer.visualSlipAngle * 2.65;
+    const apexLookBias = racer.isDrifting ? racer.driftDir * 3.1 : 0;
 
-    // Follow road-aligned forward blended with car forward so corners feel panoramic
-    const followDir = racer.frame.tangent.clone().lerp(racer.worldForward, 0.58).normalize();
+    // Follow road-aligned forward blended with car forward so hairpin exits stay crystal clear!
+    const followDir = racer.frame.tangent.clone().lerp(racer.worldForward, racer.isDrifting ? 0.32 : 0.55).normalize();
     const followRight = racer.frame.right;
     const followUp = racer.frame.up;
 
@@ -160,15 +162,16 @@ export class CameraController {
       .copy(racer.worldPos)
       .addScaledVector(followDir, -backDist)
       .addScaledVector(followUp, height)
-      .addScaledVector(followRight, -driftSwing);
+      .addScaledVector(followRight, -driftCamSwing);
 
     this._targetLook
       .copy(racer.worldPos)
-      .addScaledVector(followDir, 15)
+      .addScaledVector(followDir, 17)
+      .addScaledVector(followRight, apexLookBias)
       .addScaledVector(followUp, 1.15);
 
-    // Subtle banking roll with the banked highway (50% bank feels thrilling without motion sickness)
-    this._targetUp.set(0, 1, 0).lerp(followUp, 0.52).normalize();
+    // Subtle banking roll with the banked highway (55% bank sells high-G banked bowl thrills!)
+    this._targetUp.set(0, 1, 0).lerp(followUp, 0.58).normalize();
 
     if (!this.initialized) {
       this.currentPos.copy(this._targetPos);

@@ -88,12 +88,12 @@ export class AIDriver {
     const left = yawError < -steerDeadzone;
     const right = yawError > steerDeadzone;
 
-    // 5. Engage real arcade drifting on 90° corners & 180° hairpins!
-    const sharpCorner = (peakCurv > 0.0075 || Math.abs(avgCurv) > 0.0052) && self.speed > 44;
+    // 5. Engage real arcade corner-flow drifting on 90° corners & 180° hairpins!
+    const sharpCorner = (peakCurv > 0.0068 || Math.abs(avgCurv) > 0.0048) && self.speed > 38;
     const drift = sharpCorner && ((avgCurv > 0 && right) || (avgCurv < 0 && left));
 
-    // Gently trail-brake before ultra-tight flat hairpins so AI nails apexes cleanly
-    const needsEntryBrake = peakCurv > 0.0155 && self.speed > 76 && Math.abs(fHere.bank) < 0.25;
+    // With corner-flow drift physics, AI smoothly glides through hairpins without harsh braking
+    const needsEntryBrake = false;
 
     // 6. Smart Nitro deployment on straightaways or chasing player
     const straightAhead = Math.abs(fNear.curvature) < 0.004 && Math.abs(fMid.curvature) < 0.004 && Math.abs(fFar.curvature) < 0.0045;

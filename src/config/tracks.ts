@@ -65,8 +65,8 @@ export const TRACK_CONFIGS: TrackConfig[] = [
       { t: 0.935, d: 0, length: 26, width: 7 },
     ],
     jumpRamps: [
-      { tStart: 0.298, tEnd: 0.322, height: 4.8, widthRatio: 0.68 },
-      { tStart: 0.895, tEnd: 0.918, height: 4.2, widthRatio: 0.66 },
+      { tStart: 0.258, tEnd: 0.28, height: 3.8, widthRatio: 0.68 },
+      { tStart: 0.922, tEnd: 0.942, height: 3.6, widthRatio: 0.66 },
     ],
     tunnelZones: [
       { tStart: 0.91, tEnd: 0.968 },
@@ -105,9 +105,10 @@ export const TRACK_CONFIGS: TrackConfig[] = [
       { x: 0, y: 17, z: -275, inwardBankDeg: 0 },
       { x: 0, y: 26, z: -535, inwardBankDeg: 0 },
       // Turn 1: Zandvoort-Style 34° Extreme Banked 180° Ocean Bowl U-Turn Right!
-      { x: 18, y: 24, z: -645, inwardBankDeg: 34 },
-      { x: 105, y: 20, z: -702, inwardBankDeg: 34 },
-      { x: 188, y: 16, z: -632, inwardBankDeg: 32 },
+      { x: 16, y: 24, z: -618, inwardBankDeg: 34 },
+      { x: 64, y: 22, z: -678, inwardBankDeg: 34 },
+      { x: 138, y: 19, z: -676, inwardBankDeg: 34 },
+      { x: 186, y: 16, z: -614, inwardBankDeg: 32 },
       // Parallel Offshore Straight
       { x: 192, y: 12, z: -455, inwardBankDeg: 0 },
       // Turn 2: Tilted 90° Left onto Sea Causeway (22° bank)
@@ -121,27 +122,27 @@ export const TRACK_CONFIGS: TrackConfig[] = [
       { x: 455, y: 20, z: -115, inwardBankDeg: 18 },
       { x: 525, y: 14, z: 18, inwardBankDeg: 20 },
       // Turn 4: Steep 32° Banked 180° Southern Bay U-Turn Right!
-      { x: 518, y: 10, z: 145, inwardBankDeg: 32 },
-      { x: 422, y: 8, z: 220, inwardBankDeg: 32 },
-      { x: 325, y: 8, z: 165, inwardBankDeg: 26 },
+      { x: 518, y: 10, z: 125, inwardBankDeg: 32 },
+      { x: 468, y: 8, z: 196, inwardBankDeg: 32 },
+      { x: 382, y: 8, z: 204, inwardBankDeg: 32 },
+      { x: 318, y: 8, z: 162, inwardBankDeg: 26 },
       // Low Sea-Skimming Return Straight
-      { x: 215, y: 9, z: 215, inwardBankDeg: 10 },
+      { x: 225, y: 9, z: 215, inwardBankDeg: 10 },
       { x: 100, y: 10, z: 225, inwardBankDeg: 0 },
       // Turn 5: Crisp 12° Banked 90° Right back onto Bridge
       { x: 16, y: 11, z: 208, inwardBankDeg: 12 },
       { x: 0, y: 12, z: 132, inwardBankDeg: 10 },
     ],
     boostPads: [
-      { t: 0.045, d: 0, length: 28, width: 7 },
-      { t: 0.115, d: 0, length: 28, width: 7 },
+      { t: 0.04, d: 0, length: 28, width: 7 },
+      { t: 0.11, d: 0, length: 28, width: 7 },
       { t: 0.305, d: 0, length: 24, width: 6.4 },
       { t: 0.445, d: -2.5, length: 24, width: 6 },
-      { t: 0.625, d: 3.0, length: 24, width: 6 },
-      { t: 0.855, d: 0, length: 26, width: 6.8 },
+      { t: 0.845, d: 0, length: 26, width: 6.8 },
     ],
     jumpRamps: [
-      { tStart: 0.135, tEnd: 0.158, height: 5.4, widthRatio: 0.7 },
-      { tStart: 0.565, tEnd: 0.588, height: 4.5, widthRatio: 0.66 },
+      { tStart: 0.075, tEnd: 0.098, height: 4.2, widthRatio: 0.7 },
+      { tStart: 0.395, tEnd: 0.418, height: 3.6, widthRatio: 0.66 },
     ],
     tunnelZones: [],
     coneClusters: [
@@ -210,8 +211,8 @@ export const TRACK_CONFIGS: TrackConfig[] = [
       { t: 0.935, d: 0, length: 24, width: 6.4 },
     ],
     jumpRamps: [
-      { tStart: 0.405, tEnd: 0.43, height: 4.8, widthRatio: 0.68 },
-      { tStart: 0.805, tEnd: 0.83, height: 4.6, widthRatio: 0.66 },
+      { tStart: 0.365, tEnd: 0.388, height: 3.6, widthRatio: 0.68 },
+      { tStart: 0.755, tEnd: 0.778, height: 3.6, widthRatio: 0.66 },
     ],
     tunnelZones: [
       { tStart: 0.015, tEnd: 0.22 },
@@ -273,9 +274,10 @@ export const TRACK_CONFIGS: TrackConfig[] = [
       { x: 375, y: 5, z: 112, inwardBankDeg: 7 },
       { x: 390, y: 4, z: 190, inwardBankDeg: 7 },
       // HAIRPIN #4: Extreme 35° Mega-Banked Slingshot 180° U-Turn Bowl Right!
-      { x: 378, y: 4, z: 282, inwardBankDeg: 35 },
-      { x: 292, y: 4, z: 338, inwardBankDeg: 35 },
-      { x: 200, y: 7, z: 290, inwardBankDeg: 30 },
+      { x: 378, y: 4, z: 262, inwardBankDeg: 35 },
+      { x: 328, y: 4, z: 326, inwardBankDeg: 35 },
+      { x: 248, y: 5, z: 326, inwardBankDeg: 35 },
+      { x: 196, y: 7, z: 282, inwardBankDeg: 30 },
       // Valley Floor Turbo Climb Straight (Jump Ramp!)
       { x: 85, y: 15, z: 298, inwardBankDeg: 0 },
       // Turn 6: Tilted 22° 90° Uphill Climb Right back to Summit
@@ -284,15 +286,14 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     ],
     boostPads: [
       { t: 0.04, d: 0, length: 24, width: 6.4 },
-      { t: 0.165, d: 0, length: 22, width: 6 },
+      { t: 0.155, d: 0, length: 22, width: 6 },
       { t: 0.395, d: 0, length: 22, width: 6 },
       { t: 0.56, d: 0, length: 22, width: 6 },
-      { t: 0.825, d: 0, length: 26, width: 6.8 },
       { t: 0.945, d: 0, length: 24, width: 6.4 },
     ],
     jumpRamps: [
-      { tStart: 0.185, tEnd: 0.208, height: 4.2, widthRatio: 0.66 },
-      { tStart: 0.845, tEnd: 0.868, height: 4.8, widthRatio: 0.68 },
+      { tStart: 0.145, tEnd: 0.166, height: 3.4, widthRatio: 0.66 },
+      { tStart: 0.925, tEnd: 0.948, height: 3.6, widthRatio: 0.68 },
     ],
     tunnelZones: [],
     coneClusters: [
