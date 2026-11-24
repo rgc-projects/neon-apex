@@ -442,9 +442,17 @@ export class RacerPhysics {
       else this.driftTier = 0;
     }
 
-    // 4.5. Nitro activation & Super Nitro logic (respects `allowDriftNitro`: default OFF blocks Nitro during drift!)
+    // 4.5. Nitro & Boost Cutoff Logic (when `allowDriftNitro` is OFF, drifting cleanly shuts off ALL boosts & flames!)
     const nitroBlockedByDrift = this.isDrifting && !this.allowDriftNitro;
-    if (input.nitro && !nitroBlockedByDrift && this.nitro > (this.isNitroActive ? 0.5 : 12)) {
+    if (nitroBlockedByDrift) {
+      this.isNitroActive = false;
+      this.isSuperNitro = false;
+      this.miniBoostTimer = 0;
+      this.miniBoostPower = 0;
+      this.boostPadTimer = 0;
+      const passive = (this.speed > 55 ? 1.8 : 0.4) + (this.isSlipstreaming ? 8.5 : 0);
+      this.nitro = Math.min(100, this.nitro + passive * dt);
+    } else if (input.nitro && this.nitro > (this.isNitroActive ? 0.5 : 12)) {
       if (!this.isNitroActive) {
         this.isSuperNitro = this.nitro >= 82;
         events?.onNitroStart?.(this.isSuperNitro);
@@ -705,13 +713,15 @@ export class RacerPhysics {
       }
     }
 
-    // 10. Boost Pad Detection
+    // 10. Boost Pad Detection (still awards nitro + score, and skips flame burst if currently locked in drift!)
     if (!this.isAirborne && this.boostPadCooldown <= 0) {
       const pad = spline.getBoostPadAt(this.s, this.d);
       if (pad) {
-        this.boostPadTimer = 1.15;
         this.boostPadCooldown = 0.85;
-        this.speed = Math.min(baseMax + 24, Math.max(this.speed + 12, baseMax + 18));
+        if (!this.isDrifting || this.allowDriftNitro) {
+          this.boostPadTimer = 1.15;
+          this.speed = Math.min(baseMax + 24, Math.max(this.speed + 12, baseMax + 18));
+        }
         this.nitro = Math.min(100, this.nitro + 14);
         this.styleScore += 120;
         events?.onBoostPad?.();

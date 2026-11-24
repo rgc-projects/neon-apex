@@ -903,7 +903,9 @@ export class GameEngine {
       }
 
       // Exhaust Particles & Player Dynamic Nitro Light Ribbon Trails
-      const boosting = r.isNitroActive || r.miniBoostTimer > 0 || r.boostPadTimer > 0;
+      // When drift-nitro lock is active during drift, cleanly shut off ALL exhaust flames & orange trails!
+      const boostLockedInDrift = r.isDrifting && !r.allowDriftNitro;
+      const boosting = !boostLockedInDrift && (r.isNitroActive || r.miniBoostTimer > 0 || r.boostPadTimer > 0);
       if (boosting) {
         r.model.getExhaustWorldPositions(this._exL, this._exR);
         if (Math.random() < (r.isPlayer ? 0.9 : 0.4)) {
@@ -917,7 +919,7 @@ export class GameEngine {
           this._exL,
           this._exR,
           r.worldUp,
-          boosting || r.speed > 92,
+          !boostLockedInDrift && (boosting || r.speed > 92),
           r.isSuperNitro
         );
         if (r.isSlipstreaming && Math.random() < 0.65) {

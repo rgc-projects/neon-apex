@@ -268,6 +268,10 @@ body,
   box-shadow: 0 0 20px rgba(0, 242, 255, 0.22);
 }
 
+.select-card.track-card {
+  padding: 9px 12px;
+}
+
 .select-card.track-card.selected {
   border-color: var(--magenta);
   background: linear-gradient(125deg, rgba(255, 42, 157, 0.2), rgba(15, 23, 48, 0.85));
@@ -380,8 +384,8 @@ body,
 }
 
 .track-svg {
-  width: 58px;
-  height: 44px;
+  width: 52px;
+  height: 38px;
   flex-shrink: 0;
   filter: drop-shadow(0 0 6px rgba(0, 242, 255, 0.45));
 }

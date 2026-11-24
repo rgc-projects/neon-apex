@@ -555,11 +555,12 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   // 6. Authentic Overhead Expressway Sign Gantries (Japanese/English Green Highway Signs!)
   const signMeta: Record<string, [string, string, string]> = {
     city: ['湾岸線  BAYSHORE', 'SHIBUYA / HANEDA AIRPORT', '#046a38'],
+    'monaco-harbor': ['摩纳哥海滨  MONACO GP', 'PORT HERCULES · LOW-BANK HAIRPINS', '#035388'],
     bridge: ['海湾大橋  BAY BRIDGE', 'HYPERION COASTAL EXPWY', '#035388'],
     tunnel: ['地下幹線  SUB-ZERO', 'REACTOR EXPRESS TUNNEL', '#046a38'],
     mountain: ['秋名峠  AKINA PASS', 'DOWNHILL HAIRPINS AHEAD', '#046a38'],
   };
-  const [sL1, sL2, sBg] = signMeta[cfg.theme] ?? signMeta.city;
+  const [sL1, sL2, sBg] = signMeta[cfg.id] ?? signMeta[cfg.theme] ?? signMeta.city;
   const signTex = createHighwaySignTexture(sL1, sL2, sBg);
   const signMat = new THREE.MeshStandardMaterial({
     map: signTex,

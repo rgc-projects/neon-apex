@@ -332,4 +332,83 @@ export const TRACK_CONFIGS: TrackConfig[] = [
       { t: 0.74, side: -1, count: 6 },
     ],
   },
+  {
+    id: 'monaco-harbor',
+    name: 'MONACO HARBOR GP',
+    nameZh: '摩纳哥海滨赛道',
+    theme: 'city',
+    difficulty: 'HARD',
+    description: '专精小倾角技术漂移的 28m 写实海滨街道赛！包含 5 组 4°–11° 低倾角平直 U 型发卡弯与海港短隧道，体验精准控速与出弯快喷节奏。',
+    roadWidth: 28,
+    maxBankDeg: 11,
+    laps: 3,
+    skyTopHex: '#071228',
+    skyMidHex: '#152d52',
+    skyHorizonHex: '#b87458',
+    sunColorHex: '#ffc58f',
+    fogColor: 0x0d1b30,
+    fogDensity: 0.00058,
+    railLeftColor: 0x10b981,
+    railRightColor: 0xf59e0b,
+    accentColorHex: '#10b981',
+    asphaltTint: '#1c212b',
+    points: scalePoints(
+      [
+        // Start/Finish Harbor Boulevard Straight
+        { x: 0, y: 6, z: 0, inwardBankDeg: 0 },
+        { x: 0, y: 6, z: -185, inwardBankDeg: 0 },
+        // U-Turn #1: Sainte-Dévote Flat 4° Low-Bank 180° Hairpin Right!
+        { x: 12, y: 8, z: -265, inwardBankDeg: 4 },
+        { x: 75, y: 11, z: -318, inwardBankDeg: 4 },
+        { x: 142, y: 14, z: -272, inwardBankDeg: 4 },
+        // Beau Rivage Coastal Sprint South
+        { x: 152, y: 16, z: -165, inwardBankDeg: 0 },
+        // U-Turn #2: Fairmont Iconic 6° Low-Bank 180° Hairpin Left!
+        { x: 162, y: 16, z: -85, inwardBankDeg: 6 },
+        { x: 225, y: 14, z: -32, inwardBankDeg: 6 },
+        { x: 295, y: 12, z: -78, inwardBankDeg: 6 },
+        // Casino Terrace North Straight (Jump Ramp #1)
+        { x: 312, y: 12, z: -195, inwardBankDeg: 0 },
+        { x: 312, y: 14, z: -320, inwardBankDeg: 0 },
+        // U-Turn #3: Mirabeau 8° Low-Bank Sweeping 180° Hairpin Right!
+        { x: 326, y: 14, z: -400, inwardBankDeg: 8 },
+        { x: 392, y: 12, z: -452, inwardBankDeg: 8 },
+        { x: 460, y: 10, z: -396, inwardBankDeg: 8 },
+        // Port Hercules Waterfront Straight South (Louis II Harbor Tunnel!)
+        { x: 472, y: 8, z: -210, inwardBankDeg: 0 },
+        { x: 472, y: 7, z: 10, inwardBankDeg: 0 },
+        // U-Turn #4: Tabac 10° Low-Bank Coastal 180° Hairpin Right!
+        { x: 462, y: 7, z: 98, inwardBankDeg: 10 },
+        { x: 398, y: 7, z: 156, inwardBankDeg: 10 },
+        { x: 328, y: 7, z: 108, inwardBankDeg: 10 },
+        // Smooth Low-Bank Harbor S-Bend West (6°–8° bank!)
+        { x: 296, y: 8, z: 56, inwardBankDeg: 6 },
+        { x: 222, y: 8, z: 88, inwardBankDeg: 6 },
+        { x: 184, y: 7, z: 176, inwardBankDeg: 8 },
+        // U-Turn #5: La Rascasse 11° Final Low-Bank 180° Hairpin Right!
+        { x: 122, y: 6, z: 246, inwardBankDeg: 11 },
+        { x: 40, y: 6, z: 236, inwardBankDeg: 11 },
+        { x: 0, y: 6, z: 152, inwardBankDeg: 8 },
+      ],
+      1.55,
+      1.15
+    ),
+    boostPads: [
+      { t: 0.035, d: 0, length: 28, width: 7.2 },
+      { t: 0.30, d: 0, length: 28, width: 7.2 },
+      { t: 0.565, d: 0, length: 30, width: 7.5 },
+      { t: 0.945, d: 0, length: 30, width: 7.4 },
+    ],
+    jumpRamps: [
+      { tStart: 0.328, tEnd: 0.345, height: 3.4, widthRatio: 0.62 },
+    ],
+    tunnelZones: [{ tStart: 0.50, tEnd: 0.56 }],
+    coneClusters: [
+      { t: 0.09, side: -1, count: 6 },
+      { t: 0.22, side: 1, count: 6 },
+      { t: 0.42, side: -1, count: 6 },
+      { t: 0.65, side: -1, count: 6 },
+      { t: 0.86, side: -1, count: 6 },
+    ],
+  },
 ];
