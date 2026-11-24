@@ -475,15 +475,15 @@ export class GameEngine {
       this.dirRimLight.color.setHex(0x5eead4);
       this.dirRimLight.intensity = 1.15;
     } else if (cfg.theme === 'akina') {
-      // Moonlit Mt. Haruna autumn-midnight pass: cool alpine indigo zenith + warm amber valley glow
-      this.hemiLight.color.setHex(0x9fc2eb);
-      this.hemiLight.groundColor.setHex(0x281e1c);
-      this.hemiLight.intensity = 1.42;
-      this.dirKeyLight.color.setHex(0xffd29d);
-      this.dirKeyLight.intensity = 2.02;
-      this.dirKeyLight.position.set(220, 195, -180);
-      this.dirRimLight.color.setHex(0x8bb8f0);
-      this.dirRimLight.intensity = 1.02;
+      // Authentic Akina Mountain Pass nocturnal alpine lighting (high-contrast dark gorge + golden headlights & wet asphalt sheen!)
+      this.hemiLight.color.setHex(0xa8c5e8);
+      this.hemiLight.groundColor.setHex(0x1c2722);
+      this.hemiLight.intensity = 1.38;
+      this.dirKeyLight.color.setHex(0xffd4a3);
+      this.dirKeyLight.intensity = 1.98;
+      this.dirKeyLight.position.set(180, 155, 140);
+      this.dirRimLight.color.setHex(0x94b8e8);
+      this.dirRimLight.intensity = 0.96;
     } else if (cfg.theme === 'tunnel') {
       // Modern illuminated sub-surface expressway tunnel
       this.hemiLight.color.setHex(0xcbd5e1);

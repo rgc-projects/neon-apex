@@ -2817,7 +2817,8 @@ function buildSuperAkinaWorld(
           }
           if (dSq < hardRadiusSq) {
             const bankDrop = hw * Math.sin(Math.abs(s.bank));
-            const floor = s.pos.y - bankDrop - 9.5;
+            // Extra 10.5m clearance margin guarantees zero terrain clipping even under 35° banked -12.6% plunges!
+            const floor = s.pos.y - bankDrop - 10.5;
             if (floor < strictSafeFloor) strictSafeFloor = floor;
           }
         }
@@ -2830,8 +2831,9 @@ function buildSuperAkinaWorld(
     };
   };
 
-  // 2. Sculpted 240x240 Mount Haruna Massif + Haruna Fuji Volcanic Peak + Lake Haruna Crater Basin
-  const margin = 680;
+  // 2. Sculpted 240x240 Dramatic Nocturnal Akina Canyon Gorge + Mt. Haruna Fuji Peak + Lake Haruna Crater
+  // Faithfully captures original Akina's intimate, towering V-shaped dark mountain walls rising steeply beside the road!
+  const margin = 640;
   const widthX = maxX - minX + margin * 2;
   const depthZ = maxZ - minZ + margin * 2;
   const centerX = (minX + maxX) * 0.5;
@@ -2849,16 +2851,13 @@ function buildSuperAkinaWorld(
   const peakZ = -940;
   const lakeX = 640;
   const lakeZ = -960;
-  const lakeY = 196;
-  const lakeRadius = 465;
+  const lakeY = 204;
+  const lakeRadius = 460;
 
-  const cValleyRock = new THREE.Color(0x101720);
-  const cCedarDeep = new THREE.Color(0x0c2118);
-  const cCedarMid = new THREE.Color(0x163325);
-  const cMomijiRed = new THREE.Color(0x5c201a);
-  const cMomijiGold = new THREE.Color(0x75421b);
-  const cVolcanicSlate = new THREE.Color(0x2d3748);
-  const cSummitMist = new THREE.Color(0x64748b);
+  const cCedarValley = new THREE.Color(0x07120e);
+  const cBasaltSlope = new THREE.Color(0x0c1916);
+  const cDarkRidge = new THREE.Color(0x132028);
+  const cAlpineGranite = new THREE.Color(0x1f2b3a);
   const tmpColor = new THREE.Color();
 
   for (let i = 0; i < posAttr.count; i++) {
@@ -2866,43 +2865,43 @@ function buildSuperAkinaWorld(
     const wz = posAttr.getZ(i) + centerZ;
     const env = queryRoadEnvelope(wx, wz);
 
-    const fbm =
-      Math.sin(wx * 0.0024 + 0.6) * Math.cos(wz * 0.0022 - 0.5) * 42 +
-      Math.sin(wx * 0.0062 + 1.4) * Math.sin(wz * 0.0058 + 0.8) * 19 +
-      Math.cos((wx - wz) * 0.012) * 8;
+    // Multi-octave craggy Japanese alpine ridge noise (matches original Akina's sculpted mountain silhouettes!)
+    const fbm01 =
+      (Math.sin(wx * 0.0038 + 1.1) * Math.cos(wz * 0.0035 - 0.7) +
+        Math.sin(wx * 0.0088 - wz * 0.0071 + 2.3) * 0.52 +
+        Math.cos(wx * 0.017 + wz * 0.015) * 0.24) *
+        0.5 +
+      0.5; // ~0..1
 
-    // Natural Gunma mountain gradient: elevated alpine caldera North -> deep Ikaho valley South (Z > 2200)
-    const northAlpineSlope = smoothstep(2350, -1400, wz) * 195;
+    // Steep, looming dark mountain canyon walls rising sharply right outside BOTH sides of every serpentine pass!
+    const canyonLift = smoothstep(hw + 20, hw + 115, env.minDist) * (135 + fbm01 * 155);
 
-    // Towering Mount Haruna Fuji Volcanic Cone inside the crater interior!
+    // Towering Mount Haruna Fuji volcanic peak + dramatic outer mountain walls framing the dark indigo night sky!
     const distPeak = Math.hypot(wx - peakX, wz - peakZ);
-    const harunaPeak = Math.exp(-(distPeak * distPeak) / (560 * 560)) * 310;
+    const harunaPeak = Math.exp(-(distPeak * distPeak) / (560 * 560)) * 270;
+    const rimNorth = smoothstep(-2150, -2850, wz) * 180;
+    const rimEast = smoothstep(3620, 4350, wx) * 190;
+    const rimWest = smoothstep(-2380, -3050, wx) * 185;
+    const rimSouth = smoothstep(2620, 3300, wz) * 165;
 
-    // Secondary Akagi distant ridge mass in the southwest interior (cleanly clear of all roads!)
-    const distWestPeak = Math.hypot(wx - -1080, wz - 1480);
-    const westRidge = Math.exp(-(distWestPeak * distWestPeak) / (460 * 460)) * 185;
+    // Anchor steep gorge walls directly relative to local road elevation so EVERY sector (high summit AND deep valley)
+    // feels intimately enclosed by towering nocturnal Akina cliffs!
+    const roadBase = env.minDist < 420 ? env.nearestY - 12 : 45 + smoothstep(2350, -1400, wz) * 175;
+    let h = roadBase + canyonLift + harunaPeak + rimNorth + rimEast + rimWest + rimSouth;
 
-    // Dramatic outer Japanese mountain walls framing the distant perimeter
-    const rimNorth = smoothstep(-2250, -2950, wz) * 230;
-    const rimEast = smoothstep(3720, 4450, wx) * 240;
-    const rimWest = smoothstep(-2460, -3150, wx) * 225;
-    const rimSouth = smoothstep(2850, 3550, wz) * 190;
-
-    let h = 8 + northAlpineSlope + harunaPeak + westRidge + rimNorth + rimEast + rimWest + rimSouth + fbm;
-
-    // Sculpt smooth volcanic crater depression for Lake Haruna beneath lakeY=196m!
+    // Sculpt smooth volcanic crater depression for Lake Haruna beneath lakeY=204m!
     const distLake = Math.hypot(wx - lakeX, wz - lakeZ);
-    if (distLake < lakeRadius + 160) {
-      const basinMask = 1 - smoothstep(lakeRadius - 70, lakeRadius + 150, distLake);
+    if (distLake < lakeRadius + 150) {
+      const basinMask = 1 - smoothstep(lakeRadius - 65, lakeRadius + 145, distLake);
       const lakeBed = lakeY - 22;
       h = h * (1 - basinMask) + Math.min(h, lakeBed) * basinMask;
     }
 
-    // Strict multi-sample zero-clipping road corridor carve (>= 9.5m below EVERY road edge!)
-    const clearInner = hw + 16;
+    // Strict multi-sample zero-clipping roadbed carve (>= 10.5m below lowest banked edge!)
+    const clearInner = hw + 17;
     const clearOuter = hw + 62;
     if (env.minDist < clearOuter) {
-      const targetFloor = env.strictSafeFloor < Infinity ? env.strictSafeFloor : env.nearestY - 12.5;
+      const targetFloor = env.strictSafeFloor < Infinity ? env.strictSafeFloor : env.nearestY - 13.5;
       const blend = smoothstep(clearInner, clearOuter, env.minDist);
       h = Math.min(h, targetFloor + (Math.max(h, targetFloor) - targetFloor) * blend);
     }
@@ -2913,38 +2912,32 @@ function buildSuperAkinaWorld(
     posAttr.setY(i, h);
     terrHeights[i] = h;
 
-    // Rich nocturnal Gunma cedar forest + subtle glowing autumn Japanese maple (Momiji) patches
-    const groveNoise = 0.5 + 0.5 * Math.sin(wx * 0.0085 + wz * 0.0072);
-    const maplePatch = smoothstep(0.62, 0.88, 0.5 + 0.5 * Math.sin(wx * 0.011 - wz * 0.009 + 1.7));
-    if (h < 22) {
-      tmpColor.copy(cValleyRock).lerp(cCedarDeep, clamp((h + 6) / 28, 0, 1));
-    } else if (h < 215) {
-      tmpColor.copy(cCedarDeep).lerp(cCedarMid, groveNoise * 0.8);
-      if (maplePatch > 0.05) {
-        const autumnTint = groveNoise > 0.5 ? cMomijiRed : cMomijiGold;
-        tmpColor.lerp(autumnTint, maplePatch * 0.52);
-      }
-    } else if (h < 330) {
-      tmpColor.copy(cCedarMid).lerp(cVolcanicSlate, clamp((h - 215) / 115, 0, 1));
+    // Authentic moody nocturnal Japanese cedar & dark volcanic basalt shading (matches original Akina Pass!)
+    const relElev = clamp((h - (roadBase - 15)) / 240, 0, 1);
+    const grain = (Math.sin(wx * 0.13) * Math.cos(wz * 0.13) * 0.5 + 0.5) * 0.022;
+    if (relElev < 0.36) {
+      tmpColor.copy(cCedarValley).lerp(cBasaltSlope, relElev / 0.36);
+    } else if (relElev < 0.74) {
+      tmpColor.copy(cBasaltSlope).lerp(cDarkRidge, (relElev - 0.36) / 0.38);
     } else {
-      tmpColor.copy(cVolcanicSlate).lerp(cSummitMist, clamp((h - 330) / 120, 0, 1));
+      tmpColor.copy(cDarkRidge).lerp(cAlpineGranite, (relElev - 0.74) / 0.26);
     }
-    colors[i * 3] = tmpColor.r;
-    colors[i * 3 + 1] = tmpColor.g;
-    colors[i * 3 + 2] = tmpColor.b;
+    colors[i * 3] = tmpColor.r + grain * 0.6;
+    colors[i * 3 + 1] = tmpColor.g + grain;
+    colors[i * 3 + 2] = tmpColor.b + grain * 0.8;
   }
 
   terrGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   terrGeo.computeVertexNormals();
 
   const terrTex = createConcreteTexture();
-  terrTex.repeat.set(72, 72);
+  terrTex.repeat.set(84, 84);
   const terrMat = new THREE.MeshStandardMaterial({
     map: terrTex,
     vertexColors: true,
-    roughness: 0.94,
-    metalness: 0.03,
-    envMapIntensity: 0.18,
+    roughness: 0.96,
+    metalness: 0.02,
+    envMapIntensity: 0.15,
   });
   const terrMesh = new THREE.Mesh(terrGeo, terrMat);
   terrMesh.position.set(centerX, 0, centerZ);
@@ -3094,45 +3087,52 @@ function buildSuperAkinaWorld(
     group.add(gate);
   }
 
-  // 6. 1,100 Instanced Nocturnal Japanese Cedar Pines + Autumn Crimson-Gold Momiji Maple Trees!
+  // 6. 1,650 Dense 3-Tier Layered Japanese Cedar Pines + Subtle Nocturnal Autumn Maples framing the Gorge Walls!
   const trunkGeo = new THREE.CylinderGeometry(0.36, 0.58, 4.8, 7);
-  const pine1Geo = new THREE.ConeGeometry(3.6, 8.6, 9);
-  const pine2Geo = new THREE.ConeGeometry(2.6, 7.2, 9);
-  const mapleCrownGeo = new THREE.DodecahedronGeometry(3.7, 1);
+  const pine1Geo = new THREE.ConeGeometry(3.8, 8.8, 10);
+  const pine2Geo = new THREE.ConeGeometry(2.9, 7.6, 10);
+  const pine3Geo = new THREE.ConeGeometry(1.9, 6.0, 10);
+  const mapleCrownGeo = new THREE.DodecahedronGeometry(3.6, 1);
 
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1d15, roughness: 0.94 });
-  const pineDarkMat = new THREE.MeshStandardMaterial({ color: 0x0c241a, roughness: 0.9 });
-  const pineMidMat = new THREE.MeshStandardMaterial({ color: 0x133526, roughness: 0.88 });
-  const mapleRedMat = new THREE.MeshStandardMaterial({ color: 0x8b261d, roughness: 0.84 });
-  const mapleGoldMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.84 });
-  disposables.push(trunkGeo, pine1Geo, pine2Geo, mapleCrownGeo, trunkMat, pineDarkMat, pineMidMat, mapleRedMat, mapleGoldMat);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x261a13, roughness: 0.95, envMapIntensity: 0.18 });
+  const pineDarkMat = new THREE.MeshStandardMaterial({ color: 0x0b2219, roughness: 0.92, envMapIntensity: 0.22 });
+  const pineMidMat = new THREE.MeshStandardMaterial({ color: 0x113024, roughness: 0.9, envMapIntensity: 0.22 });
+  const mapleRedMat = new THREE.MeshStandardMaterial({ color: 0x6b1d19, roughness: 0.88, envMapIntensity: 0.2 });
+  disposables.push(
+    trunkGeo,
+    pine1Geo,
+    pine2Geo,
+    pine3Geo,
+    mapleCrownGeo,
+    trunkMat,
+    pineDarkMat,
+    pineMidMat,
+    mapleRedMat
+  );
 
   const cedars: { x: number; y: number; z: number; s: number }[] = [];
   const maplesRed: { x: number; y: number; z: number; s: number }[] = [];
-  const maplesGold: { x: number; y: number; z: number; s: number }[] = [];
 
-  for (let i = 0; i < 6500 && cedars.length + maplesRed.length + maplesGold.length < 1100; i++) {
+  for (let i = 0; i < 9200 && cedars.length + maplesRed.length < 1650; i++) {
     const sample = spline.samples[Math.floor(rand() * spline.sampleCount)];
     const side = rand() > 0.5 ? 1 : -1;
-    const offset = hw + 14 + rand() * 92;
-    const wx = sample.pos.x + sample.flatRight.x * side * offset + (rand() - 0.5) * 20;
-    const wz = sample.pos.z + sample.flatRight.z * side * offset + (rand() - 0.5) * 20;
+    // Perched closely along the steep canyon slopes just like original Akina Pass!
+    const offset = hw + 11.5 + rand() * 72;
+    const wx = sample.pos.x + sample.flatRight.x * side * offset + (rand() - 0.5) * 16;
+    const wz = sample.pos.z + sample.flatRight.z * side * offset + (rand() - 0.5) * 16;
 
-    if (Math.hypot(wx - lakeX, wz - lakeZ) < lakeRadius + 30) continue;
+    if (Math.hypot(wx - lakeX, wz - lakeZ) < lakeRadius + 28) continue;
     const env = queryRoadEnvelope(wx, wz);
-    if (env.minDist < hw + 13.5) continue;
+    if (env.minDist < hw + 12.0) continue;
 
     const wy = sampleMeshY(wx, wz);
-    if (wy < floorY + 2 || wy > 315) continue;
+    if (wy < floorY + 2 || wy > 460) continue;
 
-    const sc = 0.85 + rand() * 1.15;
-    const rPick = rand();
-    if (rPick < 0.72) {
-      cedars.push({ x: wx, y: wy - 0.8, z: wz, s: sc });
-    } else if (rPick < 0.88) {
-      maplesRed.push({ x: wx, y: wy - 0.7, z: wz, s: sc });
+    const sc = 0.95 + rand() * 1.35;
+    if (rand() < 0.86) {
+      cedars.push({ x: wx, y: wy - 1.2, z: wz, s: sc });
     } else {
-      maplesGold.push({ x: wx, y: wy - 0.7, z: wz, s: sc });
+      maplesRed.push({ x: wx, y: wy - 1.0, z: wz, s: sc * 0.92 });
     }
   }
 
@@ -3141,6 +3141,7 @@ function buildSuperAkinaWorld(
     const tInst = new THREE.InstancedMesh(trunkGeo, trunkMat, cedars.length);
     const c1Inst = new THREE.InstancedMesh(pine1Geo, pineDarkMat, cedars.length);
     const c2Inst = new THREE.InstancedMesh(pine2Geo, pineMidMat, cedars.length);
+    const c3Inst = new THREE.InstancedMesh(pine3Geo, pineDarkMat, cedars.length);
     cedars.forEach((tr, idx) => {
       dummy.rotation.set(0, rand() * Math.PI * 2, 0);
       dummy.scale.setScalar(tr.s);
@@ -3150,32 +3151,32 @@ function buildSuperAkinaWorld(
       dummy.position.set(tr.x, tr.y + 7.2 * tr.s, tr.z);
       dummy.updateMatrix();
       c1Inst.setMatrixAt(idx, dummy.matrix);
-      dummy.position.set(tr.x, tr.y + 11.6 * tr.s, tr.z);
+      dummy.position.set(tr.x, tr.y + 11.4 * tr.s, tr.z);
       dummy.updateMatrix();
       c2Inst.setMatrixAt(idx, dummy.matrix);
+      dummy.position.set(tr.x, tr.y + 15.0 * tr.s, tr.z);
+      dummy.updateMatrix();
+      c3Inst.setMatrixAt(idx, dummy.matrix);
     });
-    group.add(tInst, c1Inst, c2Inst);
+    group.add(tInst, c1Inst, c2Inst, c3Inst);
   }
 
-  const buildMapleInst = (list: { x: number; y: number; z: number; s: number }[], mat: THREE.Material) => {
-    if (list.length === 0) return;
-    const tInst = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
-    const mInst = new THREE.InstancedMesh(mapleCrownGeo, mat, list.length);
-    list.forEach((tr, idx) => {
+  if (maplesRed.length > 0) {
+    const tInst = new THREE.InstancedMesh(trunkGeo, trunkMat, maplesRed.length);
+    const mInst = new THREE.InstancedMesh(mapleCrownGeo, mapleRedMat, maplesRed.length);
+    maplesRed.forEach((tr, idx) => {
       dummy.rotation.set(0, rand() * Math.PI * 2, 0);
       dummy.scale.setScalar(tr.s);
       dummy.position.set(tr.x, tr.y + 2.3 * tr.s, tr.z);
       dummy.updateMatrix();
       tInst.setMatrixAt(idx, dummy.matrix);
       dummy.position.set(tr.x, tr.y + 6.4 * tr.s, tr.z);
-      dummy.scale.set(tr.s * 1.15, tr.s * 0.88, tr.s * 1.15);
+      dummy.scale.set(tr.s * 1.12, tr.s * 0.86, tr.s * 1.12);
       dummy.updateMatrix();
       mInst.setMatrixAt(idx, dummy.matrix);
     });
     group.add(tInst, mInst);
-  };
-  buildMapleInst(maplesRed, mapleRedMat);
-  buildMapleInst(maplesGold, mapleGoldMat);
+  }
 
   // 7. Glowing Ikaho Onsen Night Town (160 Japanese Timber Ryokan Inns lining Sector 4's 2.55km Super-Straight!)
   const innWallGeo = new THREE.BoxGeometry(1, 1, 1);

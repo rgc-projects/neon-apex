@@ -522,8 +522,8 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
       const inZone = t < 0.048 || (t > 0.485 && t < 0.545) || t > 0.955;
       if (!inZone) continue;
     } else if (cfg.theme === 'akina') {
-      // Generous warm sodium streetlamps spacing across 27.2km touge while keeping draw-call instancing light & atmospheric!
-      if (i % (lampInterval * 2) !== 0 && !(t < 0.07 || (t > 0.57 && t < 0.67) || t > 0.94)) continue;
+      // Warm sodium mountain pass streetlamps glowing vividly along every banked serpentine plunge & straight!
+      if (i % lampInterval !== 0) continue;
     }
     lampSamples.push(i);
   }
@@ -618,16 +618,18 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
           ]
       : cfg.theme === 'akina'
         ? [
-            { t: 0.012, l1: '榛名湖大直道  LAKE HARUNA', l2: 'SUPER AKINA · 27.2KM GRAND TOUGE', bg: '#046a38' },
-            { t: 0.088, l1: '北岭十连巨蟒  PYTHON ESSES', l2: '11-BEND DOWNHILL SERPENTINE DRIFT', bg: '#991b1b' },
-            { t: 0.242, l1: '苍松六连急蛇  CEDAR SNAKE', l2: 'RAPID LEFT ↔ RIGHT SWITCHBACKS', bg: '#046a38' },
-            { t: 0.342, l1: '秋名传奇五连发卡  5 HAIRPINS', l2: 'ICONIC TERRACED CLIFF DESCENT', bg: '#991b1b' },
-            { t: 0.478, l1: '山麓七连蛇道  FOOTHILL ESSES', l2: '7 FLOWING S-BENDS → IKAHO VALLEY', bg: '#046a38' },
-            { t: 0.578, l1: '伊香保温泉大直道  IKAHO EXPWY', l2: '2.55KM SUPER-STRAIGHT · TUNNEL & JUMP', bg: '#035388' },
-            { t: 0.688, l1: '赤城峡谷九连大蛇  AKAGI GORGE', l2: 'HIGH-SPEED FLOWING SERPENTINE DRIFT', bg: '#991b1b' },
-            { t: 0.818, l1: '榛名西壁八连天梯  WEST CLIMB', l2: '8-BEND UPHILL SERPENTINE ASCENT', bg: '#046a38' },
-            { t: 0.914, l1: '高岭穿山大直道  SUMMIT TUNNEL', l2: '1.85KM RIDGE CLIMB → LAKE HARUNA', bg: '#035388' },
-            { t: 0.985, l1: '秋名山顶冲刺  HARUNA FINISH', l2: 'FINAL STRAIGHT · WATER TOWER GRANDSTAND', bg: '#991b1b' },
+            // Authentic Akina Pass Japanese Green & Crimson Gantries — several placed RIGHT over 30°–35° banked bends so they tilt dramatically with the highway!
+            { t: 0.012, l1: '秋名峠  SUPER AKINA', l2: 'LAKE HARUNA SUMMIT · 26.1KM TOUGE', bg: '#046a38' },
+            { t: 0.076, l1: '秋名峠  32° 悬崖俯冲', l2: 'EXTREME BANKED SERPENTINE AHEAD', bg: '#046a38' },
+            { t: 0.132, l1: '北岭飞瀑蛇道  35° BOWLS', l2: '9-BEND ROLLERCOASTER PYTHON ESSES', bg: '#046a38' },
+            { t: 0.258, l1: '苍松悬崖急降  34° PLUNGE', l2: 'STEEP BANKED CANYON SWITCHBACKS', bg: '#046a38' },
+            { t: 0.362, l1: '秋名传奇五连发卡  35° MAX', l2: '33° / 18° / 9° / 35° / 32° HAIRPINS', bg: '#991b1b' },
+            { t: 0.495, l1: '山谷俯冲蛇道  34° ESSES', l2: 'BANKED DESCENT → IKAHO VALLEY', bg: '#046a38' },
+            { t: 0.580, l1: '伊香保大直道  IKAHO EXPWY', l2: '2.45KM SUPER-STRAIGHT · TUNNEL & JUMP', bg: '#035388' },
+            { t: 0.708, l1: '赤城峡谷过山车  35° ESSES', l2: 'HIGH-SPEED BANKED CANYON ROLLERCOASTER', bg: '#046a38' },
+            { t: 0.842, l1: '榛名西壁冲天梯  34° CLIMB', l2: 'STEEP UPHILL BANKED SERPENTINE', bg: '#046a38' },
+            { t: 0.916, l1: '高岭穿山大直道  TURBO CLIMB', l2: 'TUNNEL & CREST JUMP → 33° FINAL BOWL', bg: '#035388' },
+            { t: 0.986, l1: '秋名山顶冲线  AKINA FINISH', l2: '33° SLINGSHOT → WATER TOWER FINISH', bg: '#991b1b' },
           ]
       : cfg.theme === 'nujiang'
         ? [
