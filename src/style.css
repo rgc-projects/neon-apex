@@ -207,6 +207,19 @@ body,
   gap: 12px;
   max-height: 100%;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 242, 255, 0.35) transparent;
+}
+
+.panel-right::-webkit-scrollbar,
+.panel-left::-webkit-scrollbar {
+  width: 5px;
+}
+
+.panel-right::-webkit-scrollbar-thumb,
+.panel-left::-webkit-scrollbar-thumb {
+  background: rgba(0, 242, 255, 0.32);
+  border-radius: 4px;
 }
 
 .panel-heading {

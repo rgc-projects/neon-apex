@@ -41,11 +41,11 @@ export class TrackSpline {
     // 'centripetal' Catmull-Rom prevents loops/overshoots on sharp 90° bends and tight 180° hairpins!
     this.curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal', 0.5);
     this.totalLength = this.curve.getLength();
-    // Preserve exact 1500 samples for standard 3.4-4.3km circuits; scale density (~2.6m/sample) for mega 10km+ circuits
+    // Preserve exact 1500 samples for standard 3.4-4.3km circuits; scale density (~2.6m/sample) for mega 10-20km circuits
     this.sampleCount =
       this.totalLength <= 4500
         ? 1500
-        : Math.min(4800, Math.max(1500, Math.round(this.totalLength / 2.6)));
+        : Math.min(7600, Math.max(1500, Math.round(this.totalLength / 2.6)));
 
     const N = this.sampleCount;
     const ds = this.totalLength / N;

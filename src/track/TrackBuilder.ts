@@ -250,7 +250,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   group.add(new THREE.Mesh(deckGeo, deckMat));
   disposables.push(deckGeo, deckMat);
 
-  // Concrete Jersey Barriers
+  // Concrete Jersey Barriers (tinted weathered Manx dry-stone walls on Isle of Man TT!)
   const wallGeo = new THREE.BufferGeometry();
   wallGeo.setAttribute('position', new THREE.Float32BufferAttribute(wallPos, 3));
   wallGeo.setAttribute('normal', new THREE.Float32BufferAttribute(wallNormals, 3));
@@ -258,23 +258,24 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   wallGeo.setIndex(wallIndices);
   const wallMat = new THREE.MeshStandardMaterial({
     map: concreteTex,
-    roughness: 0.82,
-    metalness: 0.1,
+    color: cfg.theme === 'manx' ? 0x8a8175 : 0xffffff,
+    roughness: cfg.theme === 'manx' ? 0.92 : 0.82,
+    metalness: cfg.theme === 'manx' ? 0.04 : 0.1,
     side: THREE.DoubleSide,
   });
   group.add(new THREE.Mesh(wallGeo, wallMat));
   disposables.push(wallGeo, wallMat);
 
-  // Galvanized Brushed Steel W-Beam Guardrails
+  // Galvanized Brushed Steel W-Beam Guardrails (dark rural iron trim on Manx dry-stone walls)
   const steelGeo = new THREE.BufferGeometry();
   steelGeo.setAttribute('position', new THREE.Float32BufferAttribute(steelRailPos, 3));
   steelGeo.setAttribute('normal', new THREE.Float32BufferAttribute(steelRailNormals, 3));
   steelGeo.setIndex(steelRailIndices);
   const steelMat = new THREE.MeshStandardMaterial({
-    color: 0x9aa5b4,
-    roughness: 0.34,
-    metalness: 0.82,
-    envMapIntensity: 1.4,
+    color: cfg.theme === 'manx' ? 0x525860 : 0x9aa5b4,
+    roughness: cfg.theme === 'manx' ? 0.56 : 0.34,
+    metalness: cfg.theme === 'manx' ? 0.45 : 0.82,
+    envMapIntensity: cfg.theme === 'manx' ? 0.7 : 1.4,
     side: THREE.DoubleSide,
   });
   group.add(new THREE.Mesh(steelGeo, steelMat));
@@ -499,7 +500,14 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   const lampInterval = 26; // every ~65m along highway
   const lampSamples: number[] = [];
   for (let i = 18; i < N - 18; i += lampInterval) {
-    if (spline.isInTunnel(i / N)) continue;
+    const t = i / N;
+    if (spline.isInTunnel(t)) continue;
+    // Authentic Isle of Man TT: streetlamps only in Douglas, Kirk Michael/Ballaugh & Ramsey towns; A18 Snaefell Mountain is wild & open!
+    if (cfg.theme === 'manx') {
+      const inTown =
+        t < 0.08 || (t > 0.29 && t < 0.35) || (t > 0.48 && t < 0.56) || t > 0.93;
+      if (!inTown) continue;
+    }
     lampSamples.push(i);
   }
 
@@ -511,7 +519,8 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     metalness: 0.78,
     roughness: 0.34,
   });
-  const isWarmLamp = cfg.theme === 'mountain' || cfg.theme === 'bridge' || cfg.theme === 'island';
+  const isWarmLamp =
+    cfg.theme === 'mountain' || cfg.theme === 'bridge' || cfg.theme === 'island' || cfg.theme === 'manx';
   const lampLensMat = new THREE.MeshBasicMaterial({
     color: new THREE.Color(isWarmLamp ? 0xffd28a : 0xe0f2fe).multiplyScalar(1.6),
     toneMapped: false,
@@ -560,6 +569,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     tunnel: ['地下幹線  SUB-ZERO', 'REACTOR EXPRESS TUNNEL', '#046a38'],
     mountain: ['秋名峠  AKINA PASS', 'DOWNHILL HAIRPINS AHEAD', '#046a38'],
     island: ['极境环岛  APEX ISLAND', '11.9KM GRAND COASTAL LOOP', '#035388'],
+    manx: ['ISLE OF MAN TT', 'SNAEFELL MOUNTAIN COURSE · 37.73 MI', '#991b1b'],
   };
 
   const gantrySpecs: { t: number; l1: string; l2: string; bg: string }[] =
@@ -572,7 +582,18 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
           { t: 0.648, l1: '灯塔发卡弯  LIGHTHOUSE POINT', l2: 'LOW-BANK HAIRPINS · SUZUKA S-CURVES', bg: '#035388' },
           { t: 0.908, l1: '环岛冲刺  APEX FINALE', l2: 'MARINA INLET JUMP · FINISH STRAIGHT', bg: '#035388' },
         ]
-      : [0.16, 0.48, 0.78].map((t) => {
+      : cfg.theme === 'manx'
+        ? [
+            { t: 0.024, l1: 'DOUGLAS · BRAY HILL', l2: 'ISLE OF MAN TT · 37.73 MI COURSE', bg: '#991b1b' },
+            { t: 0.148, l1: 'BALLACRAINE  A1 → A3', l2: 'GLEN HELEN · STONE WALL LANES', bg: '#065f46' },
+            { t: 0.326, l1: 'BALLAUGH BRIDGE', l2: 'FAMOUS HUMPBACK FLYING JUMP!', bg: '#991b1b' },
+            { t: 0.375, l1: 'SULBY STRAIGHT', l2: 'FLAT-OUT NORTHERN PLAIN · 440 KM/H', bg: '#065f46' },
+            { t: 0.525, l1: 'RAMSEY HAIRPIN', l2: '180° TURN · GATEWAY TO SNAEFELL', bg: '#991b1b' },
+            { t: 0.615, l1: 'A18 MOUNTAIN ROAD', l2: 'GOOSENECK → HAILWOOD HEIGHT 422M', bg: '#065f46' },
+            { t: 0.758, l1: 'HAILWOOD HEIGHT', l2: '422M SUMMIT · WINDY CORNER DESCENT', bg: '#991b1b' },
+            { t: 0.870, l1: 'CREG-NY-BAA  34TH MS', l2: 'DESCENT TO DOUGLAS GRANDSTAND', bg: '#065f46' },
+          ]
+        : [0.16, 0.48, 0.78].map((t) => {
           const [sL1, sL2, sBg] = signMeta[cfg.id] ?? signMeta[cfg.theme] ?? signMeta.city;
           return { t, l1: sL1, l2: sL2, bg: sBg };
         });

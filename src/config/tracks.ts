@@ -562,4 +562,161 @@ export const TRACK_CONFIGS: TrackConfig[] = [
       { t: 0.952, side: 1, count: 6 },
     ],
   },
+  {
+    id: 'isle-of-man',
+    name: 'ISLE OF MAN TT // SNAEFELL',
+    nameZh: '曼岛 TT 斯奈菲尔环岛',
+    theme: 'manx',
+    difficulty: 'GRAND',
+    description:
+      '致敬真实 60.7km（37.73 英里）曼岛 TT 斯奈菲尔山地赛道的超长环岛终极挑战！从道格拉斯大看台冲下 Bray Hill，穿越石墙绿丘、Ballaugh 飞跃石桥、Sulby 极速直道、Ramsey 发卡弯、Gooseneck 爬坡直上高地荒原，经 Creg-ny-Baa 疾驰归来。',
+    roadWidth: 27,
+    maxBankDeg: 32,
+    laps: 1,
+    skyTopHex: '#0c1d36',
+    skyMidHex: '#284568',
+    skyHorizonHex: '#c99b6a',
+    sunColorHex: '#ffe3a3',
+    fogColor: 0x1a2b40,
+    fogDensity: 0.00031,
+    railLeftColor: 0xdc2626,
+    railRightColor: 0xfacc15,
+    accentColorHex: '#ef4444',
+    asphaltTint: '#1a1e24',
+    points: scalePoints(
+      [
+        // === SECTOR 1: Douglas TT Grandstand (Glencrutchery Road) -> Bray Hill Plunge -> Quarterbridge ===
+        { x: 0, y: 28, z: 0, inwardBankDeg: 0 },
+        { x: 0, y: 26, z: -230, inwardBankDeg: 0 },
+        // Bray Hill Iconic Steep Downhill Compression! (y=26 -> 13)
+        { x: 0, y: 15, z: -470, inwardBankDeg: 0 },
+        // Quarterbridge: Crisp 7° Urban 90° Right turning West along A1
+        { x: -24, y: 13, z: -565, inwardBankDeg: 7 },
+        { x: -120, y: 14, z: -610, inwardBankDeg: 7 },
+
+        // === SECTOR 2: Union Mills -> Crosby -> Greeba Castle -> Ballacraine (West Countryside A1) ===
+        { x: -330, y: 17, z: -630, inwardBankDeg: 10 },
+        { x: -560, y: 22, z: -590, inwardBankDeg: 14 },
+        { x: -790, y: 20, z: -645, inwardBankDeg: 12 },
+        { x: -1045, y: 18, z: -660, inwardBankDeg: 0 },
+        // Ballacraine (7.7 mi): Iconic Sharp 6° Flat-Bank 90° Right turning North onto A3!
+        { x: -1185, y: 18, z: -672, inwardBankDeg: 6 },
+        { x: -1210, y: 19, z: -780, inwardBankDeg: 6 },
+
+        // === SECTOR 3: Glen Helen Wooded Valley S-Bends -> Sarah's Cottage -> Cronk-y-Voddy ===
+        { x: -1175, y: 22, z: -960, inwardBankDeg: 15 },
+        { x: -1285, y: 27, z: -1120, inwardBankDeg: 18 },
+        { x: -1170, y: 34, z: -1285, inwardBankDeg: 18 },
+        { x: -1265, y: 44, z: -1455, inwardBankDeg: 16 },
+        // Cronk-y-Voddy High-Speed Ridge Straight (Jump Ramp #1 Crest!)
+        { x: -1255, y: 50, z: -1710, inwardBankDeg: 0 },
+        { x: -1220, y: 40, z: -1965, inwardBankDeg: 0 },
+
+        // === SECTOR 4: Kirk Michael Village -> Ballaugh Bridge Flying Jump -> Sulby Straight ===
+        // Kirk Michael Technical Stone-Wall Village Bend (9° bank)
+        { x: -1165, y: 26, z: -2120, inwardBankDeg: 9 },
+        { x: -1025, y: 18, z: -2195, inwardBankDeg: 9 },
+        // Approach & FAMOUS BALLAUGH BRIDGE HUMPBACK FLYING JUMP (Jump Ramp #2!)
+        { x: -840, y: 16, z: -2245, inwardBankDeg: 0 },
+        { x: -600, y: 15, z: -2275, inwardBankDeg: 0 },
+        // SULBY STRAIGHT (Fastest Flat-Out Section on the Isle of Man — 440+ km/h!)
+        { x: -290, y: 14, z: -2285, inwardBankDeg: 0 },
+        { x: 60, y: 14, z: -2285, inwardBankDeg: 0 },
+        { x: 420, y: 14, z: -2265, inwardBankDeg: 0 },
+        // Ginger Hall & Sulby Glen Sweeper into Ramsey Town
+        { x: 675, y: 14, z: -2215, inwardBankDeg: 14 },
+        { x: 895, y: 13, z: -2145, inwardBankDeg: 10 },
+        // Parliament Square Technical Chicane entering Ramsey
+        { x: 1065, y: 13, z: -2195, inwardBankDeg: 8 },
+        { x: 1215, y: 13, z: -2135, inwardBankDeg: 8 },
+
+        // === SECTOR 5: Ramsey Hairpin (24 mi) -> Waterworks -> The Gooseneck (Gateway to Snaefell!) ===
+        // RAMSEY HAIRPIN: Legendary Tight Low-Bank 6° 180° Town-to-Mountain Hairpin Right!
+        { x: 1325, y: 15, z: -2075, inwardBankDeg: 6 },
+        { x: 1365, y: 20, z: -1975, inwardBankDeg: 6 },
+        { x: 1270, y: 26, z: -1890, inwardBankDeg: 6 },
+        // Steep Climb through Waterworks toward The Gooseneck
+        { x: 1110, y: 36, z: -1860, inwardBankDeg: 14 },
+        // THE GOOSENECK: Iconic Steep Uphill Scenic 14° Hairpin Left overlooking Ramsey Bay!
+        { x: 995, y: 46, z: -1800, inwardBankDeg: 14 },
+        { x: 990, y: 56, z: -1680, inwardBankDeg: 14 },
+        { x: 1105, y: 66, z: -1600, inwardBankDeg: 14 },
+
+        // === SECTOR 6: Guthrie's Memorial -> Mountain Mile -> Verandah -> Bungalow -> Hailwood's Height (422m Summit!) ===
+        // Guthrie's Climbing Sweeper onto the Open Tree-Free A18 Snaefell Mountain Road!
+        { x: 1295, y: 76, z: -1550, inwardBankDeg: 22 },
+        { x: 1465, y: 86, z: -1430, inwardBankDeg: 26 },
+        // Mountain Mile High-Altitude Full-Throttle Straight!
+        { x: 1510, y: 95, z: -1175, inwardBankDeg: 0 },
+        { x: 1510, y: 102, z: -910, inwardBankDeg: 0 },
+        // Verandah: High-Speed 30° Banked Exposed Moorland Sweeper Right!
+        { x: 1480, y: 106, z: -755, inwardBankDeg: 30 },
+        { x: 1365, y: 109, z: -645, inwardBankDeg: 30 },
+        { x: 1205, y: 111, z: -630, inwardBankDeg: 26 },
+        // The Bungalow Tramway S-Chicane -> HAILWOOD'S HEIGHT (129m In-Game Summit!)
+        { x: 1065, y: 112, z: -575, inwardBankDeg: 10 },
+        { x: 1035, y: 112, z: -420, inwardBankDeg: 10 },
+        // Hailwood's Height Summit Straight (Jump Ramp #3 Launching into the Mountain Descent!)
+        { x: 1055, y: 110, z: -210, inwardBankDeg: 0 },
+
+        // === SECTOR 7: Brandywell -> Windy Corner -> Keppel Gate -> Creg-ny-Baa (High-Speed Mountain Plunge!) ===
+        // Brandywell & Windy Corner: Sweeping 28° Banked Moorland Plunge!
+        { x: 1145, y: 98, z: -30, inwardBankDeg: 26 },
+        { x: 1245, y: 84, z: 120, inwardBankDeg: 28 },
+        { x: 1185, y: 70, z: 280, inwardBankDeg: 28 },
+        // Kate's Cottage & Keppel Gate High-Speed Descent Chute
+        { x: 1035, y: 58, z: 385, inwardBankDeg: 18 },
+        { x: 895, y: 48, z: 490, inwardBankDeg: 16 },
+        // CREG-NY-BAA (34th Milestone): Iconic Crisp 10° Right Sweeper past Creg-ny-Baa Pub!
+        { x: 805, y: 40, z: 615, inwardBankDeg: 10 },
+        { x: 675, y: 36, z: 655, inwardBankDeg: 10 },
+
+        // === SECTOR 8: Brandish -> Hillberry -> Signpost Corner -> Governor's Bridge -> Douglas Grandstand ===
+        // Brandish & Hillberry Flowing High-Speed S-Curves (22° -> 18°)
+        { x: 475, y: 34, z: 545, inwardBankDeg: 22 },
+        { x: 285, y: 31, z: 645, inwardBankDeg: 18 },
+        // Signpost Corner (11° bank) -> Governor's Bridge Crisp 7° Final Hairpin!
+        { x: 145, y: 29, z: 595, inwardBankDeg: 11 },
+        { x: 145, y: 28, z: 475, inwardBankDeg: 7 },
+        { x: 42, y: 28, z: 415, inwardBankDeg: 7 },
+        { x: 0, y: 28, z: 325, inwardBankDeg: 6 },
+        // Glencrutchery Road Flat-Out Sprint Past Douglas TT Grandstand!
+        { x: 0, y: 28, z: 160, inwardBankDeg: 0 },
+      ],
+      1.55,
+      1.15
+    ),
+    boostPads: [
+      { t: 0.012, d: 0, length: 34, width: 7.6 },
+      { t: 0.036, d: 0, length: 34, width: 7.6 },
+      { t: 0.135, d: 0, length: 32, width: 7.4 },
+      { t: 0.256, d: 0, length: 34, width: 7.6 },
+      { t: 0.365, d: 0, length: 36, width: 7.8 },
+      { t: 0.405, d: 0, length: 36, width: 7.8 },
+      { t: 0.440, d: 0, length: 36, width: 7.8 },
+      { t: 0.665, d: 0, length: 36, width: 7.8 },
+      { t: 0.690, d: 0, length: 36, width: 7.8 },
+      { t: 0.785, d: 0, length: 34, width: 7.6 },
+      { t: 0.855, d: 0, length: 32, width: 7.4 },
+      { t: 0.985, d: 0, length: 36, width: 7.8 },
+    ],
+    jumpRamps: [
+      { tStart: 0.268, tEnd: 0.273, height: 3.6, widthRatio: 0.64 },
+      { tStart: 0.336, tEnd: 0.341, height: 4.5, widthRatio: 0.68 },
+      { tStart: 0.768, tEnd: 0.773, height: 3.9, widthRatio: 0.64 },
+    ],
+    tunnelZones: [],
+    coneClusters: [
+      { t: 0.052, side: -1, count: 6 },
+      { t: 0.158, side: -1, count: 6 },
+      { t: 0.205, side: 1, count: 6 },
+      { t: 0.302, side: -1, count: 6 },
+      { t: 0.542, side: -1, count: 6 },
+      { t: 0.588, side: 1, count: 6 },
+      { t: 0.715, side: -1, count: 6 },
+      { t: 0.812, side: -1, count: 6 },
+      { t: 0.882, side: -1, count: 6 },
+      { t: 0.955, side: 1, count: 6 },
+    ],
+  },
 ];

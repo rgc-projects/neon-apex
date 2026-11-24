@@ -212,11 +212,12 @@ export class MenuUI {
     const tr = TRACK_CONFIGS[this.selectedTrack];
     const rawLen = this.trackLengths[this.selectedTrack];
     const lenLabel = rawLen >= 10000 ? `${(rawLen / 1000).toFixed(1)} km` : `${rawLen}m`;
+    const lapWord = tr.laps === 1 ? '1 LAP' : `${tr.laps} LAPS`;
     this.trackInfoEl.innerHTML = `
       <div>${tr.description}</div>
       <div class="track-meta-pills">
         <span class="meta-pill">长度 ${lenLabel}</span>
-        <span class="meta-pill">${tr.laps} LAPS</span>
+        <span class="meta-pill">${lapWord}</span>
         <span class="meta-pill">${tr.boostPads.length} 加速带</span>
         <span class="meta-pill">${tr.jumpRamps.length} 飞跃跳台</span>
         <span class="meta-pill">最大倾角 ${tr.maxBankDeg}°</span>
@@ -228,11 +229,14 @@ export class MenuUI {
     const car = CAR_SPECS[this.selectedCar];
     const track = TRACK_CONFIGS[this.selectedTrack];
     const rawLen = this.trackLengths[this.selectedTrack];
+    const lapWord = track.laps === 1 ? '1 LAP' : `${track.laps} LAPS`;
     this.showcaseCarName.textContent = `${car.name} ${car.subtitle}`;
     this.showcaseTrackName.textContent = `${track.nameZh} // ${track.name}`;
     this.launchSubEl.textContent =
-      rawLen >= 10000
-        ? `${track.laps} LAPS · 6 RACERS · ${(rawLen / 1000).toFixed(1)}KM GRAND ISLAND`
-        : `${track.laps} LAPS · 6 RACERS · DRIFT TO BOOST`;
+      track.id === 'isle-of-man'
+        ? `${lapWord} · 6 RACERS · ${(rawLen / 1000).toFixed(1)}KM ISLE OF MAN TT`
+        : rawLen >= 10000
+          ? `${lapWord} · 6 RACERS · ${(rawLen / 1000).toFixed(1)}KM GRAND ISLAND`
+          : `${lapWord} · 6 RACERS · DRIFT TO BOOST`;
   }
 }

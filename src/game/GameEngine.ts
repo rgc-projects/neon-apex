@@ -407,6 +407,16 @@ export class GameEngine {
       this.dirKeyLight.position.set(260, 130, 180);
       this.dirRimLight.color.setHex(0x7dd3fc);
       this.dirRimLight.intensity = 1.05;
+    } else if (cfg.theme === 'manx') {
+      // Crisp late-afternoon Irish Sea golden Atlantic break over emerald Manx hills
+      this.hemiLight.color.setHex(0xb8d4f0);
+      this.hemiLight.groundColor.setHex(0x233825);
+      this.hemiLight.intensity = 1.52;
+      this.dirKeyLight.color.setHex(0xffe0a3);
+      this.dirKeyLight.intensity = 2.15;
+      this.dirKeyLight.position.set(-220, 155, 190);
+      this.dirRimLight.color.setHex(0x93c5fd);
+      this.dirRimLight.intensity = 0.95;
     } else if (cfg.theme === 'tunnel') {
       // Modern illuminated sub-surface expressway tunnel
       this.hemiLight.color.setHex(0xcbd5e1);
