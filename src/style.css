@@ -628,6 +628,20 @@ body,
   color: var(--green);
 }
 
+.drift-nitro-toggle.hyper-toggle.active {
+  border-color: rgba(250, 204, 21, 0.85);
+  background: linear-gradient(110deg, rgba(6, 40, 56, 0.88), rgba(58, 34, 6, 0.84));
+  box-shadow: 0 0 18px rgba(0, 242, 255, 0.28), 0 0 12px rgba(250, 204, 21, 0.22);
+}
+
+.drift-nitro-toggle.hyper-toggle.active .dnt-track {
+  background: linear-gradient(90deg, #00f2ff, #fde047);
+}
+
+.drift-nitro-toggle.hyper-toggle.active .dnt-state {
+  color: #fde047;
+}
+
 .launch-btn {
   position: relative;
   padding: 16px 46px;
@@ -2326,13 +2340,17 @@ body.touch-mode .drift-bar-bg {
   }
 
   .drift-nitro-toggle {
-    padding: 3px 10px;
-    font-size: 10px;
-    gap: 6px;
+    padding: 2px 8px;
+    font-size: 9.5px;
+    gap: 5px;
+  }
+
+  .drift-nitro-toggle .dnt-state {
+    font-size: 9px;
   }
 
   .menu-race-opts {
-    gap: 5px;
+    gap: 4px 6px;
   }
 
   .lap-selector {

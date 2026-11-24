@@ -43,12 +43,14 @@ export class GameEngine {
   private readonly touchControls: TouchControls;
   private readonly pauseOverlay = document.getElementById('pause-overlay')!;
   private readonly pauseDriftNitroBtn = document.getElementById('btn-pause-drift-nitro')!;
+  private readonly pauseHyperNitroBtn = document.getElementById('btn-pause-hyper-nitro')!;
 
   private state: GameState = 'MENU';
   private selectedCarIndex = 0;
   private selectedTrackIndex = 0;
   private selectedLaps = TRACK_CONFIGS[0].laps;
   private allowDriftNitro = false; // Default OFF: Nitro is disabled while actively drifting
+  private enableHyperNitro = false; // Default OFF: opt-in infinite nitro on mega island straightaways
 
   // Active Track World Objects
   private spline!: TrackSpline;
@@ -190,11 +192,13 @@ export class GameEngine {
     });
     this.cameraController.setMobileMode(this.touchControls.enabled);
 
-    // Restore saved drift+nitro preference (defaults to false = Nitro disabled while drifting)
+    // Restore saved preferences (both default to false!)
     try {
       this.allowDriftNitro = localStorage.getItem('neon_apex_allow_drift_nitro') === 'true';
+      this.enableHyperNitro = localStorage.getItem('neon_apex_enable_hyper_nitro') === 'true';
     } catch {
       this.allowDriftNitro = false;
+      this.enableHyperNitro = false;
     }
 
     // Wire UI
@@ -237,12 +241,19 @@ export class GameEngine {
         this.audio.unlock();
         return this.toggleDriftNitro();
       },
+      onToggleHyperNitro: () => {
+        this.audio.unlock();
+        return this.toggleHyperNitro();
+      },
     });
     this.menuUI.setTouchEnabled(this.touchControls.enabled);
     this.menuUI.setFullscreen(this.touchControls.isFullscreen());
     this.menuUI.setDriftNitroEnabled(this.allowDriftNitro);
+    this.menuUI.setHyperNitroEnabled(this.enableHyperNitro);
     this.syncPauseDriftNitroLabel();
+    this.syncPauseHyperNitroLabel();
     this.hud.setTouchLabel(this.touchControls.enabled);
+    this.hud.setHyperZonesVisible(this.enableHyperNitro);
 
     this.resultsUI = new ResultsUI({
       onRaceAgain: () => {
@@ -284,6 +295,11 @@ export class GameEngine {
       this.audio.unlock();
       const enabled = this.toggleDriftNitro();
       this.menuUI.setDriftNitroEnabled(enabled);
+    });
+    this.pauseHyperNitroBtn.addEventListener('click', () => {
+      this.audio.unlock();
+      const enabled = this.toggleHyperNitro();
+      this.menuUI.setHyperNitroEnabled(enabled);
     });
     document.getElementById('btn-pause-restart')!.addEventListener('click', () => {
       this.pauseOverlay.classList.add('hidden');
@@ -456,11 +472,13 @@ export class GameEngine {
     }
 
     this.trackBuild = buildTrackMesh(this.spline);
+    this.trackBuild.setHyperZonesVisible(this.enableHyperNitro);
     this.sceneryBuild = buildScenery(this.spline);
     this.destructibles = new DestructibleProps(this.spline);
 
     this.scene.add(this.trackBuild.group, this.sceneryBuild.group, this.destructibles.group);
     this.hud.configureTrack(this.spline);
+    this.hud.setHyperZonesVisible(this.enableHyperNitro);
     this.positionShowcaseOnTrack();
   }
 
@@ -525,6 +543,7 @@ export class GameEngine {
           totalLaps: raceLaps,
         });
         racer.allowDriftNitro = this.allowDriftNitro;
+        racer.enableHyperNitro = this.enableHyperNitro;
         racer.placeOnGrid(this.spline, gridIdx);
         this.racers.push(racer);
         this.playerRacer = racer;
@@ -543,6 +562,7 @@ export class GameEngine {
           totalLaps: raceLaps,
         });
         racer.allowDriftNitro = this.allowDriftNitro;
+        racer.enableHyperNitro = this.enableHyperNitro;
         racer.placeOnGrid(this.spline, gridIdx);
         this.racers.push(racer);
         this.aiDrivers.set(racer.id, new AIDriver(prof));
@@ -589,6 +609,40 @@ export class GameEngine {
       );
     }
     return this.allowDriftNitro;
+  }
+
+  private syncPauseHyperNitroLabel(): void {
+    this.pauseHyperNitroBtn.textContent = this.enableHyperNitro
+      ? '⚡ 环岛直道满氮：开（长直道满氮）'
+      : '⚡ 环岛直道满氮：关（常规氮气）';
+    this.pauseHyperNitroBtn.style.borderColor = this.enableHyperNitro ? '#fde047' : '';
+  }
+
+  private toggleHyperNitro(): boolean {
+    this.enableHyperNitro = !this.enableHyperNitro;
+    try {
+      localStorage.setItem('neon_apex_enable_hyper_nitro', String(this.enableHyperNitro));
+    } catch {
+      // Ignore storage failures
+    }
+    for (const r of this.racers) {
+      r.enableHyperNitro = this.enableHyperNitro;
+      if (!this.enableHyperNitro) {
+        r.inHyperZone = false;
+        r.hyperZoneRemaining = 0;
+        r.hyperZoneTotal = 0;
+      }
+    }
+    this.trackBuild?.setHyperZonesVisible(this.enableHyperNitro);
+    this.hud.setHyperZonesVisible(this.enableHyperNitro);
+    this.syncPauseHyperNitroLabel();
+    if (this.state === 'RACING' || this.state === 'PAUSED') {
+      this.hud.pushCallout(
+        this.enableHyperNitro ? '⚡ 环岛超长直道无限氮气：已开启' : '🔒 环岛超长直道无限氮气：已关闭',
+        this.enableHyperNitro ? 'gold' : 'cyan'
+      );
+    }
+    return this.enableHyperNitro;
   }
 
   private togglePause(): void {

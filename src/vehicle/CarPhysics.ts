@@ -68,6 +68,7 @@ export class RacerPhysics {
   public isNitroActive = false;
   public isSuperNitro = false;
   public allowDriftNitro = false; // Default OFF: simultaneous Nitro is disabled while drifting
+  public enableHyperNitro = false; // Default OFF: optional infinite-nitro corridors on mega island straightaways
   public boostPadTimer = 0;
   private boostPadCooldown = 0;
 
@@ -467,10 +468,13 @@ export class RacerPhysics {
       else this.driftTier = 0;
     }
 
-    // 4.4. Mega Island Circuit (>= 8 km) Hyper Straight Infinite-Nitro Zone & Straightaway Overdrive
+    // 4.4. Mega Island Circuit (>= 8 km) Hyper Straight Infinite-Nitro Zone (opt-in!) & Straightaway Overdrive
     // Standard 3–4.2 km circuits stay 100% classic original nitro & speed-cap gameplay!
     const isMegaCircuit = spline.totalLength >= 8000;
-    const hz = isMegaCircuit && this.totalProgress > 18 ? spline.getHyperZoneAt(this.s) : null;
+    const hz =
+      isMegaCircuit && this.enableHyperNitro && this.totalProgress > 18
+        ? spline.getHyperZoneAt(this.s)
+        : null;
     this.inHyperZone = hz !== null;
     if (hz) {
       this.hyperZoneRemaining = hz.remainingMeters;

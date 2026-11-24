@@ -11,6 +11,7 @@ export interface MenuCallbacks {
   onToggleTouch: () => boolean;
   onToggleFullscreen: () => void;
   onToggleDriftNitro: () => boolean;
+  onToggleHyperNitro: () => boolean;
 }
 
 export class MenuUI {
@@ -27,6 +28,8 @@ export class MenuUI {
   private readonly touchBtn = document.getElementById('btn-menu-touch')!;
   private readonly driftNitroBtn = document.getElementById('btn-menu-drift-nitro')!;
   private readonly driftNitroStateEl = document.getElementById('drift-nitro-state')!;
+  private readonly hyperNitroBtn = document.getElementById('btn-menu-hyper-nitro')!;
+  private readonly hyperNitroStateEl = document.getElementById('hyper-nitro-state')!;
   private readonly controlsBtn = document.getElementById('btn-menu-controls')!;
   private readonly controlsModal = document.getElementById('controls-modal')!;
   private readonly closeControlsBtn = document.getElementById('btn-close-controls')!;
@@ -88,6 +91,10 @@ export class MenuUI {
       const on = this.callbacks.onToggleDriftNitro();
       this.setDriftNitroEnabled(on);
     });
+    this.hyperNitroBtn.addEventListener('click', () => {
+      const on = this.callbacks.onToggleHyperNitro();
+      this.setHyperNitroEnabled(on);
+    });
     this.controlsBtn.addEventListener('click', () => {
       this.controlsModal.classList.remove('hidden');
     });
@@ -143,6 +150,12 @@ export class MenuUI {
     this.driftNitroBtn.classList.toggle('active', enabled);
     this.driftNitroBtn.setAttribute('aria-checked', String(enabled));
     this.driftNitroStateEl.textContent = enabled ? '开 · 允许同喷' : '关 · 漂移禁氮';
+  }
+
+  public setHyperNitroEnabled(enabled: boolean): void {
+    this.hyperNitroBtn.classList.toggle('active', enabled);
+    this.hyperNitroBtn.setAttribute('aria-checked', String(enabled));
+    this.hyperNitroStateEl.textContent = enabled ? '开 · 长直道满氮' : '关 · 常规氮气';
   }
 
   private renderCars(): void {

@@ -19,6 +19,7 @@ export interface TrackBuildResult {
   countdownLights: THREE.MeshStandardMaterial[];
   update: (dt: number, elapsed: number) => void;
   setCountdownState: (stage: number) => void;
+  setHyperZonesVisible: (visible: boolean) => void;
   dispose: () => void;
 }
 
@@ -779,6 +780,11 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   group.add(studInst);
 
   // 9. Auto-Detected Hyper Straight Infinite-Nitro Zone Entry/Exit Portals + Luminous Corridor Strips
+  // Hosted inside `hyperZoneGroup` (default hidden) so toggling the setting shows/hides 3D visuals instantaneously!
+  const hyperZoneGroup = new THREE.Group();
+  hyperZoneGroup.visible = false;
+  group.add(hyperZoneGroup);
+
   let hyperStripMat: THREE.MeshBasicMaterial | null = null;
   if (spline.hyperZones.length > 0) {
     const entryBannerTex = createHyperZoneGateTexture(true);
@@ -833,7 +839,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
       const banner = new THREE.Mesh(gateBannerGeo, bannerMat);
       banner.position.set(0, 10.1, 0.32);
       portal.add(topArch, banner);
-      group.add(portal);
+      hyperZoneGroup.add(portal);
     };
 
     // Build single merged glowing roadside strip mesh across ALL Hyper Straight Zones (1 draw call!)
@@ -879,7 +885,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
         polygonOffsetFactor: -2,
         toneMapped: false,
       });
-      group.add(new THREE.Mesh(hzGeo, hyperStripMat));
+      hyperZoneGroup.add(new THREE.Mesh(hzGeo, hyperStripMat));
       disposables.push(hzGeo, hyperStripMat);
     }
   }
@@ -909,11 +915,14 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     countdownLights,
     update: (dt: number, elapsed = 0) => {
       boostTexture.offset.y -= dt * 2.0;
-      if (hyperStripMat) {
+      if (hyperStripMat && hyperZoneGroup.visible) {
         hyperStripMat.opacity = 0.62 + 0.24 * Math.sin(elapsed * 5.2);
       }
     },
     setCountdownState,
+    setHyperZonesVisible: (visible: boolean) => {
+      hyperZoneGroup.visible = visible;
+    },
     dispose: () => {
       disposables.forEach((d) => d.dispose());
     },

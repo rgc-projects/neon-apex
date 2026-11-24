@@ -57,6 +57,7 @@ export class HUD {
     maxZ: number;
   } | null = null;
   private minimapHyperSegments: { x: number; y: number }[][] = [];
+  private showHyperZones = false;
   private trackAccent = '#00f2ff';
   private lastCalloutText = '';
   private lastCalloutAt = 0;
@@ -96,6 +97,10 @@ export class HUD {
 
   public setTouchLabel(enabled: boolean): void {
     this.touchBtn.classList.toggle('active-pill', enabled);
+  }
+
+  public setHyperZonesVisible(visible: boolean): void {
+    this.showHyperZones = visible;
   }
 
   public showCountdown(text: string | null, isGo = false, startRpmNorm = 0, showRpm = false): void {
@@ -299,8 +304,8 @@ export class HUD {
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Highlight auto-detected Hyper Straight Infinite-Nitro corridors in electric cyan-gold!
-    if (this.minimapHyperSegments.length > 0) {
+    // Highlight auto-detected Hyper Straight Infinite-Nitro corridors in electric cyan-gold when enabled!
+    if (this.showHyperZones && this.minimapHyperSegments.length > 0) {
       ctx.lineCap = 'round';
       for (const seg of this.minimapHyperSegments) {
         if (seg.length < 2) continue;
