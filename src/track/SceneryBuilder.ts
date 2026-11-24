@@ -46,7 +46,7 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
 
   // 1. Photorealistic Atmospheric Sky Dome (natural clouds, twilight scattering & subtle stars)
   const isMegaSea = cfg.theme === 'island' || cfg.theme === 'manx';
-  const isDusk = cfg.theme === 'bridge' || isMegaSea;
+  const isDusk = cfg.theme === 'bridge' || isMegaSea || cfg.theme === 'nujiang';
   const skyTex = createRealisticSkyTexture(
     cfg.skyTopHex,
     cfg.skyMidHex,
@@ -67,12 +67,14 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   group.add(skyDome);
   disposables.push(skyTex, skyGeo, skyMat);
 
-  // 2. Base Ground / Realistic Shimmering Ocean Water Plane
+  // 2. Base Ground / Realistic Shimmering Ocean or Glacial Gorge River Plane
   const oceanNormal = createOceanNormalTexture();
   if (cfg.theme === 'manx') {
     oceanNormal.repeat.set(280, 280);
   } else if (cfg.theme === 'island') {
     oceanNormal.repeat.set(95, 95);
+  } else if (cfg.theme === 'nujiang') {
+    oceanNormal.repeat.set(70, 70);
   }
   disposables.push(oceanNormal);
 
@@ -81,25 +83,27 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   groundGeo.rotateX(-Math.PI / 2);
 
   let groundMat: THREE.MeshStandardMaterial;
-  if (cfg.theme === 'bridge' || cfg.theme === 'city' || isMegaSea) {
-    const isOcean = cfg.theme === 'bridge' || isMegaSea;
+  if (cfg.theme === 'bridge' || cfg.theme === 'city' || isMegaSea || cfg.theme === 'nujiang') {
+    const isOcean = cfg.theme === 'bridge' || isMegaSea || cfg.theme === 'nujiang';
     groundMat = new THREE.MeshStandardMaterial({
       color:
-        cfg.theme === 'manx'
-          ? 0x0e2538
-          : cfg.theme === 'island'
-            ? 0x0b243c
-            : cfg.theme === 'bridge'
-              ? 0x0d223a
-              : 0x070f1c,
+        cfg.theme === 'nujiang'
+          ? 0x0e5e68
+          : cfg.theme === 'manx'
+            ? 0x0e2538
+            : cfg.theme === 'island'
+              ? 0x0b243c
+              : cfg.theme === 'bridge'
+                ? 0x0d223a
+                : 0x070f1c,
       normalMap: oceanNormal,
       normalScale: new THREE.Vector2(
-        cfg.theme === 'manx' ? 0.72 : isOcean ? 0.82 : 0.45,
-        cfg.theme === 'manx' ? 0.72 : isOcean ? 0.82 : 0.45
+        cfg.theme === 'nujiang' ? 0.92 : cfg.theme === 'manx' ? 0.72 : isOcean ? 0.82 : 0.45,
+        cfg.theme === 'nujiang' ? 0.92 : cfg.theme === 'manx' ? 0.72 : isOcean ? 0.82 : 0.45
       ),
-      roughness: cfg.theme === 'manx' ? 0.28 : isOcean ? 0.23 : 0.36,
-      metalness: cfg.theme === 'manx' ? 0.48 : isOcean ? 0.54 : 0.35,
-      envMapIntensity: cfg.theme === 'manx' ? 1.0 : isOcean ? 1.15 : 0.65,
+      roughness: cfg.theme === 'nujiang' ? 0.24 : cfg.theme === 'manx' ? 0.28 : isOcean ? 0.23 : 0.36,
+      metalness: cfg.theme === 'nujiang' ? 0.42 : cfg.theme === 'manx' ? 0.48 : isOcean ? 0.54 : 0.35,
+      envMapIntensity: cfg.theme === 'nujiang' ? 1.05 : cfg.theme === 'manx' ? 1.0 : isOcean ? 1.15 : 0.65,
     });
   } else {
     groundMat = new THREE.MeshStandardMaterial({
@@ -110,15 +114,17 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   }
   const groundPlane = new THREE.Mesh(groundGeo, groundMat);
   groundPlane.position.set(
-    isMegaSea ? trackCenterX : 0,
-    cfg.theme === 'bridge' || isMegaSea
-      ? -2
-      : cfg.theme === 'tunnel'
-        ? -56
-        : cfg.theme === 'mountain'
-          ? -18
-          : -22,
-    isMegaSea ? trackCenterZ : 0
+    isMegaSea || cfg.theme === 'nujiang' ? trackCenterX : 0,
+    cfg.theme === 'nujiang'
+      ? 4
+      : cfg.theme === 'bridge' || isMegaSea
+        ? -2
+        : cfg.theme === 'tunnel'
+          ? -56
+          : cfg.theme === 'mountain'
+            ? -18
+            : -22,
+    isMegaSea || cfg.theme === 'nujiang' ? trackCenterZ : 0
   );
   group.add(groundPlane);
   disposables.push(groundGeo, groundMat);
@@ -134,7 +140,8 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     cfg.theme === 'bridge' ||
     cfg.theme === 'mountain' ||
     cfg.theme === 'island' ||
-    cfg.theme === 'manx'
+    cfg.theme === 'manx' ||
+    cfg.theme === 'nujiang'
   ) {
     const floorY = groundPlane.position.y;
     const pierList: {
@@ -223,6 +230,7 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   // 5. Theme-Specific Photorealistic World Architecture
   const animatedFans: THREE.Object3D[] = [];
   const animatedBeacons: THREE.Object3D[] = [];
+  const animatedFlags: { mesh: THREE.Object3D; phase: number }[] = [];
 
   if (cfg.theme === 'city') {
     buildRealisticCitySkyline(spline, group, disposables, rand, groundPlane.position.y);
@@ -234,6 +242,8 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     buildGrandIslandWorld(spline, group, disposables, rand, groundPlane.position.y, animatedBeacons);
   } else if (cfg.theme === 'manx') {
     buildIsleOfManWorld(spline, group, disposables, rand, groundPlane.position.y, animatedBeacons);
+  } else if (cfg.theme === 'nujiang') {
+    buildNujiangGorgeWorld(spline, group, disposables, rand, groundPlane.position.y, animatedFlags);
   } else {
     buildRealisticSubterraneanCavern(spline, group, disposables, rand, animatedFans);
   }
@@ -242,8 +252,8 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     group,
     update: (dt: number, elapsed: number, camPos: THREE.Vector3) => {
       skyDome.position.set(camPos.x, 0, camPos.z);
-      if (cfg.theme === 'bridge' || cfg.theme === 'city' || isMegaSea) {
-        oceanNormal.offset.y += dt * 0.08;
+      if (cfg.theme === 'bridge' || cfg.theme === 'city' || isMegaSea || cfg.theme === 'nujiang') {
+        oceanNormal.offset.y += dt * (cfg.theme === 'nujiang' ? 0.18 : 0.08);
         oceanNormal.offset.x = Math.sin(elapsed * 0.25) * 0.08;
       }
       for (const fan of animatedFans) {
@@ -251,6 +261,9 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
       }
       for (const beacon of animatedBeacons) {
         beacon.rotation.y += dt * 0.85;
+      }
+      for (const flag of animatedFlags) {
+        flag.mesh.rotation.x = Math.sin(elapsed * 4.2 + flag.phase) * 0.22;
       }
     },
     dispose: () => {
@@ -1873,5 +1886,424 @@ function buildIsleOfManWorld(
 
     lhGroup.add(rock, tower, band, lantern, roof, beaconPivot);
     group.add(lhGroup);
+  }
+}
+
+/**
+ * 怒江 72 拐 // G318 Yela Mountain & Nujiang Gorge Tibetan Highland World:
+ * - Sculpted 200x200 ochre-terracotta Hengduan mountain canyon & snow-capped outer 360m peaks,
+ *   with strict multi-tier roadbed carving (>= 9.5m below EVERY stacked switchback shelf -> 0% clipping!).
+ * - Shimmering emerald-turquoise Nujiang River flowing through the central chasm beneath the red-steel Gorge Bridge.
+ * - Fluttering 5-color Tibetan Prayer Flag spans strung high across Yela Pass & key switchback overlooks.
+ * - Traditional Tibetan White Chorten (Stupa) with golden spire at Yela Mountain Pass & Tongni Overlook.
+ * - Sparse weathered ochre boulders & high-altitude plateau scrub tufts (InstancedMesh).
+ */
+function buildNujiangGorgeWorld(
+  spline: TrackSpline,
+  group: THREE.Group,
+  disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[],
+  rand: () => number,
+  waterY: number,
+  animatedFlags: { mesh: THREE.Object3D; phase: number }[]
+): void {
+  // 1. Build fast 80m local spatial grid over all spline samples (stride 2) for multi-tier zero-clipping carving!
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const s of spline.samples) {
+    if (s.pos.x < minX) minX = s.pos.x;
+    if (s.pos.x > maxX) maxX = s.pos.x;
+    if (s.pos.z < minZ) minZ = s.pos.z;
+    if (s.pos.z > maxZ) maxZ = s.pos.z;
+  }
+
+  const cellSize = 80;
+  const gridMap = new Map<number, number[]>();
+  for (let i = 0; i < spline.sampleCount; i += 2) {
+    const p = spline.samples[i].pos;
+    const gx = Math.floor(p.x / cellSize);
+    const gz = Math.floor(p.z / cellSize);
+    const key = ((gx + 2048) << 12) | (gz + 2048);
+    let bucket = gridMap.get(key);
+    if (!bucket) {
+      bucket = [];
+      gridMap.set(key, bucket);
+    }
+    bucket.push(i);
+  }
+
+  const queryRoadEnvelope = (wx: number, wz: number): { minDist: number; strictSafeFloor: number; nearestY: number } => {
+    const gx = Math.floor(wx / cellSize);
+    const gz = Math.floor(wz / cellSize);
+    let minDistSq = Infinity;
+    let nearestY = 60;
+    let strictSafeFloor = Infinity;
+    const hardRadiusSq = (spline.halfWidth + 24) * (spline.halfWidth + 24);
+
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oz = -1; oz <= 1; oz++) {
+        const key = ((gx + ox + 2048) << 12) | (gz + oz + 2048);
+        const bucket = gridMap.get(key);
+        if (!bucket) continue;
+        for (let k = 0; k < bucket.length; k++) {
+          const s = spline.samples[bucket[k]];
+          const dx = s.pos.x - wx;
+          const dz = s.pos.z - wz;
+          const dSq = dx * dx + dz * dz;
+          if (dSq < minDistSq) {
+            minDistSq = dSq;
+            nearestY = s.pos.y;
+          }
+          if (dSq < hardRadiusSq) {
+            const bankDrop = spline.halfWidth * Math.sin(Math.abs(s.bank));
+            const floor = s.pos.y - bankDrop - 9.5;
+            if (floor < strictSafeFloor) strictSafeFloor = floor;
+          }
+        }
+      }
+    }
+    return {
+      minDist: minDistSq === Infinity ? 999 : Math.sqrt(minDistSq),
+      strictSafeFloor,
+      nearestY,
+    };
+  };
+
+  // 2. Sculpted 200x200 Hengduan Ochre Canyon & Snow-Capped Outer Peaks
+  const margin = 460;
+  const widthX = maxX - minX + margin * 2;
+  const depthZ = maxZ - minZ + margin * 2;
+  const centerX = (minX + maxX) * 0.5;
+  const centerZ = (minZ + maxZ) * 0.5;
+  const segs = 200;
+
+  const terrGeo = new THREE.PlaneGeometry(widthX, depthZ, segs, segs);
+  terrGeo.rotateX(-Math.PI / 2);
+  const posAttr = terrGeo.attributes.position as THREE.BufferAttribute;
+  const colors = new Float32Array(posAttr.count * 3);
+
+  const cRiverBed = new THREE.Color(0x1f2d34);
+  const cGorgeRock = new THREE.Color(0x5b4c3f);
+  const cOchreEarth = new THREE.Color(0x966340);
+  const cRustSlope = new THREE.Color(0x7c5338);
+  const cAlpineSlate = new THREE.Color(0x636975);
+  const cSnowPeak = new THREE.Color(0xeaf2fb);
+  const tmpColor = new THREE.Color();
+
+  const evalTerrainHeight = (wx: number, wz: number): number => {
+    // Dramatic Tibetan canyon profile: deep river chasm along x ≈ -85, towering walls East (+X), West (-X) & Summit (+Z)
+    const fbm =
+      Math.sin(wx * 0.0048) * Math.cos(wz * 0.0044) * 44 +
+      Math.sin(wx * 0.0115 + 1.3) * Math.sin(wz * 0.0108 + 0.7) * 20 +
+      Math.cos((wx + wz) * 0.022) * 8;
+
+    // Central Nujiang River Gorge carved deep below waterY=4 along x ≈ -85 (z < -180)
+    const riverAxisX = -85 + Math.sin(wz * 0.0032) * 38;
+    const distFromRiver = Math.abs(wx - riverAxisX);
+    const northFactor = smoothstep(-80, -340, wz);
+    const riverCarve = (1 - smoothstep(26, 145, distFromRiver)) * northFactor;
+
+    // Mountain backdrop rises steeply toward Yela Pass (+Z) and outside East/West canyon rims
+    const slopeNorthToSouth = clamp((wz + 1220) / 1380, 0, 1.25) * 185;
+    const rimEast = smoothstep(320, 760, wx) * 195;
+    const rimWest = smoothstep(-360, -820, wx) * 205;
+    const rimSouth = smoothstep(60, 440, wz) * 180;
+    const rimNorth = smoothstep(-1190, -1580, wz) * 210;
+
+    let h = 14 + slopeNorthToSouth + rimEast + rimWest + rimSouth + rimNorth + fbm;
+    // Deepen the central Nujiang River gorge channel so turquoise water flows visibly down the canyon floor!
+    h = h * (1 - riverCarve) + (waterY - 6.5) * riverCarve;
+
+    const env = queryRoadEnvelope(wx, wz);
+    const clearInner = spline.halfWidth + 15;
+    const clearOuter = spline.halfWidth + 56;
+    if (env.minDist < clearOuter) {
+      const targetFloor =
+        env.strictSafeFloor < Infinity ? env.strictSafeFloor : env.nearestY - 12.5;
+      const blend = smoothstep(clearInner, clearOuter, env.minDist);
+      h = Math.min(h, targetFloor + (Math.max(h, targetFloor) - targetFloor) * blend);
+    }
+    if (env.strictSafeFloor < Infinity) {
+      h = Math.min(h, env.strictSafeFloor);
+    }
+    return h;
+  };
+
+  const terrHeights = new Float32Array((segs + 1) * (segs + 1));
+  for (let i = 0; i < posAttr.count; i++) {
+    const lx = posAttr.getX(i);
+    const lz = posAttr.getZ(i);
+    const wx = lx + centerX;
+    const wz = lz + centerZ;
+    const h = evalTerrainHeight(wx, wz);
+    posAttr.setY(i, h);
+    terrHeights[i] = h;
+
+    // Rich Tibetan Hengduan elevation-stratified vertex coloring
+    const patch = 0.5 + 0.5 * Math.sin(wx * 0.017 + wz * 0.014);
+    if (h < 12) {
+      tmpColor.copy(cRiverBed).lerp(cGorgeRock, clamp((h + 4) / 16, 0, 1));
+    } else if (h < 58) {
+      tmpColor.copy(cGorgeRock).lerp(cRustSlope, clamp((h - 12) / 46, 0, 1));
+    } else if (h < 178) {
+      tmpColor.copy(cRustSlope).lerp(cOchreEarth, patch * 0.72 + clamp((h - 58) / 140, 0, 0.28));
+    } else if (h < 248) {
+      tmpColor.copy(cOchreEarth).lerp(cAlpineSlate, clamp((h - 178) / 70, 0, 1));
+    } else {
+      tmpColor.copy(cAlpineSlate).lerp(cSnowPeak, clamp((h - 248) / 52, 0, 1));
+    }
+    colors[i * 3] = tmpColor.r;
+    colors[i * 3 + 1] = tmpColor.g;
+    colors[i * 3 + 2] = tmpColor.b;
+  }
+
+  terrGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  terrGeo.computeVertexNormals();
+  const terrMat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.93,
+    metalness: 0.04,
+  });
+  const terrMesh = new THREE.Mesh(terrGeo, terrMat);
+  terrMesh.position.set(centerX, 0, centerZ);
+  group.add(terrMesh);
+  disposables.push(terrGeo, terrMat);
+
+  // 3. Nujiang River Red-Steel Canyon Bridge (spanning the turquoise river at t = 0.498..0.528!)
+  const bridgeRedMat = new THREE.MeshStandardMaterial({
+    color: 0xb91c1c,
+    metalness: 0.58,
+    roughness: 0.36,
+  });
+  const cableSteelMat = new THREE.MeshStandardMaterial({
+    color: 0xdbeafe,
+    metalness: 0.85,
+    roughness: 0.25,
+  });
+  const pylonGeo = new THREE.BoxGeometry(2.8, 72, 3.2);
+  const crossGeo = new THREE.BoxGeometry(spline.roadWidth + 7.4, 2.8, 2.8);
+  const cableGeo = new THREE.CylinderGeometry(0.16, 0.16, 1, 6);
+  disposables.push(bridgeRedMat, cableSteelMat, pylonGeo, crossGeo, cableGeo);
+
+  const basis = new THREE.Matrix4();
+  const hw = spline.halfWidth;
+  for (const towerT of [0.502, 0.526]) {
+    const f = spline.getFrameAtDistance(towerT * spline.totalLength);
+    const tower = new THREE.Group();
+    tower.position.set(f.pos.x, waterY, f.pos.z);
+    basis.makeBasis(f.flatRight, new THREE.Vector3(0, 1, 0), f.tangent.clone().negate());
+    tower.quaternion.setFromRotationMatrix(basis);
+
+    const deckH = f.pos.y - waterY;
+    for (const side of [-1, 1] as const) {
+      const leg = new THREE.Mesh(pylonGeo, bridgeRedMat);
+      leg.position.set(side * (hw + 2.6), 36, 0);
+      tower.add(leg);
+    }
+    const lowCross = new THREE.Mesh(crossGeo, bridgeRedMat);
+    lowCross.position.set(0, deckH + 17, 0);
+    const topCross = new THREE.Mesh(crossGeo, bridgeRedMat);
+    topCross.position.set(0, 68, 0);
+    tower.add(lowCross, topCross);
+
+    // Crisp fanned steel stay cables anchored cleanly outside road shoulders
+    const upVec = new THREE.Vector3(0, 1, 0);
+    for (const side of [-1, 1] as const) {
+      for (const dir of [-1, 1] as const) {
+        for (let c = 1; c <= 4; c++) {
+          const topPt = new THREE.Vector3(side * (hw + 2.4), 66 - c * 4.8, 0);
+          const botPt = new THREE.Vector3(side * (hw + 1.4), deckH + 0.8, dir * (c * 14));
+          const span = botPt.clone().sub(topPt);
+          const len = span.length();
+          const cable = new THREE.Mesh(cableGeo, cableSteelMat);
+          cable.position.copy(topPt).addScaledVector(span, 0.5);
+          cable.scale.set(1, len, 1);
+          cable.quaternion.setFromUnitVectors(upVec, span.normalize());
+          tower.add(cable);
+        }
+      }
+    }
+    group.add(tower);
+  }
+
+  // 4. Fluttering 5-Color Tibetan Prayer Flag Spans across Yela Pass & Key Cliff Overlooks!
+  const poleWoodMat = new THREE.MeshStandardMaterial({
+    color: 0x5c4033,
+    roughness: 0.9,
+    metalness: 0.05,
+  });
+  const ropeMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 });
+  const flagColors = [0x1d4ed8, 0xf8fafc, 0xdc2626, 0x16a34a, 0xeab308]; // Traditional Tibetan Blue-White-Red-Green-Yellow
+  const flagMats = flagColors.map(
+    (hex) =>
+      new THREE.MeshStandardMaterial({
+        color: hex,
+        emissive: hex,
+        emissiveIntensity: 0.16,
+        roughness: 0.72,
+        side: THREE.DoubleSide,
+      })
+  );
+  const flagPoleGeo = new THREE.CylinderGeometry(0.18, 0.24, 15.0, 7);
+  const flagGeo = new THREE.PlaneGeometry(1.35, 1.65);
+  flagGeo.translate(0, -0.82, 0); // Pivot at top edge so flags flutter downward naturally!
+  const ropeGeo = new THREE.CylinderGeometry(0.04, 0.04, spline.roadWidth + 4.4, 6);
+  ropeGeo.rotateZ(Math.PI / 2);
+  disposables.push(poleWoodMat, ropeMat, flagPoleGeo, flagGeo, ropeGeo, ...flagMats);
+
+  for (const [idx, flagT] of [0.010, 0.150, 0.308, 0.468, 0.725, 0.968].entries()) {
+    const f = spline.getFrameAtDistance(flagT * spline.totalLength);
+    const spanGroup = new THREE.Group();
+    spanGroup.position.copy(f.pos);
+    basis.makeBasis(f.right, f.up, f.tangent.clone().negate());
+    spanGroup.quaternion.setFromRotationMatrix(basis);
+
+    for (const side of [-1, 1] as const) {
+      const pole = new THREE.Mesh(flagPoleGeo, poleWoodMat);
+      pole.position.set(side * (hw + 2.1), 7.5, 0);
+      spanGroup.add(pole);
+    }
+
+    const rope = new THREE.Mesh(ropeGeo, ropeMat);
+    rope.position.set(0, 14.2, 0);
+    spanGroup.add(rope);
+
+    const numFlags = 15;
+    const totalW = spline.roadWidth + 1.6;
+    for (let k = 0; k < numFlags; k++) {
+      const u = (k + 0.5) / numFlags;
+      const fx = (u - 0.5) * totalW;
+      const sag = Math.sin(u * Math.PI) * 1.15;
+      const fm = new THREE.Mesh(flagGeo, flagMats[(k + idx) % flagMats.length]);
+      fm.position.set(fx, 14.2 - sag, 0);
+      spanGroup.add(fm);
+      animatedFlags.push({ mesh: fm, phase: idx * 1.7 + k * 0.55 });
+    }
+    group.add(spanGroup);
+  }
+
+  // 5. Traditional Tibetan White Chorten (Stupa) Landmarks at Yela Pass Summit & Tongni Overlook!
+  const stupaWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.76, metalness: 0.05 });
+  const stupaGoldMat = new THREE.MeshStandardMaterial({
+    color: 0xfacc15,
+    emissive: 0xca8a04,
+    emissiveIntensity: 0.25,
+    metalness: 0.78,
+    roughness: 0.28,
+  });
+  const stupaRedMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.68 });
+  const sBaseGeo = new THREE.BoxGeometry(10.5, 4.2, 10.5);
+  const sStepGeo = new THREE.BoxGeometry(7.8, 2.2, 7.8);
+  const sDomeGeo = new THREE.CylinderGeometry(2.8, 3.6, 4.8, 14);
+  const sTrimGeo = new THREE.BoxGeometry(3.2, 1.4, 3.2);
+  const sSpireGeo = new THREE.ConeGeometry(1.4, 5.2, 12);
+  disposables.push(
+    stupaWhiteMat,
+    stupaGoldMat,
+    stupaRedMat,
+    sBaseGeo,
+    sStepGeo,
+    sDomeGeo,
+    sTrimGeo,
+    sSpireGeo
+  );
+
+  for (const [stupaT, side] of [
+    [0.006, 1],
+    [0.304, 1],
+    [0.985, -1],
+  ] as const) {
+    const f = spline.getFrameAtDistance(stupaT * spline.totalLength);
+    const pos = f.pos.clone().addScaledVector(f.flatRight, side * (hw + 19));
+    if (spline.minHorizontalDistanceToTrack(pos.x, pos.z) < hw + 13) continue;
+
+    const stupa = new THREE.Group();
+    stupa.position.set(pos.x, f.pos.y - 1.2, pos.z);
+    const base = new THREE.Mesh(sBaseGeo, stupaWhiteMat);
+    base.position.y = 2.1;
+    const step = new THREE.Mesh(sStepGeo, stupaWhiteMat);
+    step.position.y = 5.3;
+    const dome = new THREE.Mesh(sDomeGeo, stupaWhiteMat);
+    dome.position.y = 8.8;
+    const trim = new THREE.Mesh(sTrimGeo, stupaRedMat);
+    trim.position.y = 11.9;
+    const spire = new THREE.Mesh(sSpireGeo, stupaGoldMat);
+    spire.position.y = 15.2;
+    stupa.add(base, step, dome, trim, spire);
+    group.add(stupa);
+  }
+
+  // 6. Instanced Weathered Ochre Cliff Boulders & Sparse Tibetan Highland Scrub
+  const boulderGeo = new THREE.DodecahedronGeometry(2.6, 0);
+  const boulderMat = new THREE.MeshStandardMaterial({
+    color: 0x7c5a43,
+    roughness: 0.94,
+    metalness: 0.04,
+  });
+  const scrubGeo = new THREE.ConeGeometry(1.9, 3.4, 6);
+  const scrubMat = new THREE.MeshStandardMaterial({
+    color: 0x4d5d36,
+    roughness: 0.92,
+  });
+  disposables.push(boulderGeo, boulderMat, scrubGeo, scrubMat);
+
+  const sampleMeshTerrainY = (wx: number, wz: number): number => {
+    const fx = ((wx - (centerX - widthX * 0.5)) / widthX) * segs;
+    const fz = ((wz - (centerZ - depthZ * 0.5)) / depthZ) * segs;
+    const ix = clamp(Math.floor(fx), 0, segs - 1);
+    const iz = clamp(Math.floor(fz), 0, segs - 1);
+    const tx = clamp(fx - ix, 0, 1);
+    const tz = clamp(fz - iz, 0, 1);
+    const stride = segs + 1;
+    const h00 = terrHeights[iz * stride + ix];
+    const h10 = terrHeights[iz * stride + ix + 1];
+    const h01 = terrHeights[(iz + 1) * stride + ix];
+    const h11 = terrHeights[(iz + 1) * stride + ix + 1];
+    return (h00 * (1 - tx) + h10 * tx) * (1 - tz) + (h01 * (1 - tx) + h11 * tx) * tz;
+  };
+
+  const boulders: { x: number; y: number; z: number; sx: number; sy: number; sz: number }[] = [];
+  const scrubs: { x: number; y: number; z: number; s: number }[] = [];
+  for (let i = 0; i < 2400 && (boulders.length < 260 || scrubs.length < 180); i++) {
+    const wx = minX - 240 + rand() * (maxX - minX + 480);
+    const wz = minZ - 240 + rand() * (maxZ - minZ + 480);
+    const env = queryRoadEnvelope(wx, wz);
+    if (env.minDist < hw + 22) continue;
+    const wy = sampleMeshTerrainY(wx, wz);
+    if (wy < waterY + 6 || wy > 230) continue;
+    if (boulders.length < 260 && rand() < 0.6) {
+      boulders.push({
+        x: wx,
+        y: wy - 1.2,
+        z: wz,
+        sx: 0.8 + rand() * 2.2,
+        sy: 0.6 + rand() * 1.4,
+        sz: 0.8 + rand() * 2.0,
+      });
+    } else if (scrubs.length < 180 && wy < 170) {
+      scrubs.push({ x: wx, y: wy + 0.2, z: wz, s: 0.7 + rand() * 1.0 });
+    }
+  }
+
+  const dummy = new THREE.Object3D();
+  if (boulders.length > 0) {
+    const bInst = new THREE.InstancedMesh(boulderGeo, boulderMat, boulders.length);
+    boulders.forEach((b, idx) => {
+      dummy.position.set(b.x, b.y, b.z);
+      dummy.rotation.set(rand() * 2, rand() * 6, rand() * 2);
+      dummy.scale.set(b.sx, b.sy, b.sz);
+      dummy.updateMatrix();
+      bInst.setMatrixAt(idx, dummy.matrix);
+    });
+    group.add(bInst);
+  }
+  if (scrubs.length > 0) {
+    const sInst = new THREE.InstancedMesh(scrubGeo, scrubMat, scrubs.length);
+    scrubs.forEach((sc, idx) => {
+      dummy.position.set(sc.x, sc.y, sc.z);
+      dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+      dummy.scale.setScalar(sc.s);
+      dummy.updateMatrix();
+      sInst.setMatrixAt(idx, dummy.matrix);
+    });
+    group.add(sInst);
   }
 }

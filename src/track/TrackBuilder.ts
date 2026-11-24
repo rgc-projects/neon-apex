@@ -260,9 +260,9 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   wallGeo.setIndex(wallIndices);
   const wallMat = new THREE.MeshStandardMaterial({
     map: concreteTex,
-    color: cfg.theme === 'manx' ? 0x8a8175 : 0xffffff,
-    roughness: cfg.theme === 'manx' ? 0.92 : 0.82,
-    metalness: cfg.theme === 'manx' ? 0.04 : 0.1,
+    color: cfg.theme === 'manx' ? 0x8a8175 : cfg.theme === 'nujiang' ? 0x8e8072 : 0xffffff,
+    roughness: cfg.theme === 'manx' || cfg.theme === 'nujiang' ? 0.92 : 0.82,
+    metalness: cfg.theme === 'manx' || cfg.theme === 'nujiang' ? 0.04 : 0.1,
     side: THREE.DoubleSide,
   });
   group.add(new THREE.Mesh(wallGeo, wallMat));
@@ -504,11 +504,14 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   for (let i = 18; i < N - 18; i += lampInterval) {
     const t = i / N;
     if (spline.isInTunnel(t)) continue;
-    // Authentic Isle of Man TT: streetlamps only in Douglas, Kirk Michael/Ballaugh & Ramsey towns; A18 Snaefell Mountain is wild & open!
+    // Authentic Isle of Man TT & Nujiang G318: streetlamps only at towns/overlooks/bridges so wild cliffs stay dramatic!
     if (cfg.theme === 'manx') {
       const inTown =
         t < 0.052 || (t > 0.328 && t < 0.402) || (t > 0.558 && t < 0.590) || t > 0.962;
       if (!inTown) continue;
+    } else if (cfg.theme === 'nujiang') {
+      const inZone = t < 0.048 || (t > 0.485 && t < 0.545) || t > 0.955;
+      if (!inZone) continue;
     }
     lampSamples.push(i);
   }
@@ -522,7 +525,11 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     roughness: 0.34,
   });
   const isWarmLamp =
-    cfg.theme === 'mountain' || cfg.theme === 'bridge' || cfg.theme === 'island' || cfg.theme === 'manx';
+    cfg.theme === 'mountain' ||
+    cfg.theme === 'bridge' ||
+    cfg.theme === 'island' ||
+    cfg.theme === 'manx' ||
+    cfg.theme === 'nujiang';
   const lampLensMat = new THREE.MeshBasicMaterial({
     color: new THREE.Color(isWarmLamp ? 0xffd28a : 0xe0f2fe).multiplyScalar(1.6),
     toneMapped: false,
@@ -572,6 +579,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     mountain: ['秋名峠  AKINA PASS', 'DOWNHILL HAIRPINS AHEAD', '#046a38'],
     island: ['极境环岛  APEX ISLAND', '11.9KM GRAND COASTAL LOOP', '#035388'],
     manx: ['ISLE OF MAN TT', 'SNAEFELL MOUNTAIN COURSE · 37.73 MI', '#991b1b'],
+    nujiang: ['G318 怒江72拐', 'YELA PASS 4658M · HAIRPIN TOUGE', '#046a38'],
   };
 
   const gantrySpecs: { t: number; l1: string; l2: string; bg: string }[] =
@@ -584,6 +592,15 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
           { t: 0.648, l1: '灯塔发卡弯  LIGHTHOUSE POINT', l2: 'LOW-BANK HAIRPINS · SUZUKA S-CURVES', bg: '#035388' },
           { t: 0.908, l1: '环岛冲刺  APEX FINALE', l2: 'MARINA INLET JUMP · FINISH STRAIGHT', bg: '#035388' },
         ]
+      : cfg.theme === 'nujiang'
+        ? [
+            { t: 0.016, l1: 'G318 业拉山垭口  4658M', l2: 'NUJIANG 72 BENDS · HAIRPIN DESCENT', bg: '#046a38' },
+            { t: 0.165, l1: '怒江72拐  连续发卡弯', l2: 'STACKED Z-SWITCHBACKS · DRIFT ZONE', bg: '#991b1b' },
+            { t: 0.325, l1: '同尼村观景台  OVERLOOK', l2: 'STEEP 180° HAIRPINS → NUJIANG GORGE', bg: '#046a38' },
+            { t: 0.488, l1: '怒江峡谷大桥  3100M', l2: 'NUJIANG RIVER CROSSING · TUNNEL AHEAD', bg: '#035388' },
+            { t: 0.695, l1: '邦达西壁盘山  CLIMB', l2: '5 UPHILL HAIRPINS → YELA PASS 4658M', bg: '#046a38' },
+            { t: 0.918, l1: '业拉山冲刺  SUMMIT', l2: 'FINAL SWITCHBACKS → G318 GRANDSTAND', bg: '#991b1b' },
+          ]
       : cfg.theme === 'manx'
         ? [
             { t: 0.012, l1: 'DOUGLAS · BRAY HILL', l2: 'ISLE OF MAN TT · 60.7 KM (37.73 MI)', bg: '#991b1b' },

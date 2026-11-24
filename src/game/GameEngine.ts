@@ -439,6 +439,16 @@ export class GameEngine {
       this.dirKeyLight.position.set(-220, 155, 190);
       this.dirRimLight.color.setHex(0x93c5fd);
       this.dirRimLight.intensity = 0.95;
+    } else if (cfg.theme === 'nujiang') {
+      // Crisp high-altitude Tibetan Plateau cobalt-sky sunlight over warm ochre Hengduan cliffs
+      this.hemiLight.color.setHex(0xbce0ff);
+      this.hemiLight.groundColor.setHex(0x4a3222);
+      this.hemiLight.intensity = 1.55;
+      this.dirKeyLight.color.setHex(0xffe6b8);
+      this.dirKeyLight.intensity = 2.32;
+      this.dirKeyLight.position.set(-210, 260, 160);
+      this.dirRimLight.color.setHex(0x93c5fd);
+      this.dirRimLight.intensity = 1.05;
     } else if (cfg.theme === 'tunnel') {
       // Modern illuminated sub-surface expressway tunnel
       this.hemiLight.color.setHex(0xcbd5e1);

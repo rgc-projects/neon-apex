@@ -86,6 +86,7 @@
    - 标准赛道（`<= 4,500m`）保持 `sampleCount = 1500`；`10–35 km` 按 `~2.6m/段` 采样；`> 35 km`（如 `60.725 km`）按 `~3.0m/段` 扩展至 `20,242` 段；内置 240m 2D 空间哈希 `getNearestRoadInfo()` 使全岛净空与地标查询达 O(1) 级耗时。
    - 发车直道与跳台坡道倾角展平使用物理米制缓冲区；弯前 `150m/100m/50m` 距离牌统一采用 `InstancedMesh`（全图仅 3 次绘制调用）。
 2. **节奏叙事、真实地标分区与全局圈数选择**：
+   - **怒江 72 拐盘山天路（`nujiang-72`，`7.32 km`，默认 2 圈，`< 8 km` 纯正发卡弯漂移山道）**：独立配置于 `src/config/nujiangTrack.ts`，采用 `makeHairpin()` 精确 5 点半圆弧生成器避免内侧护栏折角，路宽收紧至 `24m`、最紧弯半径 **`R = 39m`**（比常规高速弯急 2–3 倍）、弯道倾角控制在写实的 `7°–15°`（`maxBankDeg = 18°`）；以 4,658m 业拉山垭口（`Y = 172m`）发车，连续 7 连层叠“之”字形下坡发卡弯（`minSep3D = 111.2m`）俯冲 154m 至碧绿怒江大峡谷（`Y = 18m`），穿越红钢怒江大桥与 200m G318 穿山石洞后再经 5 连上坡发卡弯重返垭口；配套 `200×200` 横断山红岩雪峰零穿模山体（`minTerrainClearance = +9.50m`）、6 组飘动藏族五彩经幡与 3 座藏式白塔，单圈漂移总长超 `3.6–4.3 km`（50%–60% 路程处于横滑漂移状态）。
    - **极境环岛大满贯（`apex-island`，`11.9 km`，默认 2 圈）**：海港都市 -> 双塔跨海悬索桥 + 34° 海洋碗弯 -> 76m 火山松林鸟居与悬崖发卡 -> 1.3km 穿山弧形隧道 + 33° 卡鲁塞尔 -> 灯塔半岛 5°–9° 低倾角发卡 + 铃鹿 S 弯 -> 海湾跳台冲刺。
    - **曼岛 TT 斯奈菲尔环岛（`isle-of-man`，精确 `60,725m / 37.73 英里`，默认 1 圈 ≈ 8 分钟，支持 `1 / 2 / 3 圈` 自由切换）**：独立配置于 `src/config/isleOfManTrack.ts`，完整还原道格拉斯大看台 → Bray Hill → Quarterbridge → Braddan → Crosby → Ballacraine → Glen Helen → Cronk-y-Voddy → Kirk Michael → Ballaugh 飞跃石桥 → Quarry Bends → 3.5km Sulby 极速超频直道 → Kerrowmoar → Ramsey 6° 发卡 → Gooseneck → 荒凉无树的 18km A18 Snaefell 高地（Mountain Mile / 30° Verandah / Bungalow / Hailwood's Height 跳台 / 28° Windy Corner）→ Creg-ny-Baa 酒馆 → Brandish → Governor's Bridge 冲线。
 3. **双层 60 km 零穿模地形架构（`SceneryBuilder.ts`）**：
