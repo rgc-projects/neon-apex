@@ -154,8 +154,11 @@ export class HUD {
     const isSuperState = telemetry.isSuperNitro || nPct >= 82;
     this.nitroFill.classList.toggle('super', isSuperState);
 
-    this.nitroStatus.classList.remove('ready', 'super');
-    if (telemetry.isSuperNitro) {
+    this.nitroStatus.classList.remove('ready', 'super', 'locked');
+    if (telemetry.nitroLockedByDrift) {
+      this.nitroStatus.textContent = '漂移禁用氮气';
+      this.nitroStatus.classList.add('locked');
+    } else if (telemetry.isSuperNitro) {
       this.nitroStatus.textContent = '★ SUPER NITRO!';
       this.nitroStatus.classList.add('super');
     } else if (telemetry.isNitroActive) {

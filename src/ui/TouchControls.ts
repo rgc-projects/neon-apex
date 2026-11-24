@@ -648,13 +648,15 @@ export class TouchControls {
 
     if (!telemetry) return;
 
-    const superReady = telemetry.isSuperNitro || telemetry.nitro >= 82;
-    const ready = telemetry.nitro >= 14;
+    const locked = telemetry.nitroLockedByDrift;
+    const superReady = !locked && (telemetry.isSuperNitro || telemetry.nitro >= 82);
+    const ready = !locked && telemetry.nitro >= 14;
+    this.nitroBtn.classList.toggle('locked', locked);
     this.nitroBtn.classList.toggle('ready', ready && !superReady);
     this.nitroBtn.classList.toggle('super', superReady);
     const nSub = this.nitroBtn.querySelector('.tbtn-sub');
     if (nSub) {
-      nSub.textContent = superReady ? 'SUPER!' : `${Math.round(telemetry.nitro)}%`;
+      nSub.textContent = locked ? '漂移禁用' : superReady ? 'SUPER!' : `${Math.round(telemetry.nitro)}%`;
     }
 
     this.driftBtn.classList.remove('tier-1', 'tier-2', 'tier-3');

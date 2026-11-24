@@ -447,6 +447,76 @@ body,
   color: rgba(255, 255, 255, 0.3);
 }
 
+/* Drift + Nitro Simultaneous Mode Switch Pill */
+.drift-nitro-toggle {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(8, 13, 30, 0.76);
+  backdrop-filter: blur(8px);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.drift-nitro-toggle:hover {
+  border-color: rgba(0, 242, 255, 0.65);
+  color: #ffffff;
+}
+
+.drift-nitro-toggle.active {
+  border-color: rgba(0, 255, 157, 0.78);
+  background: rgba(6, 36, 38, 0.8);
+  color: #ffffff;
+  box-shadow: 0 0 18px rgba(0, 255, 157, 0.24);
+}
+
+.dnt-track {
+  position: relative;
+  width: 30px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.55);
+  transition: background 0.16s ease;
+  flex-shrink: 0;
+}
+
+.drift-nitro-toggle.active .dnt-track {
+  background: linear-gradient(90deg, #00d9ff, #00ff9d);
+}
+
+.dnt-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.drift-nitro-toggle.active .dnt-thumb {
+  transform: translateX(14px);
+}
+
+.dnt-state {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.drift-nitro-toggle.active .dnt-state {
+  color: var(--green);
+}
+
 .launch-btn {
   position: relative;
   padding: 16px 46px;
@@ -1033,6 +1103,11 @@ kbd {
   animation: pulse 0.7s infinite;
 }
 
+.nitro-status.locked {
+  color: var(--gold);
+  opacity: 0.9;
+}
+
 .nitro-bar-track {
   position: relative;
   height: 11px;
@@ -1603,6 +1678,14 @@ body.touch-mode .hud-keybinds {
   box-shadow: 0 0 36px rgba(0, 242, 255, 0.85);
 }
 
+.nitro-btn.locked {
+  opacity: 0.45;
+  border-color: rgba(255, 184, 0, 0.48);
+  background: rgba(15, 20, 34, 0.62);
+  box-shadow: none;
+  animation: none;
+}
+
 /* Inner-Left Thumb Arc (~9 o'clock): Circular BRAKE / Tap-to-Drift Button */
 .brake-btn {
   right: 118px;
@@ -2084,7 +2167,14 @@ body.touch-mode .drift-bar-bg {
   }
 
   .menu-center-bottom {
-    padding-bottom: 16px;
+    gap: 6px;
+    padding-bottom: 10px;
+  }
+
+  .drift-nitro-toggle {
+    padding: 3px 10px;
+    font-size: 10px;
+    gap: 6px;
   }
 
   .launch-btn {

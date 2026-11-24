@@ -9,6 +9,7 @@ export interface MenuCallbacks {
   onToggleAudio: () => boolean;
   onToggleTouch: () => boolean;
   onToggleFullscreen: () => void;
+  onToggleDriftNitro: () => boolean;
 }
 
 export class MenuUI {
@@ -22,6 +23,8 @@ export class MenuUI {
   private readonly fullscreenBtn = document.getElementById('btn-menu-fullscreen')!;
   private readonly audioBtn = document.getElementById('btn-menu-audio')!;
   private readonly touchBtn = document.getElementById('btn-menu-touch')!;
+  private readonly driftNitroBtn = document.getElementById('btn-menu-drift-nitro')!;
+  private readonly driftNitroStateEl = document.getElementById('drift-nitro-state')!;
   private readonly controlsBtn = document.getElementById('btn-menu-controls')!;
   private readonly controlsModal = document.getElementById('controls-modal')!;
   private readonly closeControlsBtn = document.getElementById('btn-close-controls')!;
@@ -62,6 +65,10 @@ export class MenuUI {
     this.touchBtn.addEventListener('click', () => {
       const on = this.callbacks.onToggleTouch();
       this.setTouchEnabled(on);
+    });
+    this.driftNitroBtn.addEventListener('click', () => {
+      const on = this.callbacks.onToggleDriftNitro();
+      this.setDriftNitroEnabled(on);
     });
     this.controlsBtn.addEventListener('click', () => {
       this.controlsModal.classList.remove('hidden');
@@ -112,6 +119,12 @@ export class MenuUI {
       : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
     label.textContent = active ? '退出全屏' : '全屏';
     this.fullscreenBtn.style.borderColor = active ? '#00f2ff' : '';
+  }
+
+  public setDriftNitroEnabled(enabled: boolean): void {
+    this.driftNitroBtn.classList.toggle('active', enabled);
+    this.driftNitroBtn.setAttribute('aria-checked', String(enabled));
+    this.driftNitroStateEl.textContent = enabled ? '开 · 允许同喷' : '关 · 漂移禁氮';
   }
 
   private renderCars(): void {

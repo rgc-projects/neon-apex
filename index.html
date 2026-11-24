@@ -68,6 +68,18 @@
             <span class="sep">|</span>
             <span id="showcase-track-name">NEO TOKYO OVERDRIVE</span>
           </div>
+          <button
+            id="btn-menu-drift-nitro"
+            class="drift-nitro-toggle"
+            type="button"
+            role="switch"
+            aria-checked="false"
+            title="默认关闭：漂移时禁止同时使用氮气；开启后可漂移与氮气同时触发"
+          >
+            <span class="dnt-label">🔥 漂移同步喷气</span>
+            <span class="dnt-track"><span class="dnt-thumb"></span></span>
+            <span id="drift-nitro-state" class="dnt-state">关 · 漂移禁氮</span>
+          </button>
           <button id="btn-start-race" class="launch-btn">
             <span class="launch-bg"></span>
             <span class="launch-text">START RACE // 立即开赛</span>
@@ -111,7 +123,7 @@
           <div class="ctrl-item"><kbd>S / ↓</kbd><div><strong>点刹起漂 / 刹车</strong><p>高速打方向时轻点 S 即可像极品飞车一样丝滑甩尾入弯！</p></div></div>
           <div class="ctrl-item"><kbd>A / D / ← / →</kbd><div><strong>内切收线 / 反打修正</strong><p>漂移中往弯心打方向收紧走线，反打外侧可稳住大角度横滑</p></div></div>
           <div class="ctrl-item"><kbd>SPACE</kbd><div><strong>手刹漂移 (按住)</strong><p>结合弯道 150m/100m/50m 路牌提早起漂，松开即享小喷加速！</p></div></div>
-          <div class="ctrl-item"><kbd>SHIFT / E / N</kbd><div><strong>主动氮气喷射（独立按键）</strong><p>与漂移完全分开！氮气≥82% 释放将触发蓝焰超级氮气爆发</p></div></div>
+          <div class="ctrl-item"><kbd>SHIFT / E / N</kbd><div><strong>主动氮气喷射（独立按键）</strong><p>默认漂移中禁止同喷；可在主菜单或暂停页开启「漂移同步喷气」</p></div></div>
           <div class="ctrl-item"><kbd>C / R / M / ESC</kbd><div><strong>辅助功能</strong><p>C 切换追尾/引擎盖视角 · R 复位 · M 静音 · ESC 暂停</p></div></div>
         </div>
         <div class="pro-tips">
@@ -300,6 +312,7 @@
         <h2 class="pause-title">RACE PAUSED</h2>
         <div class="pause-actions">
           <button id="btn-resume" class="cyber-btn primary">RESUME // 继续比赛</button>
+          <button id="btn-pause-drift-nitro" class="cyber-btn">🔥 漂移同步喷气：关（漂移禁氮）</button>
           <button id="btn-pause-restart" class="cyber-btn">RESTART // 重新开赛</button>
           <button id="btn-pause-menu" class="cyber-btn ghost">MAIN MENU // 返回主菜单</button>
         </div>

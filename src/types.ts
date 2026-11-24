@@ -114,6 +114,7 @@ export interface RacerHUDTelemetry {
   nitro: number;         // 0..100
   isNitroActive: boolean;
   isSuperNitro: boolean;
+  nitroLockedByDrift: boolean;
   isDrifting: boolean;
   driftTier: 0 | 1 | 2 | 3;
   driftChargeNorm: number;

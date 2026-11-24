@@ -65,6 +65,7 @@ export class RacerPhysics {
   public nitro = 40;       // 0..100
   public isNitroActive = false;
   public isSuperNitro = false;
+  public allowDriftNitro = false; // Default OFF: simultaneous Nitro is disabled while drifting
   public boostPadTimer = 0;
   private boostPadCooldown = 0;
 
@@ -271,30 +272,10 @@ export class RacerPhysics {
           : 0;
     this.steerSmooth = damp(this.steerSmooth, rawSteer, 12.5, dt);
 
-    // 2. Nitro activation & Super Nitro logic
-    if (input.nitro && this.nitro > (this.isNitroActive ? 0.5 : 12)) {
-      if (!this.isNitroActive) {
-        this.isSuperNitro = this.nitro >= 82;
-        events?.onNitroStart?.(this.isSuperNitro);
-      }
-      this.isNitroActive = true;
-      const drainRate = (this.isSuperNitro ? 26 : 20) / this.spec.nitroCapacity;
-      this.nitro = Math.max(0, this.nitro - drainRate * dt);
-      if (this.nitro <= 0.5) {
-        this.isNitroActive = false;
-        this.isSuperNitro = false;
-      }
-    } else {
-      this.isNitroActive = false;
-      this.isSuperNitro = false;
-      const passive = (this.speed > 55 ? 1.8 : 0.4) + (this.isSlipstreaming ? 8.5 : 0);
-      this.nitro = Math.min(100, this.nitro + passive * dt);
-    }
-
     if (this.miniBoostTimer > 0) this.miniBoostTimer = Math.max(0, this.miniBoostTimer - dt);
     if (this.boostPadTimer > 0) this.boostPadTimer = Math.max(0, this.boostPadTimer - dt);
 
-    // 3. Road Frame & Upcoming Corner Telemetry Scan (for player HUD callouts!)
+    // 2. Road Frame & Upcoming Corner Telemetry Scan (for player HUD callouts!)
     spline.getFrameAtDistance(this.s, this.frame);
     spline.getFrameAtDistance(this.s + 18, this._lookFrame);
     if (this.isPlayer) {
@@ -459,6 +440,27 @@ export class RacerPhysics {
       else if (this.driftCharge >= 1.28) this.driftTier = 2;
       else if (this.driftCharge >= 0.42) this.driftTier = 1;
       else this.driftTier = 0;
+    }
+
+    // 4.5. Nitro activation & Super Nitro logic (respects `allowDriftNitro`: default OFF blocks Nitro during drift!)
+    const nitroBlockedByDrift = this.isDrifting && !this.allowDriftNitro;
+    if (input.nitro && !nitroBlockedByDrift && this.nitro > (this.isNitroActive ? 0.5 : 12)) {
+      if (!this.isNitroActive) {
+        this.isSuperNitro = this.nitro >= 82;
+        events?.onNitroStart?.(this.isSuperNitro);
+      }
+      this.isNitroActive = true;
+      const drainRate = (this.isSuperNitro ? 26 : 20) / this.spec.nitroCapacity;
+      this.nitro = Math.max(0, this.nitro - drainRate * dt);
+      if (this.nitro <= 0.5) {
+        this.isNitroActive = false;
+        this.isSuperNitro = false;
+      }
+    } else {
+      this.isNitroActive = false;
+      this.isSuperNitro = false;
+      const passive = (this.speed > 55 ? 1.8 : 0.4) + (this.isSlipstreaming ? 8.5 : 0);
+      this.nitro = Math.min(100, this.nitro + passive * dt);
     }
 
     // 5. Longitudinal Speed, Banking-Driven Corner Speed & Slope Gravity
@@ -886,6 +888,7 @@ export class RacerPhysics {
       nitro: this.nitro,
       isNitroActive: this.isNitroActive,
       isSuperNitro: this.isSuperNitro,
+      nitroLockedByDrift: this.isDrifting && !this.allowDriftNitro,
       isDrifting: this.isDrifting,
       driftTier: this.driftTier,
       driftChargeNorm: clamp(this.driftCharge / 2.35, 0, 1),

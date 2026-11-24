@@ -42,10 +42,12 @@ export class GameEngine {
   private readonly resultsUI: ResultsUI;
   private readonly touchControls: TouchControls;
   private readonly pauseOverlay = document.getElementById('pause-overlay')!;
+  private readonly pauseDriftNitroBtn = document.getElementById('btn-pause-drift-nitro')!;
 
   private state: GameState = 'MENU';
   private selectedCarIndex = 0;
   private selectedTrackIndex = 0;
+  private allowDriftNitro = false; // Default OFF: Nitro is disabled while actively drifting
 
   // Active Track World Objects
   private spline!: TrackSpline;
@@ -187,6 +189,13 @@ export class GameEngine {
     });
     this.cameraController.setMobileMode(this.touchControls.enabled);
 
+    // Restore saved drift+nitro preference (defaults to false = Nitro disabled while drifting)
+    try {
+      this.allowDriftNitro = localStorage.getItem('neon_apex_allow_drift_nitro') === 'true';
+    } catch {
+      this.allowDriftNitro = false;
+    }
+
     // Wire UI
     this.menuUI = new MenuUI({
       onSelectCar: (idx) => {
@@ -218,9 +227,15 @@ export class GameEngine {
         this.audio.unlock();
         void this.touchControls.toggleFullscreen();
       },
+      onToggleDriftNitro: () => {
+        this.audio.unlock();
+        return this.toggleDriftNitro();
+      },
     });
     this.menuUI.setTouchEnabled(this.touchControls.enabled);
     this.menuUI.setFullscreen(this.touchControls.isFullscreen());
+    this.menuUI.setDriftNitroEnabled(this.allowDriftNitro);
+    this.syncPauseDriftNitroLabel();
     this.hud.setTouchLabel(this.touchControls.enabled);
 
     this.resultsUI = new ResultsUI({
@@ -259,6 +274,11 @@ export class GameEngine {
     });
 
     document.getElementById('btn-resume')!.addEventListener('click', () => this.togglePause());
+    this.pauseDriftNitroBtn.addEventListener('click', () => {
+      this.audio.unlock();
+      const enabled = this.toggleDriftNitro();
+      this.menuUI.setDriftNitroEnabled(enabled);
+    });
     document.getElementById('btn-pause-restart')!.addEventListener('click', () => {
       this.pauseOverlay.classList.add('hidden');
       this.startRace();
@@ -478,6 +498,7 @@ export class GameEngine {
           colorHex: playerSpec.neonHex,
           totalLaps: trackCfg.laps,
         });
+        racer.allowDriftNitro = this.allowDriftNitro;
         racer.placeOnGrid(this.spline, gridIdx);
         this.racers.push(racer);
         this.playerRacer = racer;
@@ -495,6 +516,7 @@ export class GameEngine {
           colorHex: prof.overrideNeonHex,
           totalLaps: trackCfg.laps,
         });
+        racer.allowDriftNitro = this.allowDriftNitro;
         racer.placeOnGrid(this.spline, gridIdx);
         this.racers.push(racer);
         this.aiDrivers.set(racer.id, new AIDriver(prof));
@@ -514,6 +536,33 @@ export class GameEngine {
     this.hud.setCameraLabel(this.cameraController.mode);
     this.cameraController.resetSnap();
     this.audio.setEngineActive(true, true);
+  }
+
+  private syncPauseDriftNitroLabel(): void {
+    this.pauseDriftNitroBtn.textContent = this.allowDriftNitro
+      ? '🔥 漂移同步喷气：开（允许同喷）'
+      : '🔥 漂移同步喷气：关（漂移禁氮）';
+    this.pauseDriftNitroBtn.style.borderColor = this.allowDriftNitro ? '#00ff9d' : '';
+  }
+
+  private toggleDriftNitro(): boolean {
+    this.allowDriftNitro = !this.allowDriftNitro;
+    try {
+      localStorage.setItem('neon_apex_allow_drift_nitro', String(this.allowDriftNitro));
+    } catch {
+      // Ignore storage failures
+    }
+    for (const r of this.racers) {
+      r.allowDriftNitro = this.allowDriftNitro;
+    }
+    this.syncPauseDriftNitroLabel();
+    if (this.state === 'RACING' || this.state === 'PAUSED') {
+      this.hud.pushCallout(
+        this.allowDriftNitro ? '🔥 漂移同步喷气：已开启' : '🔒 漂移同步喷气：已关闭',
+        this.allowDriftNitro ? 'green' : 'cyan'
+      );
+    }
+    return this.allowDriftNitro;
   }
 
   private togglePause(): void {
