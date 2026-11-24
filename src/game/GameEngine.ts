@@ -449,6 +449,16 @@ export class GameEngine {
       this.dirKeyLight.position.set(-210, 260, 160);
       this.dirRimLight.color.setHex(0x93c5fd);
       this.dirRimLight.intensity = 1.05;
+    } else if (cfg.theme === 'fjord') {
+      // Nordic Arctic aurora twilight: cool emerald-cyan zenith + icy blue moonlight rim over dark basalt cliffs
+      this.hemiLight.color.setHex(0x7ee8e0);
+      this.hemiLight.groundColor.setHex(0x162436);
+      this.hemiLight.intensity = 1.48;
+      this.dirKeyLight.color.setHex(0xcbe8ff);
+      this.dirKeyLight.intensity = 2.05;
+      this.dirKeyLight.position.set(-180, 220, -240);
+      this.dirRimLight.color.setHex(0x5eead4);
+      this.dirRimLight.intensity = 1.15;
     } else if (cfg.theme === 'tunnel') {
       // Modern illuminated sub-surface expressway tunnel
       this.hemiLight.color.setHex(0xcbd5e1);

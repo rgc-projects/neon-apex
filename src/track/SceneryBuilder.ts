@@ -45,7 +45,7 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   const trackCenterZ = (tMinZ + tMaxZ) * 0.5;
 
   // 1. Photorealistic Atmospheric Sky Dome (natural clouds, twilight scattering & subtle stars)
-  const isMegaSea = cfg.theme === 'island' || cfg.theme === 'manx';
+  const isMegaSea = cfg.theme === 'island' || cfg.theme === 'manx' || cfg.theme === 'fjord';
   const isDusk = cfg.theme === 'bridge' || isMegaSea || cfg.theme === 'nujiang';
   const skyTex = createRealisticSkyTexture(
     cfg.skyTopHex,
@@ -54,7 +54,7 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     cfg.sunColorHex,
     isDusk
   );
-  const skyRadius = cfg.theme === 'manx' ? 7200 : cfg.theme === 'island' ? 3900 : 3200;
+  const skyRadius = cfg.theme === 'manx' ? 7200 : cfg.theme === 'island' || cfg.theme === 'fjord' ? 4200 : 3200;
   const skyGeo = new THREE.SphereGeometry(skyRadius, 48, 28);
   const skyMat = new THREE.MeshBasicMaterial({
     map: skyTex,
@@ -71,14 +71,14 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   const oceanNormal = createOceanNormalTexture();
   if (cfg.theme === 'manx') {
     oceanNormal.repeat.set(280, 280);
-  } else if (cfg.theme === 'island') {
-    oceanNormal.repeat.set(95, 95);
+  } else if (cfg.theme === 'island' || cfg.theme === 'fjord') {
+    oceanNormal.repeat.set(110, 110);
   } else if (cfg.theme === 'nujiang') {
     oceanNormal.repeat.set(70, 70);
   }
   disposables.push(oceanNormal);
 
-  const groundSpan = cfg.theme === 'manx' ? 44000 : cfg.theme === 'island' ? 14000 : 7600;
+  const groundSpan = cfg.theme === 'manx' ? 44000 : cfg.theme === 'island' || cfg.theme === 'fjord' ? 16000 : 7600;
   const groundGeo = new THREE.PlaneGeometry(groundSpan, groundSpan);
   groundGeo.rotateX(-Math.PI / 2);
 
@@ -87,23 +87,25 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     const isOcean = cfg.theme === 'bridge' || isMegaSea || cfg.theme === 'nujiang';
     groundMat = new THREE.MeshStandardMaterial({
       color:
-        cfg.theme === 'nujiang'
-          ? 0x0e5e68
-          : cfg.theme === 'manx'
-            ? 0x0e2538
-            : cfg.theme === 'island'
-              ? 0x0b243c
-              : cfg.theme === 'bridge'
-                ? 0x0d223a
-                : 0x070f1c,
+        cfg.theme === 'fjord'
+          ? 0x061b30
+          : cfg.theme === 'nujiang'
+            ? 0x0e5e68
+            : cfg.theme === 'manx'
+              ? 0x0e2538
+              : cfg.theme === 'island'
+                ? 0x0b243c
+                : cfg.theme === 'bridge'
+                  ? 0x0d223a
+                  : 0x070f1c,
       normalMap: oceanNormal,
       normalScale: new THREE.Vector2(
         cfg.theme === 'nujiang' ? 0.92 : cfg.theme === 'manx' ? 0.72 : isOcean ? 0.82 : 0.45,
         cfg.theme === 'nujiang' ? 0.92 : cfg.theme === 'manx' ? 0.72 : isOcean ? 0.82 : 0.45
       ),
-      roughness: cfg.theme === 'nujiang' ? 0.24 : cfg.theme === 'manx' ? 0.28 : isOcean ? 0.23 : 0.36,
-      metalness: cfg.theme === 'nujiang' ? 0.42 : cfg.theme === 'manx' ? 0.48 : isOcean ? 0.54 : 0.35,
-      envMapIntensity: cfg.theme === 'nujiang' ? 1.05 : cfg.theme === 'manx' ? 1.0 : isOcean ? 1.15 : 0.65,
+      roughness: cfg.theme === 'fjord' ? 0.21 : cfg.theme === 'nujiang' ? 0.24 : cfg.theme === 'manx' ? 0.28 : isOcean ? 0.23 : 0.36,
+      metalness: cfg.theme === 'fjord' ? 0.58 : cfg.theme === 'nujiang' ? 0.42 : cfg.theme === 'manx' ? 0.48 : isOcean ? 0.54 : 0.35,
+      envMapIntensity: cfg.theme === 'fjord' ? 1.25 : cfg.theme === 'nujiang' ? 1.05 : cfg.theme === 'manx' ? 1.0 : isOcean ? 1.15 : 0.65,
     });
   } else {
     groundMat = new THREE.MeshStandardMaterial({
@@ -117,13 +119,15 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     isMegaSea || cfg.theme === 'nujiang' ? trackCenterX : 0,
     cfg.theme === 'nujiang'
       ? 4
-      : cfg.theme === 'bridge' || isMegaSea
-        ? -2
-        : cfg.theme === 'tunnel'
-          ? -56
-          : cfg.theme === 'mountain'
-            ? -18
-            : -22,
+      : cfg.theme === 'fjord'
+        ? 0
+        : cfg.theme === 'bridge' || isMegaSea
+          ? -2
+          : cfg.theme === 'tunnel'
+            ? -56
+            : cfg.theme === 'mountain'
+              ? -18
+              : -22,
     isMegaSea || cfg.theme === 'nujiang' ? trackCenterZ : 0
   );
   group.add(groundPlane);
@@ -141,7 +145,8 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     cfg.theme === 'mountain' ||
     cfg.theme === 'island' ||
     cfg.theme === 'manx' ||
-    cfg.theme === 'nujiang'
+    cfg.theme === 'nujiang' ||
+    cfg.theme === 'fjord'
   ) {
     const floorY = groundPlane.position.y;
     const pierList: {
@@ -231,6 +236,7 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   const animatedFans: THREE.Object3D[] = [];
   const animatedBeacons: THREE.Object3D[] = [];
   const animatedFlags: { mesh: THREE.Object3D; phase: number }[] = [];
+  const animatedAuroras: { mesh: THREE.Mesh; baseY: number; phase: number }[] = [];
 
   if (cfg.theme === 'city') {
     buildRealisticCitySkyline(spline, group, disposables, rand, groundPlane.position.y);
@@ -244,6 +250,16 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     buildIsleOfManWorld(spline, group, disposables, rand, groundPlane.position.y, animatedBeacons);
   } else if (cfg.theme === 'nujiang') {
     buildNujiangGorgeWorld(spline, group, disposables, rand, groundPlane.position.y, animatedFlags);
+  } else if (cfg.theme === 'fjord') {
+    buildAuroraFjordWorld(
+      spline,
+      group,
+      disposables,
+      rand,
+      groundPlane.position.y,
+      animatedBeacons,
+      animatedAuroras
+    );
   } else {
     buildRealisticSubterraneanCavern(spline, group, disposables, rand, animatedFans);
   }
@@ -264,6 +280,11 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
       }
       for (const flag of animatedFlags) {
         flag.mesh.rotation.x = Math.sin(elapsed * 4.2 + flag.phase) * 0.22;
+      }
+      for (const aur of animatedAuroras) {
+        aur.mesh.position.y = aur.baseY + Math.sin(elapsed * 0.45 + aur.phase) * 18;
+        const mat = aur.mesh.material as THREE.MeshBasicMaterial;
+        mat.opacity = 0.65 + 0.18 * Math.sin(elapsed * 0.85 + aur.phase);
       }
     },
     dispose: () => {
@@ -2305,5 +2326,407 @@ function buildNujiangGorgeWorld(
       sInst.setMatrixAt(idx, dummy.matrix);
     });
     group.add(sInst);
+  }
+}
+
+/**
+ * 极光星湾 24 弯迷宫 // AURORA FJORD ARCHIPELAGO (20.8 km Radial Starfish Drift Labyrinth):
+ * - Sculpted 220x220 dark volcanic basalt sea-peninsulas rising out of shimmering sapphire Arctic fjords,
+ *   with a towering 210m snow-crowned central caldera volcano and zero-clipping multi-sample roadbed carving (>= 9.5m).
+ * - 3 animated emerald-cyan-violet Aurora Borealis curtains shimmering softly across the Nordic night sky!
+ * - Instanced Nordic red-timber Rorbuer coastal cabins with warm glowing windows, snow-dusted spruce pines,
+ *   dark basalt sea stacks jutting out of the fjord inlets, and a rotating headland lighthouse!
+ */
+function buildAuroraFjordWorld(
+  spline: TrackSpline,
+  group: THREE.Group,
+  disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[],
+  rand: () => number,
+  waterY: number,
+  animatedBeacons: THREE.Object3D[],
+  animatedAuroras: { mesh: THREE.Mesh; baseY: number; phase: number }[]
+): void {
+  // 1. Fast 90m local spatial grid over all spline samples (stride 2) for strict zero-clipping peninsula carving!
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const s of spline.samples) {
+    if (s.pos.x < minX) minX = s.pos.x;
+    if (s.pos.x > maxX) maxX = s.pos.x;
+    if (s.pos.z < minZ) minZ = s.pos.z;
+    if (s.pos.z > maxZ) maxZ = s.pos.z;
+  }
+
+  const cellSize = 90;
+  const gridMap = new Map<number, number[]>();
+  for (let i = 0; i < spline.sampleCount; i += 2) {
+    const p = spline.samples[i].pos;
+    const gx = Math.floor(p.x / cellSize);
+    const gz = Math.floor(p.z / cellSize);
+    const key = ((gx + 2048) << 12) | (gz + 2048);
+    let b = gridMap.get(key);
+    if (!b) {
+      b = [];
+      gridMap.set(key, b);
+    }
+    b.push(i);
+  }
+
+  const hw = spline.halfWidth;
+  const queryRoadEnvelope = (wx: number, wz: number) => {
+    const gx = Math.floor(wx / cellSize);
+    const gz = Math.floor(wz / cellSize);
+    let minDistSq = Infinity;
+    let nearestY = 30;
+    let strictSafeFloor = Infinity;
+    const hardRadiusSq = (hw + 24) * (hw + 24);
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oz = -1; oz <= 1; oz++) {
+        const bucket = gridMap.get(((gx + ox + 2048) << 12) | (gz + oz + 2048));
+        if (!bucket) continue;
+        for (let k = 0; k < bucket.length; k++) {
+          const s = spline.samples[bucket[k]];
+          const dx = s.pos.x - wx;
+          const dz = s.pos.z - wz;
+          const dSq = dx * dx + dz * dz;
+          if (dSq < minDistSq) {
+            minDistSq = dSq;
+            nearestY = s.pos.y;
+          }
+          if (dSq < hardRadiusSq) {
+            const bankDrop = hw * Math.sin(Math.abs(s.bank));
+            const floor = s.pos.y - bankDrop - 9.5;
+            if (floor < strictSafeFloor) strictSafeFloor = floor;
+          }
+        }
+      }
+    }
+    return {
+      minDist: minDistSq === Infinity ? 999 : Math.sqrt(minDistSq),
+      strictSafeFloor,
+      nearestY,
+    };
+  };
+
+  // 2. Sculpted 220x220 Basalt Fjord Archipelago + Central Snow-Crowned Caldera Volcano
+  const margin = 520;
+  const widthX = maxX - minX + margin * 2;
+  const depthZ = maxZ - minZ + margin * 2;
+  const centerX = (minX + maxX) * 0.5;
+  const centerZ = (minZ + maxZ) * 0.5;
+  const segs = 220;
+
+  const terrGeo = new THREE.PlaneGeometry(widthX, depthZ, segs, segs);
+  terrGeo.rotateX(-Math.PI / 2);
+  const posAttr = terrGeo.attributes.position as THREE.BufferAttribute;
+  const colors = new Float32Array(posAttr.count * 3);
+  const terrHeights = new Float32Array((segs + 1) * (segs + 1));
+
+  const cSeabed = new THREE.Color(0x0c1520);
+  const cBasalt = new THREE.Color(0x1f2835);
+  const cNordicMoss = new THREE.Color(0x26443a);
+  const cGlacialSlate = new THREE.Color(0x475a72);
+  const cSnow = new THREE.Color(0xe2eefc);
+  const tmpColor = new THREE.Color();
+
+  // Central snow-crowned caldera summit sits safely inside the ring of inner valleys around (-120, -240)
+  const hubX = -120;
+  const hubZ = -240;
+
+  for (let i = 0; i < posAttr.count; i++) {
+    const wx = posAttr.getX(i) + centerX;
+    const wz = posAttr.getZ(i) + centerZ;
+    const env = queryRoadEnvelope(wx, wz);
+
+    const fbm =
+      Math.sin(wx * 0.0036) * Math.cos(wz * 0.0034) * 32 +
+      Math.sin(wx * 0.0092 + 1.1) * Math.sin(wz * 0.0088 + 0.6) * 14 +
+      Math.cos((wx - wz) * 0.017) * 6;
+
+    // Central caldera volcanic massif rising majestically between the 11 starfish fingers!
+    const distHub = Math.hypot(wx - hubX, wz - hubZ);
+    const hubPeak = Math.exp(-(distHub * distHub) / (340 * 340)) * 225;
+
+    // Distant fjord mountain ring framing the northern/eastern/western horizon across the water
+    const distEdge = Math.hypot((wx - centerX) / (widthX * 0.44), (wz - centerZ) / (depthZ * 0.44));
+    const outerFjordRim = smoothstep(0.92, 1.24, distEdge) * (155 + Math.max(0, fbm * 1.4));
+
+    // Sea inlets naturally stay submerged (below waterY=0) between fingers unless near central caldera or fjord rim,
+    // while gentle rocky shelves rise modestly beneath peninsula road corridors!
+    const peninsulaShelf =
+      env.minDist < 120 ? (1 - smoothstep(32, 120, env.minDist)) * Math.max(0, env.nearestY - 12) : 0;
+
+    let h = waterY - 10 + hubPeak + outerFjordRim + peninsulaShelf + fbm * 0.42;
+
+    // Strict multi-sample zero-clipping road corridor carve (>= 9.5m below every road deck!)
+    const clearInner = hw + 15;
+    const clearOuter = hw + 58;
+    if (env.minDist < clearOuter) {
+      const targetFloor = env.strictSafeFloor < Infinity ? env.strictSafeFloor : env.nearestY - 12.5;
+      const blend = smoothstep(clearInner, clearOuter, env.minDist);
+      h = Math.min(h, targetFloor + (Math.max(h, targetFloor) - targetFloor) * blend);
+    }
+    if (env.strictSafeFloor < Infinity) {
+      h = Math.min(h, env.strictSafeFloor);
+    }
+
+    posAttr.setY(i, h);
+    terrHeights[i] = h;
+
+    const mossMix = 0.5 + 0.5 * Math.sin(wx * 0.014 + wz * 0.011);
+    if (h < 4) {
+      tmpColor.copy(cSeabed).lerp(cBasalt, clamp((h + 8) / 12, 0, 1));
+    } else if (h < 56) {
+      tmpColor.copy(cBasalt).lerp(cNordicMoss, mossMix * 0.65);
+    } else if (h < 122) {
+      tmpColor.copy(cNordicMoss).lerp(cGlacialSlate, clamp((h - 56) / 66, 0, 1));
+    } else {
+      tmpColor.copy(cGlacialSlate).lerp(cSnow, clamp((h - 122) / 48, 0, 1));
+    }
+    colors[i * 3] = tmpColor.r;
+    colors[i * 3 + 1] = tmpColor.g;
+    colors[i * 3 + 2] = tmpColor.b;
+  }
+
+  terrGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  terrGeo.computeVertexNormals();
+  const terrMat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.9,
+    metalness: 0.08,
+  });
+  const terrMesh = new THREE.Mesh(terrGeo, terrMat);
+  terrMesh.position.set(centerX, 0, centerZ);
+  group.add(terrMesh);
+  disposables.push(terrGeo, terrMat);
+
+  const sampleMeshY = (wx: number, wz: number): number => {
+    const fx = ((wx - (centerX - widthX * 0.5)) / widthX) * segs;
+    const fz = ((wz - (centerZ - depthZ * 0.5)) / depthZ) * segs;
+    const ix = clamp(Math.floor(fx), 0, segs - 1);
+    const iz = clamp(Math.floor(fz), 0, segs - 1);
+    const tx = clamp(fx - ix, 0, 1);
+    const tz = clamp(fz - iz, 0, 1);
+    const stride = segs + 1;
+    const h00 = terrHeights[iz * stride + ix];
+    const h10 = terrHeights[iz * stride + ix + 1];
+    const h01 = terrHeights[(iz + 1) * stride + ix];
+    const h11 = terrHeights[(iz + 1) * stride + ix + 1];
+    return (h00 * (1 - tx) + h10 * tx) * (1 - tz) + (h01 * (1 - tx) + h11 * tx) * tz;
+  };
+
+  // 3. Animated Shimmering Aurora Borealis Sky Curtains (Soft Gaussian-feathered vertical rays -> ZERO hard plane edges!)
+  const aurCanvas = document.createElement('canvas');
+  aurCanvas.width = 512;
+  aurCanvas.height = 256;
+  const aurCtx = aurCanvas.getContext('2d')!;
+  aurCtx.fillStyle = '#000000';
+  aurCtx.fillRect(0, 0, 512, 256);
+  // Draw soft vertical aurora ray curtains tapering cleanly to 0 at all 4 canvas edges
+  for (let x = 24; x < 488; x += 5) {
+    const u = x / 512;
+    const hMask = Math.pow(Math.sin(u * Math.PI), 2.4);
+    const rayNoise = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(x * 0.13) * Math.cos(x * 0.047 + 1.2));
+    const alpha = hMask * rayNoise * 0.52;
+    if (alpha < 0.01) continue;
+    const g = aurCtx.createLinearGradient(0, 256, 0, 0);
+    g.addColorStop(0.0, 'rgba(0,0,0,0)');
+    g.addColorStop(0.18, `rgba(0, 255, 175, ${(alpha * 0.95).toFixed(3)})`);
+    g.addColorStop(0.42, `rgba(0, 220, 255, ${(alpha * 0.72).toFixed(3)})`);
+    g.addColorStop(0.72, `rgba(147, 51, 234, ${(alpha * 0.36).toFixed(3)})`);
+    g.addColorStop(1.0, 'rgba(0,0,0,0)');
+    aurCtx.fillStyle = g;
+    aurCtx.fillRect(x, 0, 6, 256);
+  }
+  const aurTex = new THREE.CanvasTexture(aurCanvas);
+  aurTex.colorSpace = THREE.SRGBColorSpace;
+  disposables.push(aurTex);
+
+  const aurConfigs = [
+    { x: centerX - 180, y: 460, z: centerZ - 1650, rotY: 0.12, span: 3400, height: 420, phase: 0.0 },
+    { x: centerX + 780, y: 520, z: centerZ - 1150, rotY: -0.58, span: 3000, height: 380, phase: 2.1 },
+    { x: centerX - 1020, y: 490, z: centerZ - 520, rotY: 0.78, span: 2900, height: 370, phase: 4.3 },
+  ];
+
+  for (const ac of aurConfigs) {
+    const aSegs = 48;
+    const aGeo = new THREE.PlaneGeometry(ac.span, ac.height, aSegs, 8);
+    const aPos = aGeo.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < aPos.count; i++) {
+      const lx = aPos.getX(i);
+      const u = lx / ac.span + 0.5;
+      // Gentle, broad sky-curtain undulation (no sharp self-folding creases)
+      const waveZ = Math.sin(u * Math.PI * 2.5 + ac.phase) * 110 + Math.cos(u * Math.PI * 4.5) * 35;
+      aPos.setZ(i, waveZ);
+    }
+    const aMat = new THREE.MeshBasicMaterial({
+      map: aurTex,
+      transparent: true,
+      opacity: 0.78,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      fog: false,
+    });
+    const aMesh = new THREE.Mesh(aGeo, aMat);
+    aMesh.position.set(ac.x, ac.y, ac.z);
+    aMesh.rotation.y = ac.rotY;
+    group.add(aMesh);
+    disposables.push(aGeo, aMat);
+    animatedAuroras.push({ mesh: aMesh, baseY: ac.y, phase: ac.phase });
+  }
+
+  // 4. Instanced Basalt Sea Stacks, Frost-Dusted Nordic Spruce Trees & Red-Timber Rorbuer Cabins
+  const stackGeo = new THREE.CylinderGeometry(3.2, 6.2, 26, 6);
+  const stackMat = new THREE.MeshStandardMaterial({ color: 0x1b232e, roughness: 0.88, metalness: 0.14 });
+  const pineTrunkGeo = new THREE.CylinderGeometry(0.45, 0.72, 4.5, 6);
+  const pineCrown1Geo = new THREE.ConeGeometry(3.4, 8.5, 7);
+  const pineCrown2Geo = new THREE.ConeGeometry(2.5, 6.5, 7);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3b2c20, roughness: 0.92 });
+  const spruceMat = new THREE.MeshStandardMaterial({ color: 0x1e3f38, roughness: 0.86 });
+  const frostTipMat = new THREE.MeshStandardMaterial({ color: 0xbcd4e6, roughness: 0.8 });
+
+  const cabinWallGeo = new THREE.BoxGeometry(8.5, 5.2, 11.0);
+  const cabinRoofGeo = new THREE.ConeGeometry(7.6, 3.8, 4);
+  cabinRoofGeo.rotateY(Math.PI / 4);
+  const cabinWinGeo = new THREE.BoxGeometry(8.7, 1.5, 6.2);
+  const cabinRedMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.75 });
+  const cabinRoofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.65 });
+  const cabinWinMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xffd27d).multiplyScalar(1.6),
+    toneMapped: false,
+  });
+
+  disposables.push(
+    stackGeo,
+    stackMat,
+    pineTrunkGeo,
+    pineCrown1Geo,
+    pineCrown2Geo,
+    trunkMat,
+    spruceMat,
+    frostTipMat,
+    cabinWallGeo,
+    cabinRoofGeo,
+    cabinWinGeo,
+    cabinRedMat,
+    cabinRoofMat,
+    cabinWinMat
+  );
+
+  const stacks: { x: number; z: number; sx: number; sy: number; sz: number }[] = [];
+  const pines: { x: number; y: number; z: number; s: number }[] = [];
+  const cabins: { x: number; y: number; z: number; rotY: number }[] = [];
+
+  for (let i = 0; i < 4200 && (stacks.length < 130 || pines.length < 400 || cabins.length < 75); i++) {
+    const wx = minX - 320 + rand() * (maxX - minX + 640);
+    const wz = minZ - 320 + rand() * (maxZ - minZ + 640);
+    const env = queryRoadEnvelope(wx, wz);
+    if (env.minDist < hw + 22) continue;
+    const wy = sampleMeshY(wx, wz);
+
+    if (wy < waterY + 1 && env.minDist > hw + 44 && stacks.length < 130) {
+      stacks.push({
+        x: wx,
+        z: wz,
+        sx: 0.9 + rand() * 2.4,
+        sy: 0.65 + rand() * 2.1,
+        sz: 0.9 + rand() * 2.4,
+      });
+    } else if (wy > waterY + 6 && wy < 118 && pines.length < 400 && rand() < 0.72) {
+      pines.push({ x: wx, y: wy - 0.5, z: wz, s: 0.8 + rand() * 1.15 });
+    } else if (wy > waterY + 4 && wy < 62 && env.minDist > hw + 28 && env.minDist < hw + 130 && cabins.length < 75) {
+      cabins.push({ x: wx, y: wy - 0.4, z: wz, rotY: rand() * Math.PI * 2 });
+    }
+  }
+
+  const dummy = new THREE.Object3D();
+  if (stacks.length > 0) {
+    const inst = new THREE.InstancedMesh(stackGeo, stackMat, stacks.length);
+    stacks.forEach((st, idx) => {
+      dummy.position.set(st.x, waterY + 6 * st.sy, st.z);
+      dummy.rotation.set(0, rand() * Math.PI, 0);
+      dummy.scale.set(st.sx, st.sy, st.sz);
+      dummy.updateMatrix();
+      inst.setMatrixAt(idx, dummy.matrix);
+    });
+    group.add(inst);
+  }
+
+  if (pines.length > 0) {
+    const tInst = new THREE.InstancedMesh(pineTrunkGeo, trunkMat, pines.length);
+    const c1Inst = new THREE.InstancedMesh(pineCrown1Geo, spruceMat, pines.length);
+    const c2Inst = new THREE.InstancedMesh(pineCrown2Geo, frostTipMat, pines.length);
+    pines.forEach((p, idx) => {
+      dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+      dummy.scale.setScalar(p.s);
+      dummy.position.set(p.x, p.y + 2.2 * p.s, p.z);
+      dummy.updateMatrix();
+      tInst.setMatrixAt(idx, dummy.matrix);
+      dummy.position.set(p.x, p.y + 7.0 * p.s, p.z);
+      dummy.updateMatrix();
+      c1Inst.setMatrixAt(idx, dummy.matrix);
+      dummy.position.set(p.x, p.y + 11.4 * p.s, p.z);
+      dummy.updateMatrix();
+      c2Inst.setMatrixAt(idx, dummy.matrix);
+    });
+    group.add(tInst, c1Inst, c2Inst);
+  }
+
+  if (cabins.length > 0) {
+    const wInst = new THREE.InstancedMesh(cabinWallGeo, cabinRedMat, cabins.length);
+    const rInst = new THREE.InstancedMesh(cabinRoofGeo, cabinRoofMat, cabins.length);
+    const gInst = new THREE.InstancedMesh(cabinWinGeo, cabinWinMat, cabins.length);
+    cabins.forEach((c, idx) => {
+      dummy.rotation.set(0, c.rotY, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.position.set(c.x, c.y + 2.6, c.z);
+      dummy.updateMatrix();
+      wInst.setMatrixAt(idx, dummy.matrix);
+      dummy.position.set(c.x, c.y + 7.0, c.z);
+      dummy.updateMatrix();
+      rInst.setMatrixAt(idx, dummy.matrix);
+      dummy.position.set(c.x, c.y + 2.8, c.z);
+      dummy.updateMatrix();
+      gInst.setMatrixAt(idx, dummy.matrix);
+    });
+    group.add(wInst, rInst, gInst);
+  }
+
+  // 5. Rotating Arctic Headland Lighthouse on the tall North-East Spire overlooking the entire fjord!
+  const lhGlassMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0x9be7ff).multiplyScalar(2.4),
+    toneMapped: false,
+  });
+  const lhBeamMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0.16,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const lhTowerGeo = new THREE.CylinderGeometry(3.4, 5.6, 52, 16);
+  const lhLanternGeo = new THREE.CylinderGeometry(2.8, 2.8, 5.0, 14);
+  const lhBeamGeo = new THREE.ConeGeometry(16, 260, 16, 1, true);
+  lhBeamGeo.translate(0, -130, 0);
+  lhBeamGeo.rotateX(Math.PI / 2);
+  disposables.push(lhGlassMat, lhBeamMat, lhTowerGeo, lhLanternGeo, lhBeamGeo);
+
+  const lhPos = new THREE.Vector3(hubX, sampleMeshY(hubX, hubZ) - 4, hubZ);
+  if (queryRoadEnvelope(lhPos.x, lhPos.z).minDist > hw + 45) {
+    const lhGroup = new THREE.Group();
+    lhGroup.position.copy(lhPos);
+    const tower = new THREE.Mesh(lhTowerGeo, cabinRedMat);
+    tower.position.y = 26;
+    const lantern = new THREE.Mesh(lhLanternGeo, lhGlassMat);
+    lantern.position.y = 54.5;
+    const pivot = new THREE.Group();
+    pivot.position.y = 54.5;
+    const b1 = new THREE.Mesh(lhBeamGeo, lhBeamMat);
+    const b2 = new THREE.Mesh(lhBeamGeo, lhBeamMat);
+    b2.rotation.y = Math.PI;
+    pivot.add(b1, b2);
+    animatedBeacons.push(pivot);
+    lhGroup.add(tower, lantern, pivot);
+    group.add(lhGroup);
   }
 }

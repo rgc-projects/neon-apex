@@ -260,9 +260,16 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   wallGeo.setIndex(wallIndices);
   const wallMat = new THREE.MeshStandardMaterial({
     map: concreteTex,
-    color: cfg.theme === 'manx' ? 0x8a8175 : cfg.theme === 'nujiang' ? 0x8e8072 : 0xffffff,
+    color:
+      cfg.theme === 'manx'
+        ? 0x8a8175
+        : cfg.theme === 'nujiang'
+          ? 0x8e8072
+          : cfg.theme === 'fjord'
+            ? 0x475569
+            : 0xffffff,
     roughness: cfg.theme === 'manx' || cfg.theme === 'nujiang' ? 0.92 : 0.82,
-    metalness: cfg.theme === 'manx' || cfg.theme === 'nujiang' ? 0.04 : 0.1,
+    metalness: cfg.theme === 'manx' || cfg.theme === 'nujiang' ? 0.04 : 0.14,
     side: THREE.DoubleSide,
   });
   group.add(new THREE.Mesh(wallGeo, wallMat));
@@ -580,6 +587,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     island: ['极境环岛  APEX ISLAND', '11.9KM GRAND COASTAL LOOP', '#035388'],
     manx: ['ISLE OF MAN TT', 'SNAEFELL MOUNTAIN COURSE · 37.73 MI', '#991b1b'],
     nujiang: ['G318 怒江72拐', 'YELA PASS 4658M · HAIRPIN TOUGE', '#046a38'],
+    fjord: ['极光星湾  AURORA FJORD', '20.8KM RADIAL HAIRPIN LABYRINTH', '#035388'],
   };
 
   const gantrySpecs: { t: number; l1: string; l2: string; bg: string }[] =
@@ -592,6 +600,15 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
           { t: 0.648, l1: '灯塔发卡弯  LIGHTHOUSE POINT', l2: 'LOW-BANK HAIRPINS · SUZUKA S-CURVES', bg: '#035388' },
           { t: 0.908, l1: '环岛冲刺  APEX FINALE', l2: 'MARINA INLET JUMP · FINISH STRAIGHT', bg: '#035388' },
         ]
+      : cfg.theme === 'fjord'
+        ? [
+            { t: 0.012, l1: '极光星湾  NORTH CROWN', l2: '20.8KM LABYRINTH · 4 NORTHERN SPIRES', bg: '#035388' },
+            { t: 0.210, l1: '极冠四连发卡  CROWN SPIRES', l2: 'TIGHT 180° SEA-CLIFF HAIRPINS', bg: '#0f4c5c' },
+            { t: 0.395, l1: '东礁珊瑚臂  EAST REEF', l2: 'TWIN CORAL SPURS → CALDERA HUB', bg: '#035388' },
+            { t: 0.545, l1: '深渊回旋臂  ABYSS FJORD', l2: 'SOUTH SEA-ARM → SOUTHWEST CLAW', bg: '#0f4c5c' },
+            { t: 0.690, l1: '西南巨钳弯  CLAW BAY', l2: 'TECHNICAL HOOKED HAIRPIN LOOP', bg: '#035388' },
+            { t: 0.855, l1: '西月三连角  WEST CRESCENTS', l2: '3 SWEEPING HORNS → AURORA FINISH', bg: '#0f4c5c' },
+          ]
       : cfg.theme === 'nujiang'
         ? [
             { t: 0.016, l1: 'G318 业拉山垭口  4658M', l2: 'NUJIANG 72 BENDS · HAIRPIN DESCENT', bg: '#046a38' },

@@ -216,9 +216,9 @@ export class TrackSpline {
   }
 
   private detectHyperZones(): void {
-    // Only enable Hyper Straight infinite-nitro corridors on mega island circuits (>= 8 km);
-    // all standard 3–4.2 km circuits remain 100% classic original gameplay!
-    if (this.totalLength < 8000) return;
+    // Only enable Hyper Straight infinite-nitro corridors on open-road mega island circuits (Apex Island & Isle of Man);
+    // standard tracks & pure technical hairpin drift circuits (Nujiang 72, Aurora Fjord) stay pure classic drift!
+    if (this.config.theme !== 'island' && this.config.theme !== 'manx') return;
 
     const N = this.sampleCount;
     const ds = this.totalLength / N;

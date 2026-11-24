@@ -468,9 +468,9 @@ export class RacerPhysics {
       else this.driftTier = 0;
     }
 
-    // 4.4. Mega Island Circuit (>= 8 km) Hyper Straight Infinite-Nitro Zone (opt-in!) & Straightaway Overdrive
-    // Standard 3–4.2 km circuits stay 100% classic original nitro & speed-cap gameplay!
-    const isMegaCircuit = spline.totalLength >= 8000;
+    // 4.4. Open-Road Mega Island Circuit (Apex Island & Isle of Man) Hyper Straight Infinite-Nitro Zone & Straightaway Overdrive
+    // Standard tracks & dedicated hairpin drift touges (Nujiang 72, Aurora Fjord) stay 100% pure classic drift & manual nitro!
+    const isMegaCircuit = spline.config.theme === 'island' || spline.config.theme === 'manx';
     const hz =
       isMegaCircuit && this.enableHyperNitro && this.totalProgress > 18
         ? spline.getHyperZoneAt(this.s)
