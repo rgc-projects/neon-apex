@@ -28,7 +28,7 @@ export class TrackSpline {
   public readonly totalLength: number;
   public readonly roadWidth: number;
   public readonly halfWidth: number;
-  public readonly sampleCount = 1500;
+  public readonly sampleCount: number;
 
   private readonly _tmpA = new THREE.Vector3();
 
@@ -41,6 +41,11 @@ export class TrackSpline {
     // 'centripetal' Catmull-Rom prevents loops/overshoots on sharp 90° bends and tight 180° hairpins!
     this.curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal', 0.5);
     this.totalLength = this.curve.getLength();
+    // Preserve exact 1500 samples for standard 3.4-4.3km circuits; scale density (~2.6m/sample) for mega 10km+ circuits
+    this.sampleCount =
+      this.totalLength <= 4500
+        ? 1500
+        : Math.min(4800, Math.max(1500, Math.round(this.totalLength / 2.6)));
 
     const N = this.sampleCount;
     const ds = this.totalLength / N;
@@ -140,11 +145,16 @@ export class TrackSpline {
         }
       }
 
-      // Flatten start/finish grid & jump ramp takeoffs cleanly
+      // Flatten start/finish grid & jump ramp takeoffs cleanly (physical meters on mega tracks so zones don't over-stretch)
+      const isMega = this.totalLength > 4500;
       const distFromStart = Math.min(t, 1 - t);
-      let bankMask = smoothstep(0.012, 0.045, distFromStart);
+      let bankMask = isMega
+        ? smoothstep(45 / this.totalLength, 165 / this.totalLength, distFromStart)
+        : smoothstep(0.012, 0.045, distFromStart);
+      const rampPadPre = isMega ? 70 / this.totalLength : 0.02;
+      const rampPadPost = isMega ? 90 / this.totalLength : 0.025;
       for (const ramp of config.jumpRamps) {
-        if (t >= ramp.tStart - 0.02 && t <= ramp.tEnd + 0.025) {
+        if (t >= ramp.tStart - rampPadPre && t <= ramp.tEnd + rampPadPost) {
           bankMask *= 0.12;
         }
       }
@@ -305,8 +315,9 @@ export class TrackSpline {
     minZ: number;
     maxZ: number;
   } {
+    const effStep = Math.max(step, Math.round(this.sampleCount / 260));
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    for (let i = 0; i < this.sampleCount; i += step) {
+    for (let i = 0; i < this.sampleCount; i += effStep) {
       const p = this.samples[i].pos;
       if (p.x < minX) minX = p.x;
       if (p.x > maxX) maxX = p.x;
@@ -320,7 +331,7 @@ export class TrackSpline {
     const padZ = (scale - spanZ) * 0.5;
 
     const points: { x: number; y: number }[] = [];
-    for (let i = 0; i < this.sampleCount; i += step) {
+    for (let i = 0; i < this.sampleCount; i += effStep) {
       const p = this.samples[i].pos;
       points.push({
         x: (p.x - minX + padX) / scale,

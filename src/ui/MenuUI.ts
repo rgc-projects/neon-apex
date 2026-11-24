@@ -20,6 +20,7 @@ export class MenuUI {
   private readonly trackInfoEl = document.getElementById('track-info')!;
   private readonly showcaseCarName = document.getElementById('showcase-car-name')!;
   private readonly showcaseTrackName = document.getElementById('showcase-track-name')!;
+  private readonly launchSubEl = document.getElementById('launch-sub')!;
   private readonly fullscreenBtn = document.getElementById('btn-menu-fullscreen')!;
   private readonly audioBtn = document.getElementById('btn-menu-audio')!;
   private readonly touchBtn = document.getElementById('btn-menu-touch')!;
@@ -176,7 +177,14 @@ export class MenuUI {
     this.trackListEl.innerHTML = '';
     TRACK_CONFIGS.forEach((t, idx) => {
       const btn = document.createElement('button');
-      const diffClass = t.difficulty === 'EXTREME' ? 'extreme' : t.difficulty === 'HARD' ? 'hard' : '';
+      const diffClass =
+        t.difficulty === 'GRAND'
+          ? 'grand'
+          : t.difficulty === 'EXTREME'
+            ? 'extreme'
+            : t.difficulty === 'HARD'
+              ? 'hard'
+              : '';
       btn.className = `select-card track-card ${idx === this.selectedTrack ? 'selected' : ''}`;
       btn.innerHTML = `
         <div class="track-card-inner">
@@ -202,10 +210,12 @@ export class MenuUI {
     });
 
     const tr = TRACK_CONFIGS[this.selectedTrack];
+    const rawLen = this.trackLengths[this.selectedTrack];
+    const lenLabel = rawLen >= 10000 ? `${(rawLen / 1000).toFixed(1)} km` : `${rawLen}m`;
     this.trackInfoEl.innerHTML = `
       <div>${tr.description}</div>
       <div class="track-meta-pills">
-        <span class="meta-pill">长度 ${this.trackLengths[this.selectedTrack]}m</span>
+        <span class="meta-pill">长度 ${lenLabel}</span>
         <span class="meta-pill">${tr.laps} LAPS</span>
         <span class="meta-pill">${tr.boostPads.length} 加速带</span>
         <span class="meta-pill">${tr.jumpRamps.length} 飞跃跳台</span>
@@ -217,7 +227,12 @@ export class MenuUI {
   private updateSelectionReadout(): void {
     const car = CAR_SPECS[this.selectedCar];
     const track = TRACK_CONFIGS[this.selectedTrack];
+    const rawLen = this.trackLengths[this.selectedTrack];
     this.showcaseCarName.textContent = `${car.name} ${car.subtitle}`;
     this.showcaseTrackName.textContent = `${track.nameZh} // ${track.name}`;
+    this.launchSubEl.textContent =
+      rawLen >= 10000
+        ? `${track.laps} LAPS · 6 RACERS · ${(rawLen / 1000).toFixed(1)}KM GRAND ISLAND`
+        : `${track.laps} LAPS · 6 RACERS · DRIFT TO BOOST`;
   }
 }

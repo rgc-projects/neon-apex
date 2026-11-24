@@ -411,4 +411,155 @@ export const TRACK_CONFIGS: TrackConfig[] = [
       { t: 0.86, side: -1, count: 6 },
     ],
   },
+  {
+    id: 'apex-island',
+    name: 'APEX GRAND ISLAND',
+    nameZh: '极境环岛大满贯',
+    theme: 'island',
+    difficulty: 'GRAND',
+    description:
+      '全长超 11km 的集大成环岛终极赛道！一条公路串起海港都市、跨海悬索大桥、34° 海洋大碗弯、76m 火山松林连续发卡弯、穿山弧形隧道、灯塔 5°–9° 低倾角发卡弯与铃鹿连续 S 弯。',
+    roadWidth: 29,
+    maxBankDeg: 34,
+    laps: 2,
+    skyTopHex: '#07142b',
+    skyMidHex: '#18365e',
+    skyHorizonHex: '#e88b5a',
+    sunColorHex: '#ffd080',
+    fogColor: 0x11223a,
+    fogDensity: 0.00036,
+    railLeftColor: 0x22d3ee,
+    railRightColor: 0xfbbf24,
+    accentColorHex: '#38f9d7',
+    asphaltTint: '#1b2029',
+    points: scalePoints(
+      [
+        // === SECTOR 1: West Harbor Metropolis (Start/Finish Waterfront Straight -> Urban 90° Chicane) ===
+        { x: 0, y: 14, z: 0, inwardBankDeg: 0 },
+        { x: 0, y: 14, z: -235, inwardBankDeg: 0 },
+        // Turn 1: Crisp 7° Flat Urban 90° Right -> 9° 90° Left Harbor Interchange
+        { x: 24, y: 14, z: -325, inwardBankDeg: 7 },
+        { x: 118, y: 15, z: -355, inwardBankDeg: 8 },
+        { x: 205, y: 16, z: -390, inwardBankDeg: 9 },
+        { x: 225, y: 18, z: -485, inwardBankDeg: 8 },
+
+        // === SECTOR 2: North Strait Cable-Stayed Suspension Bridge & 34° Zandvoort Ocean Bowl ===
+        // Colossal Twin-Pylon Cross-Bay Suspension Bridge Straight (y=18 -> 34, full-throttle 430+ km/h!)
+        { x: 225, y: 26, z: -725, inwardBankDeg: 0 },
+        { x: 225, y: 34, z: -965, inwardBankDeg: 0 },
+        // Turn 2: 34° Extreme Zandvoort Banked 180° Ocean Bowl Sweeper Right!
+        { x: 248, y: 33, z: -1070, inwardBankDeg: 34 },
+        { x: 350, y: 31, z: -1135, inwardBankDeg: 34 },
+        { x: 472, y: 29, z: -1112, inwardBankDeg: 34 },
+        { x: 548, y: 27, z: -1022, inwardBankDeg: 30 },
+        // High-Speed Coastal Causeway Sweeper East (Breathing Space & Flow State)
+        { x: 645, y: 26, z: -915, inwardBankDeg: 14 },
+        { x: 805, y: 30, z: -875, inwardBankDeg: 16 },
+        { x: 965, y: 38, z: -855, inwardBankDeg: 12 },
+
+        // === SECTOR 3: Northeast Volcanic Mountain Pass, Blind Crest & Cliffside Switchbacks ===
+        // Turn 3: 24° Summit Approach Corner Right (climbing to 76m summit!)
+        { x: 1105, y: 50, z: -815, inwardBankDeg: 22 },
+        { x: 1205, y: 60, z: -725, inwardBankDeg: 24 },
+        { x: 1235, y: 66, z: -595, inwardBankDeg: 18 },
+        // Summit Overlook Straight & Laguna-Seca Style Blind Crest Downhill Plunge!
+        { x: 1275, y: 66, z: -445, inwardBankDeg: 0 },
+        { x: 1365, y: 55, z: -335, inwardBankDeg: 18 },
+        // Turn 4: 30° Banked Volcanic Cliffside 180° Hairpin Right!
+        { x: 1475, y: 44, z: -285, inwardBankDeg: 30 },
+        { x: 1545, y: 38, z: -185, inwardBankDeg: 30 },
+        { x: 1475, y: 34, z: -90, inwardBankDeg: 28 },
+        // Mountain Mid-Chute West
+        { x: 1325, y: 31, z: -72, inwardBankDeg: 0 },
+        // Turn 5: 18° Technical Mountain Touge 180° Hairpin Left!
+        { x: 1225, y: 28, z: -38, inwardBankDeg: 18 },
+        { x: 1212, y: 25, z: 65, inwardBankDeg: 18 },
+        { x: 1305, y: 23, z: 132, inwardBankDeg: 16 },
+        // Cliffside Sprint into Volcanic Express Tunnel Mouth
+        { x: 1465, y: 22, z: 148, inwardBankDeg: 0 },
+        { x: 1575, y: 21, z: 218, inwardBankDeg: 14 },
+
+        // === SECTOR 4: East Cape Volcanic Arch Express Tunnel & 33° Underground Karussell ===
+        // Long Vaulted Concrete Arch Tunnel Straight + 33° Karussell Bowl (y=20..22, safely high above sea!)
+        { x: 1605, y: 20, z: 365, inwardBankDeg: 0 },
+        { x: 1605, y: 20, z: 565, inwardBankDeg: 0 },
+        // Turn 6: 33° Karussell Banked 180° Tunnel-Exit Sweeper Right!
+        { x: 1578, y: 20, z: 685, inwardBankDeg: 33 },
+        { x: 1478, y: 19, z: 775, inwardBankDeg: 33 },
+        { x: 1352, y: 18, z: 745, inwardBankDeg: 32 },
+        { x: 1285, y: 17, z: 645, inwardBankDeg: 26 },
+        // Tunnel Exit Daylight Burst Straight North-West
+        { x: 1255, y: 16, z: 505, inwardBankDeg: 0 },
+
+        // === SECTOR 5: Southeast Riviera Low-Bank Technical Hairpins & Lighthouse Peninsula ===
+        // Turn 7: Monaco-Style 5° Flat-Bank 90° Left -> Crisp 6° Tight U-Turn Left -> 9° Lighthouse Hairpin Right!
+        { x: 1212, y: 15, z: 408, inwardBankDeg: 5 },
+        { x: 1118, y: 15, z: 378, inwardBankDeg: 5 },
+        { x: 995, y: 15, z: 418, inwardBankDeg: 0 },
+        // Turn 8: 6° Low-Bank Tight Coastal 180° Hairpin Left (Monaco Fairmont technical precision!)
+        { x: 912, y: 15, z: 472, inwardBankDeg: 6 },
+        { x: 918, y: 15, z: 562, inwardBankDeg: 6 },
+        { x: 1008, y: 15, z: 625, inwardBankDeg: 6 },
+        // Turn 9: 9° Low-Bank Lighthouse Peninsula Tight 180° Hairpin Right!
+        { x: 1052, y: 15, z: 735, inwardBankDeg: 9 },
+        { x: 978, y: 15, z: 838, inwardBankDeg: 9 },
+        { x: 868, y: 15, z: 818, inwardBankDeg: 8 },
+
+        // === SECTOR 6: South Coast Suzuka Flowing S-Curves, Bay Inlet Jump & Grand Harbor Finale ===
+        // Turn 10: Rapid Suzuka-Style Flowing S-Curves (Left -> Right -> Left, 15°-18° bank!)
+        { x: 715, y: 15, z: 762, inwardBankDeg: 15 },
+        { x: 565, y: 16, z: 878, inwardBankDeg: 18 },
+        { x: 405, y: 16, z: 780, inwardBankDeg: 16 },
+        { x: 258, y: 15, z: 856, inwardBankDeg: 14 },
+        // Turn 11: 28° Banked Southwest Cape Sweeper Right (launching onto West Bay Return Expressway!)
+        { x: 132, y: 16, z: 818, inwardBankDeg: 28 },
+        { x: 75, y: 17, z: 702, inwardBankDeg: 28 },
+        { x: 122, y: 18, z: 572, inwardBankDeg: 22 },
+        // West Bay Coastal Turbo Chute (Jump Ramp #3 across Marina Inlet -> Final Technical Corner!)
+        { x: 138, y: 18, z: 415, inwardBankDeg: 0 },
+        // Turn 12: Final 11° Low-Bank Harbor Chicane Left -> Right onto Main Straight
+        { x: 105, y: 16, z: 305, inwardBankDeg: 11 },
+        { x: 18, y: 15, z: 252, inwardBankDeg: 11 },
+        // Final Grand Harbor Express Straight (Harbor Tunnel #2 + Twin Boost Pads to Finish Line!)
+        { x: 0, y: 14, z: 155, inwardBankDeg: 0 },
+      ],
+      1.55,
+      1.15
+    ),
+    boostPads: [
+      { t: 0.012, d: 0, length: 34, width: 8.0 },
+      { t: 0.098, d: 0, length: 36, width: 8.2 },
+      { t: 0.136, d: 0, length: 36, width: 8.2 },
+      { t: 0.245, d: 0, length: 32, width: 7.6 },
+      { t: 0.342, d: 0, length: 32, width: 7.4 },
+      { t: 0.426, d: 0, length: 30, width: 7.4 },
+      { t: 0.535, d: 0, length: 34, width: 7.8 },
+      { t: 0.635, d: 0, length: 32, width: 7.6 },
+      { t: 0.785, d: 0, length: 30, width: 7.4 },
+      { t: 0.872, d: 0, length: 32, width: 7.6 },
+      { t: 0.938, d: 0, length: 32, width: 7.6 },
+      { t: 0.986, d: 0, length: 36, width: 8.2 },
+    ],
+    jumpRamps: [
+      { tStart: 0.115, tEnd: 0.121, height: 4.3, widthRatio: 0.66 },
+      { tStart: 0.324, tEnd: 0.330, height: 3.7, widthRatio: 0.62 },
+      { tStart: 0.922, tEnd: 0.928, height: 3.9, widthRatio: 0.64 },
+    ],
+    tunnelZones: [
+      { tStart: 0.515, tEnd: 0.622 },
+      { tStart: 0.972, tEnd: 0.990 },
+    ],
+    coneClusters: [
+      { t: 0.040, side: -1, count: 6 },
+      { t: 0.165, side: -1, count: 6 },
+      { t: 0.295, side: -1, count: 6 },
+      { t: 0.382, side: -1, count: 6 },
+      { t: 0.440, side: 1, count: 6 },
+      { t: 0.652, side: 1, count: 6 },
+      { t: 0.732, side: -1, count: 6 },
+      { t: 0.800, side: 1, count: 6 },
+      { t: 0.840, side: -1, count: 6 },
+      { t: 0.952, side: 1, count: 6 },
+    ],
+  },
 ];

@@ -511,7 +511,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     metalness: 0.78,
     roughness: 0.34,
   });
-  const isWarmLamp = cfg.theme === 'mountain' || cfg.theme === 'bridge';
+  const isWarmLamp = cfg.theme === 'mountain' || cfg.theme === 'bridge' || cfg.theme === 'island';
   const lampLensMat = new THREE.MeshBasicMaterial({
     color: new THREE.Color(isWarmLamp ? 0xffd28a : 0xe0f2fe).multiplyScalar(1.6),
     toneMapped: false,
@@ -552,31 +552,55 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   }
   group.add(poleInst, armInst, headInst);
 
-  // 6. Authentic Overhead Expressway Sign Gantries (Japanese/English Green Highway Signs!)
+  // 6. Authentic Overhead Expressway Sign Gantries (Japanese/English Green/Blue Highway Signs!)
   const signMeta: Record<string, [string, string, string]> = {
     city: ['湾岸線  BAYSHORE', 'SHIBUYA / HANEDA AIRPORT', '#046a38'],
     'monaco-harbor': ['摩纳哥海滨  MONACO GP', 'PORT HERCULES · LOW-BANK HAIRPINS', '#035388'],
     bridge: ['海湾大橋  BAY BRIDGE', 'HYPERION COASTAL EXPWY', '#035388'],
     tunnel: ['地下幹線  SUB-ZERO', 'REACTOR EXPRESS TUNNEL', '#046a38'],
     mountain: ['秋名峠  AKINA PASS', 'DOWNHILL HAIRPINS AHEAD', '#046a38'],
+    island: ['极境环岛  APEX ISLAND', '11.9KM GRAND COASTAL LOOP', '#035388'],
   };
-  const [sL1, sL2, sBg] = signMeta[cfg.id] ?? signMeta[cfg.theme] ?? signMeta.city;
-  const signTex = createHighwaySignTexture(sL1, sL2, sBg);
-  const signMat = new THREE.MeshStandardMaterial({
-    map: signTex,
-    emissive: 0xffffff,
-    emissiveMap: signTex,
-    emissiveIntensity: 0.35,
-    roughness: 0.32,
-  });
+
+  const gantrySpecs: { t: number; l1: string; l2: string; bg: string }[] =
+    cfg.theme === 'island'
+      ? [
+          { t: 0.025, l1: '海港大道  HARBOR BAY', l2: 'WEST MARINA · GRAND ISLAND LOOP', bg: '#035388' },
+          { t: 0.086, l1: '跨海悬索桥  APEX BRIDGE', l2: 'NORTH STRAIT · 34° OCEAN BOWL', bg: '#035388' },
+          { t: 0.275, l1: '环岛火山峠  VOLCANIC PASS', l2: '76M SUMMIT · SWITCHBACKS AHEAD', bg: '#046a38' },
+          { t: 0.502, l1: '穿山隧道  EAST CAPE TUNNEL', l2: '1.3KM VAULT · 33° KARUSSELL', bg: '#046a38' },
+          { t: 0.648, l1: '灯塔发卡弯  LIGHTHOUSE POINT', l2: 'LOW-BANK HAIRPINS · SUZUKA S-CURVES', bg: '#035388' },
+          { t: 0.908, l1: '环岛冲刺  APEX FINALE', l2: 'MARINA INLET JUMP · FINISH STRAIGHT', bg: '#035388' },
+        ]
+      : [0.16, 0.48, 0.78].map((t) => {
+          const [sL1, sL2, sBg] = signMeta[cfg.id] ?? signMeta[cfg.theme] ?? signMeta.city;
+          return { t, l1: sL1, l2: sL2, bg: sBg };
+        });
+
   const signBoardGeo = new THREE.BoxGeometry(14.5, 4.1, 0.3);
   const gLegGeo = new THREE.BoxGeometry(0.95, 13.5, 0.95);
   const gBeamGeo = new THREE.BoxGeometry(cfg.roadWidth + 3.8, 0.9, 0.9);
-  disposables.push(signTex, signMat, signBoardGeo, gLegGeo, gBeamGeo);
+  disposables.push(signBoardGeo, gLegGeo, gBeamGeo);
 
-  for (const t of [0.16, 0.48, 0.78]) {
-    if (spline.isInTunnel(t)) continue;
-    const f = spline.getFrameAtDistance(t * spline.totalLength);
+  const signMatCache = new Map<string, THREE.MeshStandardMaterial>();
+  for (const spec of gantrySpecs) {
+    if (spline.isInTunnel(spec.t)) continue;
+    const key = `${spec.l1}|${spec.l2}|${spec.bg}`;
+    let signMat = signMatCache.get(key);
+    if (!signMat) {
+      const signTex = createHighwaySignTexture(spec.l1, spec.l2, spec.bg);
+      signMat = new THREE.MeshStandardMaterial({
+        map: signTex,
+        emissive: 0xffffff,
+        emissiveMap: signTex,
+        emissiveIntensity: 0.35,
+        roughness: 0.32,
+      });
+      signMatCache.set(key, signMat);
+      disposables.push(signTex, signMat);
+    }
+
+    const f = spline.getFrameAtDistance(spec.t * spline.totalLength);
     const sg = new THREE.Group();
     sg.position.copy(f.pos);
     basisMat.makeBasis(f.right, f.up, f.tangent.clone().negate());

@@ -237,11 +237,16 @@ body,
 }
 
 /* Car Cards */
-.car-list,
-.track-list {
+.car-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .select-card {
@@ -269,7 +274,7 @@ body,
 }
 
 .select-card.track-card {
-  padding: 9px 12px;
+  padding: 7px 11px;
 }
 
 .select-card.track-card.selected {
@@ -325,6 +330,13 @@ body,
   background: rgba(255, 42, 157, 0.18);
   color: var(--magenta);
   border-color: rgba(255, 42, 157, 0.45);
+}
+
+.card-badge.grand {
+  background: linear-gradient(110deg, rgba(56, 249, 215, 0.22), rgba(251, 191, 36, 0.24));
+  color: #5eead4;
+  border-color: rgba(56, 249, 215, 0.6);
+  box-shadow: 0 0 10px rgba(56, 249, 215, 0.25);
 }
 
 .card-sub {
@@ -384,8 +396,8 @@ body,
 }
 
 .track-svg {
-  width: 52px;
-  height: 38px;
+  width: 48px;
+  height: 34px;
   flex-shrink: 0;
   filter: drop-shadow(0 0 6px rgba(0, 242, 255, 0.45));
 }
@@ -2161,6 +2173,37 @@ body.touch-mode .drift-bar-bg {
     display: flex;
     flex-direction: column;
     gap: 5px;
+  }
+
+  .select-card.track-card {
+    padding: 6px 8px;
+  }
+
+  .track-card .card-top {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 4px;
+  }
+
+  .track-card .card-name {
+    font-size: 12.5px;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+  }
+
+  .track-card .card-badge {
+    font-size: 8.5px;
+    padding: 1px 5px;
+  }
+
+  .track-card .card-sub {
+    font-size: 9.5px;
+    margin-top: 2px;
+  }
+
+  .track-card .track-svg {
+    width: 36px;
+    height: 26px;
   }
 
   .spec-desc,

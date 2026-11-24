@@ -397,6 +397,16 @@ export class GameEngine {
       this.dirKeyLight.position.set(220, 115, 160);
       this.dirRimLight.color.setHex(0x93c5fd);
       this.dirRimLight.intensity = 0.95;
+    } else if (cfg.theme === 'island') {
+      // Pacific twilight-sunset grand coastal island lighting
+      this.hemiLight.color.setHex(0xffcfa3);
+      this.hemiLight.groundColor.setHex(0x1f3344);
+      this.hemiLight.intensity = 1.45;
+      this.dirKeyLight.color.setHex(0xffbe7a);
+      this.dirKeyLight.intensity = 2.2;
+      this.dirKeyLight.position.set(260, 130, 180);
+      this.dirRimLight.color.setHex(0x7dd3fc);
+      this.dirRimLight.intensity = 1.05;
     } else if (cfg.theme === 'tunnel') {
       // Modern illuminated sub-surface expressway tunnel
       this.hemiLight.color.setHex(0xcbd5e1);

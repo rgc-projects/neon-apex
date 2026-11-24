@@ -1,6 +1,6 @@
 export type GameState = 'MENU' | 'COUNTDOWN' | 'RACING' | 'PAUSED' | 'FINISH_SLOWMO' | 'RESULTS';
 export type CameraMode = 'CHASE' | 'HOOD';
-export type TrackTheme = 'city' | 'bridge' | 'tunnel' | 'mountain';
+export type TrackTheme = 'city' | 'bridge' | 'tunnel' | 'mountain' | 'island';
 
 export interface CarSpec {
   id: string;
@@ -65,7 +65,7 @@ export interface TrackConfig {
   name: string;
   nameZh: string;
   theme: TrackTheme;
-  difficulty: 'MEDIUM' | 'HARD' | 'EXTREME';
+  difficulty: 'MEDIUM' | 'HARD' | 'EXTREME' | 'GRAND';
   description: string;
   roadWidth: number;
   maxBankDeg: number;
