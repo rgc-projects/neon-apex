@@ -505,7 +505,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     // Authentic Isle of Man TT: streetlamps only in Douglas, Kirk Michael/Ballaugh & Ramsey towns; A18 Snaefell Mountain is wild & open!
     if (cfg.theme === 'manx') {
       const inTown =
-        t < 0.08 || (t > 0.29 && t < 0.35) || (t > 0.48 && t < 0.56) || t > 0.93;
+        t < 0.055 || (t > 0.308 && t < 0.365) || (t > 0.525 && t < 0.568) || t > 0.948;
       if (!inTown) continue;
     }
     lampSamples.push(i);
@@ -584,14 +584,18 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
         ]
       : cfg.theme === 'manx'
         ? [
-            { t: 0.024, l1: 'DOUGLAS · BRAY HILL', l2: 'ISLE OF MAN TT · 37.73 MI COURSE', bg: '#991b1b' },
-            { t: 0.148, l1: 'BALLACRAINE  A1 → A3', l2: 'GLEN HELEN · STONE WALL LANES', bg: '#065f46' },
-            { t: 0.326, l1: 'BALLAUGH BRIDGE', l2: 'FAMOUS HUMPBACK FLYING JUMP!', bg: '#991b1b' },
-            { t: 0.375, l1: 'SULBY STRAIGHT', l2: 'FLAT-OUT NORTHERN PLAIN · 440 KM/H', bg: '#065f46' },
-            { t: 0.525, l1: 'RAMSEY HAIRPIN', l2: '180° TURN · GATEWAY TO SNAEFELL', bg: '#991b1b' },
-            { t: 0.615, l1: 'A18 MOUNTAIN ROAD', l2: 'GOOSENECK → HAILWOOD HEIGHT 422M', bg: '#065f46' },
-            { t: 0.758, l1: 'HAILWOOD HEIGHT', l2: '422M SUMMIT · WINDY CORNER DESCENT', bg: '#991b1b' },
-            { t: 0.870, l1: 'CREG-NY-BAA  34TH MS', l2: 'DESCENT TO DOUGLAS GRANDSTAND', bg: '#065f46' },
+            { t: 0.015, l1: 'DOUGLAS · BRAY HILL', l2: 'ISLE OF MAN TT · 30.1 KM HALF-SCALE', bg: '#991b1b' },
+            { t: 0.094, l1: 'CROSBY · A1 STRAIGHT', l2: 'BRADDAN S-BEND → GREEBA CASTLE', bg: '#065f46' },
+            { t: 0.150, l1: 'BALLACRAINE  A1 → A3', l2: 'GLEN HELEN · WOODED VALLEY S-BENDS', bg: '#065f46' },
+            { t: 0.252, l1: 'CRONK-Y-VODDY', l2: 'HIGH-SPEED RIDGE CREST JUMP AHEAD', bg: '#991b1b' },
+            { t: 0.306, l1: 'KIRK MICHAEL VILLAGE', l2: 'STONE WALL CHICANE → BALLAUGH', bg: '#065f46' },
+            { t: 0.346, l1: 'BALLAUGH BRIDGE', l2: 'ICONIC HUMPBACK FLYING JUMP!', bg: '#991b1b' },
+            { t: 0.410, l1: 'SULBY STRAIGHT', l2: '2KM FLAT-OUT PLAIN · 440 KM/H', bg: '#065f46' },
+            { t: 0.541, l1: 'RAMSEY HAIRPIN', l2: '180° TURN · GATEWAY TO SNAEFELL', bg: '#991b1b' },
+            { t: 0.608, l1: 'A18 MOUNTAIN ROAD', l2: 'GOOSENECK → GUTHRIE MEMORIAL', bg: '#065f46' },
+            { t: 0.666, l1: 'MOUNTAIN MILE', l2: 'HIGH-ALTITUDE CLIMB → VERANDAH 30°', bg: '#065f46' },
+            { t: 0.768, l1: 'HAILWOOD HEIGHT', l2: '150M SUMMIT · WINDY CORNER PLUNGE', bg: '#991b1b' },
+            { t: 0.873, l1: 'CREG-NY-BAA  34TH MS', l2: 'BRANDISH → GOVERNOR BRIDGE FINISH', bg: '#065f46' },
           ]
         : [0.16, 0.48, 0.78].map((t) => {
           const [sL1, sL2, sBg] = signMeta[cfg.id] ?? signMeta[cfg.theme] ?? signMeta.city;
@@ -704,8 +708,9 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     group.add(chevronInst, stakeInst);
   }
 
-  // Place crisp 150m / 100m / 50m Braking/Drift Distance Markers on approach to every sharp corner!
+  // Place crisp 150m / 100m / 50m Braking/Drift Distance Markers (InstancedMesh: only 3 draw calls even on 30km!)
   const distMats: Record<number, THREE.MeshStandardMaterial> = {};
+  const distMatrices: Record<number, THREE.Matrix4[]> = { 150: [], 100: [], 50: [] };
   for (const m of [150, 100, 50]) {
     const dtTex = createDistanceBoardTexture(m);
     const dtMat = new THREE.MeshStandardMaterial({
@@ -727,15 +732,23 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     for (const distBack of [150, 100, 50]) {
       const f = spline.getFrameAtDistance(entryS - distBack);
       if (Math.abs(f.curvature) > 0.008) continue; // skip if inside another corner
-      const board = new THREE.Mesh(distBoardGeo, distMats[distBack]);
-      board.position
+      dummy.position
         .copy(f.pos)
         .addScaledVector(f.right, outSign * (halfW + 1.5))
         .addScaledVector(f.up, 2.4);
       basisMat.makeBasis(f.right, f.up, f.tangent.clone().negate());
-      board.quaternion.setFromRotationMatrix(basisMat);
-      group.add(board);
+      dummy.quaternion.setFromRotationMatrix(basisMat);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      distMatrices[distBack].push(dummy.matrix.clone());
     }
+  }
+  for (const m of [150, 100, 50]) {
+    const mats = distMatrices[m];
+    if (mats.length === 0) continue;
+    const inst = new THREE.InstancedMesh(distBoardGeo, distMats[m], mats.length);
+    mats.forEach((mat, idx) => inst.setMatrixAt(idx, mat));
+    group.add(inst);
   }
 
   // 8. Reflective Cat's-Eye Highway Shoulder Studs (InstancedMesh)

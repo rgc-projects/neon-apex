@@ -408,11 +408,11 @@ export function createHighwaySignTexture(
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'left';
   ctx.font = '900 54px sans-serif';
-  ctx.fillText(line1, 148, 106);
+  ctx.fillText(line1, 148, 106, 480);
 
   ctx.fillStyle = '#dbeafe';
   ctx.font = '700 32px sans-serif';
-  ctx.fillText(line2, 148, 162);
+  ctx.fillText(line2, 148, 162, 480);
 
   // Downward lane arrows on right
   ctx.fillStyle = '#f8fafc';

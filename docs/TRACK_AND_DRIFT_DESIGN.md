@@ -71,14 +71,14 @@
 
 ## 四、 超长环岛 / 多地貌大满贯赛道规范（Mega Island Grand Circuit）
 
-当赛道总长超过 `4,500m`（如 `apex-island` `11.9 km` 与 `isle-of-man` `17.25 km`）时，需同步满足以下扩展规范：
+当赛道总长超过 `4,500m`（如 `apex-island` `11.9 km` 与 `isle-of-man` `30.15 km`）时，需同步满足以下扩展规范：
 1. **动态样条精度与物理米制缓冲区（`TrackSpline.ts`）**：
-   - 标准赛道（`<= 4,500m`）保持 `sampleCount = 1500` 不变；超长赛道按 `Math.min(7600, Math.round(totalLength / 2.6))` 自适应扩充采样点（`17.25 km` 对应 `6,633` 段），保证每段步长稳定在 `~2.6m`。
-   - 发车直道与跳台坡道倾角展平范围改按物理米数计算（发车前 `45m–165m`，跳台前 `70m` / 后 `90m`），避免按归一化 `t` 比例在 12–18km 赛道上过度拉伸。
+   - 标准赛道（`<= 4,500m`）保持 `sampleCount = 1500` 不变；超长赛道按 `Math.min(13000, Math.round(totalLength / 2.6))` 自适应扩充采样点（`30.15 km` 对应 `11,595` 段），保证每段步长稳定在 `~2.6m`。
+   - 发车直道与跳台坡道倾角展平范围改按物理米数计算（发车前 `45m–165m`，跳台前 `70m` / 后 `90m`），避免按归一化 `t` 比例在 12–30km 赛道上过度拉伸；弯前 `150m/100m/50m` 距离牌统一采用 `InstancedMesh`（全图仅 3 次绘制调用）。
 2. **节奏叙事与真实地标分区（参考 *Forza Horizon Goliath* / *Nürburgring Nordschleife* / *Isle of Man TT Snaefell Mountain Course*）**：
    - **极境环岛大满贯（`apex-island`，`11.9 km` × 2 圈）**：海港都市 -> 双塔跨海悬索桥 + 34° 海洋碗弯 -> 76m 火山松林鸟居与悬崖发卡 -> 1.3km 穿山弧形隧道 + 33° 卡鲁塞尔 -> 灯塔半岛 5°–9° 低倾角发卡 + 铃鹿 S 弯 -> 海湾跳台冲刺。
-   - **曼岛 TT 斯奈菲尔环岛（`isle-of-man`，`17.25 km` × 1 圈，按 1:3.5 街机比例还原真实 60.725 km / 37.73 英里、最高海拔 422m 赛道）**：道格拉斯 TT 大看台 -> Bray Hill 下坡 -> Quarterbridge -> Ballacraine -> Glen Helen 阔叶林谷 -> Cronk-y-Voddy -> Ballaugh 飞跃石桥 -> Sulby 极速直道 -> Ramsey 6° 发卡弯 -> Gooseneck 上山 -> 荒凉无树的 A18 Snaefell 紫石南高地与 129m Hailwood's Height 山顶 -> Windy Corner -> Creg-ny-Baa 酒馆弯 -> Governor's Bridge 冲线。
-   - 每个分区入口设置专属分区高速龙门路牌与标志性地标，降低超长赛道视觉疲劳并强化路感记忆。
-3. **超大世界渲染与零穿模海底/山地雕刻（`SceneryBuilder.ts`）**：
-   - 相机远裁面提升至 `6400m`，天空盒半径 `3900–4800m`，动态海面扩展至 `14–18 km` 并对齐赛道几何中心。
-   - 3D 环岛山地高度场必须采用 `Math.min(rawTerrainY, nearestY - nearestBankDrop - 9.5..10.0)` 雕刻规则：海峡下保持海底沉没于海面之下，山坡路基处严格下挖至倾斜路沿下方 `>= 9.5m`，并经全采样点三角插值净空审计（要求全线路面边缘高于地形 `>= 6m`）。
+   - **曼岛 TT 斯奈菲尔环岛（`isle-of-man`，`30.15 km` × 1 圈，按 1:2 半尺寸精确还原真实 60.725 km / 37.73 英里、最高峰 422m 赛道）**：道格拉斯 TT 大看台 -> Bray Hill 下坡 -> Quarterbridge -> Braddan S 弯 -> Crosby -> Ballacraine -> Glen Helen 连续林谷弯 -> Cronk-y-Voddy 跳台 -> Kirk Michael -> Ballaugh 飞跃石桥 -> Quarry Bends -> 2km Sulby 极速直道 -> Kerrowmoar -> Ramsey 6° 发卡弯 -> Waterworks -> Gooseneck 上山 -> 荒凉无树的 A18 Snaefell 紫石南高地、Mountain Mile、30° Verandah、Bungalow 与 150m Hailwood's Height 山顶跳台 -> Windy Corner -> Creg-ny-Baa 酒馆弯 -> Brandish -> Governor's Bridge 冲线。
+   - 每个分区入口设置专属分区高速龙门路牌（文字加 `maxWidth` 防与车道箭头重叠）与标志性地标，降低超长赛道视觉疲劳并强化路感记忆。
+3. **超大世界渲染与空间哈希零穿模地形雕刻（`SceneryBuilder.ts`）**：
+   - 相机远裁面提升至 `7600m`，天空盒半径 `3900–5600m`，动态海面扩展至 `14–26 km` 并对齐赛道几何中心。
+   - 超长赛道 3D 环岛山地高度场（如 `260×260` 网格）采用 **220m 2D 空间哈希网格**将路基雕刻加速至 `< 40ms`，并严格遵循 `Math.min(rawTerrainY, nearestY - nearestBankDrop - 10.5)` 规则：海峡下保持海底沉没于海面之下，山坡路基处严格下挖至倾斜路沿下方 `>= 10.5m`，且经全采样点三角插值净空审计（要求全线路面边缘高于地形 `>= 6m`）。

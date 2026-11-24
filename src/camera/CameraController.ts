@@ -26,7 +26,7 @@ export class CameraController {
   private readonly _hoodPos = new THREE.Vector3();
 
   constructor(aspect: number) {
-    this.camera = new THREE.PerspectiveCamera(64, aspect, 0.25, 6400);
+    this.camera = new THREE.PerspectiveCamera(64, aspect, 0.25, 7600);
   }
 
   public setAspect(aspect: number): void {
