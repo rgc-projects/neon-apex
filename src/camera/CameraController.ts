@@ -26,7 +26,7 @@ export class CameraController {
   private readonly _hoodPos = new THREE.Vector3();
 
   constructor(aspect: number) {
-    this.camera = new THREE.PerspectiveCamera(64, aspect, 0.25, 7600);
+    this.camera = new THREE.PerspectiveCamera(64, aspect, 0.25, 9800);
   }
 
   public setAspect(aspect: number): void {
@@ -98,14 +98,18 @@ export class CameraController {
   public updateRace(dt: number, racer: RacerPhysics, isFinishSlowMo: boolean): void {
     this.shakeIntensity = Math.max(0, this.shakeIntensity - dt * 2.6);
 
-    const speedRatio = clamp(racer.speed / 110, 0, 1.3);
-    const boostAdd = racer.isNitroActive
-      ? racer.isSuperNitro
-        ? 1.0
-        : 0.65
-      : racer.miniBoostTimer > 0 || racer.boostPadTimer > 0
-        ? 0.45
-        : 0;
+    const speedRatio = clamp(racer.speed / 110, 0, 1.45);
+    const odAdd = racer.overdriveStage === 2 ? 0.85 : racer.overdriveStage === 1 ? 0.42 : 0;
+    const boostAdd = Math.max(
+      odAdd,
+      racer.isNitroActive
+        ? racer.isSuperNitro
+          ? 1.05
+          : 0.68
+        : racer.miniBoostTimer > 0 || racer.boostPadTimer > 0
+          ? 0.48
+          : 0
+    );
 
     if (isFinishSlowMo) {
       // Dramatic low-angle cinematic orbit around the crossing car!
@@ -254,8 +258,10 @@ export class CameraController {
 
     this.camera.position.copy(this.currentPos);
 
-    // Apply camera shake (impacts, landings, super nitro roar)
-    const activeShake = this.shakeIntensity + (racer.isSuperNitro ? 0.18 : racer.isNitroActive ? 0.08 : 0);
+    // Apply camera shake (impacts, landings, super nitro roar & Stage 2 Hyper Overdrive high-speed vibration)
+    const activeShake =
+      this.shakeIntensity +
+      (racer.isSuperNitro ? 0.18 : racer.overdriveStage === 2 ? 0.11 : racer.isNitroActive ? 0.08 : 0);
     if (activeShake > 0.01) {
       const mag = activeShake * 0.28;
       this.camera.position.x += (Math.random() - 0.5) * mag;

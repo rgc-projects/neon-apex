@@ -53,7 +53,13 @@
    - 利用 `innerClearance` 与 `outerClearance` 渐变系数，在距内/外护栏 `2.6m – 8.1m` 范围内柔和衰减横向切入角，让玩家贴着 FIA 红白路肩丝滑擦弯而不猛撞护栏。
 
 4. **漂移禁氮干脆切断规则（默认关闭「漂移同步喷气」）**
-   - 当 `allowDriftNitro === false` 时，进入或处于漂移期间立即关闭 `isNitroActive`、`isSuperNitro`，并同步清空残留的 `miniBoostTimer` 与 `boostPadTimer`、屏蔽排气管橙色尾焰与高速光带拖尾，确保漂移过程干净纯粹、零残余火焰；开启「漂移同步喷气」开关后允许自由叠加。
+   - 当 `allowDriftNitro === false` 时，进入或处于漂移期间立即关闭 `isNitroActive`、`isSuperNitro`、`overdriveStage`，并同步清空残留的 `miniBoostTimer` 与 `boostPadTimer`、屏蔽排气管橙色尾焰与高速光带拖尾，确保漂移过程干净纯粹、零残余火焰；开启「漂移同步喷气」开关后允许自由叠加。
+
+5. **全赛道通用直道二阶自动超频（Straightaway Auto-Overdrive & Active DRS）**
+   - 在任意赛道的直道（`|κ| < 0.0052`）持续全油门、不刹车、不撞墙、不起漂且车速超过基础极速 `78%` 时，触发两阶无氮气自动提速：
+     - **一阶 `DRS OVERDRIVE I`（`2.0s` 触发）**：3D GT3 碳纤尾翼自动放平降阻，极速突破 `+52 km/h`（`~405 km/h`），自然氮气回充提至 `6.2/秒`。
+     - **二阶 `HYPER OVERDRIVE II`（`5.2s` 触发，仅超长直道自然解锁）**：极速突破 `+104 km/h`（`~460–490 km/h`），自然氮气回充提至 `9.2/秒`，手动氮气可继续叠加冲破 `510–540 km/h`；刹车、撞墙或入弯起漂瞬间清零归位。
+   - 尾流（Slipstream）判定范围放宽至 `80m / ±4.6m`，吸尾流加速超频充能 `1.5×` 并提供 `13.5/秒` 氮气回充。
 
 ---
 
@@ -69,16 +75,17 @@
 
 ---
 
-## 四、 超长环岛 / 多地貌大满贯赛道规范（Mega Island Grand Circuit）
+## 四、 超长环岛 / 1:1 真实 60.7 km 赛道架构规范（Mega Island Grand Circuit）
 
-当赛道总长超过 `4,500m`（如 `apex-island` `11.9 km` 与 `isle-of-man` `30.15 km`）时，需同步满足以下扩展规范：
-1. **动态样条精度与物理米制缓冲区（`TrackSpline.ts`）**：
-   - 标准赛道（`<= 4,500m`）保持 `sampleCount = 1500` 不变；超长赛道按 `Math.min(13000, Math.round(totalLength / 2.6))` 自适应扩充采样点（`30.15 km` 对应 `11,595` 段），保证每段步长稳定在 `~2.6m`。
-   - 发车直道与跳台坡道倾角展平范围改按物理米数计算（发车前 `45m–165m`，跳台前 `70m` / 后 `90m`），避免按归一化 `t` 比例在 12–30km 赛道上过度拉伸；弯前 `150m/100m/50m` 距离牌统一采用 `InstancedMesh`（全图仅 3 次绘制调用）。
-2. **节奏叙事与真实地标分区（参考 *Forza Horizon Goliath* / *Nürburgring Nordschleife* / *Isle of Man TT Snaefell Mountain Course*）**：
-   - **极境环岛大满贯（`apex-island`，`11.9 km` × 2 圈）**：海港都市 -> 双塔跨海悬索桥 + 34° 海洋碗弯 -> 76m 火山松林鸟居与悬崖发卡 -> 1.3km 穿山弧形隧道 + 33° 卡鲁塞尔 -> 灯塔半岛 5°–9° 低倾角发卡 + 铃鹿 S 弯 -> 海湾跳台冲刺。
-   - **曼岛 TT 斯奈菲尔环岛（`isle-of-man`，`30.15 km` × 1 圈，按 1:2 半尺寸精确还原真实 60.725 km / 37.73 英里、最高峰 422m 赛道）**：道格拉斯 TT 大看台 -> Bray Hill 下坡 -> Quarterbridge -> Braddan S 弯 -> Crosby -> Ballacraine -> Glen Helen 连续林谷弯 -> Cronk-y-Voddy 跳台 -> Kirk Michael -> Ballaugh 飞跃石桥 -> Quarry Bends -> 2km Sulby 极速直道 -> Kerrowmoar -> Ramsey 6° 发卡弯 -> Waterworks -> Gooseneck 上山 -> 荒凉无树的 A18 Snaefell 紫石南高地、Mountain Mile、30° Verandah、Bungalow 与 150m Hailwood's Height 山顶跳台 -> Windy Corner -> Creg-ny-Baa 酒馆弯 -> Brandish -> Governor's Bridge 冲线。
-   - 每个分区入口设置专属分区高速龙门路牌（文字加 `maxWidth` 防与车道箭头重叠）与标志性地标，降低超长赛道视觉疲劳并强化路感记忆。
-3. **超大世界渲染与空间哈希零穿模地形雕刻（`SceneryBuilder.ts`）**：
-   - 相机远裁面提升至 `7600m`，天空盒半径 `3900–5600m`，动态海面扩展至 `14–26 km` 并对齐赛道几何中心。
-   - 超长赛道 3D 环岛山地高度场（如 `260×260` 网格）采用 **220m 2D 空间哈希网格**将路基雕刻加速至 `< 40ms`，并严格遵循 `Math.min(rawTerrainY, nearestY - nearestBankDrop - 10.5)` 规则：海峡下保持海底沉没于海面之下，山坡路基处严格下挖至倾斜路沿下方 `>= 10.5m`，且经全采样点三角插值净空审计（要求全线路面边缘高于地形 `>= 6m`）。
+当赛道总长超过 `4,500m`（如 `apex-island` `11.9 km` 与 1:1 真实全长 `isle-of-man` `60.725 km`）时，需同步满足以下扩展规范：
+1. **动态样条精度与 O(1) 空间哈希（`TrackSpline.ts`）**：
+   - 显式设置 `curve.arcLengthDivisions = Math.max(200, pts.length * 16)`，确保 130+ 控制点超长样条弧长采样绝对均匀。
+   - 标准赛道（`<= 4,500m`）保持 `sampleCount = 1500`；`10–35 km` 按 `~2.6m/段` 采样；`> 35 km`（如 `60.725 km`）按 `~3.0m/段` 扩展至 `20,242` 段；内置 240m 2D 空间哈希 `getNearestRoadInfo()` 使全岛净空与地标查询达 O(1) 级耗时。
+   - 发车直道与跳台坡道倾角展平使用物理米制缓冲区；弯前 `150m/100m/50m` 距离牌统一采用 `InstancedMesh`（全图仅 3 次绘制调用）。
+2. **节奏叙事、真实地标分区与全局圈数选择**：
+   - **极境环岛大满贯（`apex-island`，`11.9 km`，默认 2 圈）**：海港都市 -> 双塔跨海悬索桥 + 34° 海洋碗弯 -> 76m 火山松林鸟居与悬崖发卡 -> 1.3km 穿山弧形隧道 + 33° 卡鲁塞尔 -> 灯塔半岛 5°–9° 低倾角发卡 + 铃鹿 S 弯 -> 海湾跳台冲刺。
+   - **曼岛 TT 斯奈菲尔环岛（`isle-of-man`，精确 `60,725m / 37.73 英里`，默认 1 圈 ≈ 8 分钟，支持 `1 / 2 / 3 圈` 自由切换）**：独立配置于 `src/config/isleOfManTrack.ts`，完整还原道格拉斯大看台 → Bray Hill → Quarterbridge → Braddan → Crosby → Ballacraine → Glen Helen → Cronk-y-Voddy → Kirk Michael → Ballaugh 飞跃石桥 → Quarry Bends → 3.5km Sulby 极速超频直道 → Kerrowmoar → Ramsey 6° 发卡 → Gooseneck → 荒凉无树的 18km A18 Snaefell 高地（Mountain Mile / 30° Verandah / Bungalow / Hailwood's Height 跳台 / 28° Windy Corner）→ Creg-ny-Baa 酒馆 → Brandish → Governor's Bridge 冲线。
+3. **双层 60 km 零穿模地形架构（`SceneryBuilder.ts`）**：
+   - 相机远裁面升至 `9,800m`，天空盒半径 `7,200m`，动态爱尔兰海面扩展至 `44 km × 44 km`。
+   - **Layer A（沿路 12m 精度防折叠绿丘坡带）**：紧贴 60.7 km 公路两侧展开，内弯自动按 `0.72 / |κ|` 限幅防折回，路基核心严格 `<= pos.y - bankDrop - 10.5m` 并经 O(1) 跨路段安全钳位。
+   - **Layer B（240×240 全岛宏山脉 + 547m 斯奈菲尔主峰）**：沿公路走廊宽域下挖 `>= 15m`（`macroClearance >= 108m`），在远景无缝接续 Layer A，全线 60,726 个路沿边缘检测点零穿模、总加载 `< 160ms`。

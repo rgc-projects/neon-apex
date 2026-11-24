@@ -19,6 +19,7 @@ export class HUD {
 
   private readonly nitroFill = document.getElementById('nitro-bar-fill')!;
   private readonly nitroStatus = document.getElementById('nitro-status')!;
+  private readonly overdrivePill = document.getElementById('overdrive-pill')!;
 
   private readonly driftHud = document.getElementById('drift-hud')!;
   private readonly driftLabel = document.getElementById('drift-tier-label')!;
@@ -141,12 +142,23 @@ export class HUD {
     this.speedEl.textContent = String(telemetry.speedKmh);
     this.gearEl.textContent = String(telemetry.gear);
 
-    const speedRatio = clamp(telemetry.speedKmh / 460, 0, 1);
+    const speedRatio = clamp(telemetry.speedKmh / 540, 0, 1);
     const speedDash = 355 * (1 - speedRatio);
     this.speedArc.setAttribute('stroke-dashoffset', speedDash.toFixed(1));
 
     const rpmDash = 280 * (1 - clamp(telemetry.rpmNorm, 0, 1));
     this.rpmArc.setAttribute('stroke-dashoffset', rpmDash.toFixed(1));
+
+    // Straightaway Auto-Escalating Overdrive Pill (Stage 1 DRS -> Stage 2 Hyper!)
+    if (telemetry.overdriveStage >= 1 && !telemetry.isDrifting) {
+      this.overdrivePill.classList.remove('hidden');
+      this.overdrivePill.classList.toggle('stage2', telemetry.overdriveStage === 2);
+      this.overdrivePill.textContent =
+        telemetry.overdriveStage === 2 ? '⚡⚡ HYPER OVERDRIVE II' : '⚡ DRS OVERDRIVE I';
+    } else {
+      this.overdrivePill.classList.add('hidden');
+      this.overdrivePill.classList.remove('stage2');
+    }
 
     // Nitro Bar
     const nPct = clamp(telemetry.nitro, 0, 100);

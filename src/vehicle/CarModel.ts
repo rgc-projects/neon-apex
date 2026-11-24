@@ -31,6 +31,9 @@ export class CarModel {
   private frontRightPivot: THREE.Object3D | null = null;
   private wheelSpinNodes: THREE.Object3D[] = [];
   private steeringWheelNode: THREE.Object3D | null = null;
+  private rearWingBlade: THREE.Mesh | null = null;
+  private rearWingFlap: THREE.Mesh | null = null;
+  private wingBaseAngle = 0.07;
 
   private readonly paintMat: THREE.MeshPhysicalMaterial;
   private readonly carbonMat: THREE.MeshStandardMaterial;
@@ -348,7 +351,9 @@ export class CarModel {
     const mainBladeGeo = new THREE.BoxGeometry(wingW, 0.048, 0.34);
     const mainBlade = new THREE.Mesh(mainBladeGeo, this.carbonMat);
     mainBlade.position.set(0, wingY, wingZ);
-    mainBlade.rotation.x = style === 'katana' ? 0.13 : 0.07;
+    this.wingBaseAngle = style === 'katana' ? 0.13 : 0.07;
+    mainBlade.rotation.x = this.wingBaseAngle;
+    this.rearWingBlade = mainBlade;
 
     const strutH = wingY - 0.88;
     const strutGeo = new THREE.BoxGeometry(0.048, strutH, 0.22);
@@ -378,6 +383,7 @@ export class CarModel {
       const flap = new THREE.Mesh(flapGeo, this.carbonMat);
       flap.position.set(0, wingY + 0.11, wingZ + 0.1);
       flap.rotation.x = 0.2;
+      this.rearWingFlap = flap;
 
       this.aeroSlot.add(fin, flap);
       this.disposables.push(finGeo, flapGeo);
@@ -489,6 +495,7 @@ export class CarModel {
     isDrifting: boolean;
     boostIntensity: number;
     isSuperNitro: boolean;
+    overdriveStage?: 0 | 1 | 2;
   }): void {
     const {
       dt,
@@ -502,6 +509,7 @@ export class CarModel {
       isDrifting,
       boostIntensity,
       isSuperNitro,
+      overdriveStage = 0,
     } = params;
 
     // Spin all 4 real supercar wheels proportional to road speed
@@ -524,6 +532,23 @@ export class CarModel {
     this.chassis.rotation.z = bodyRoll;
     this.chassis.rotation.x = bodyPitch;
     this.chassis.position.y = suspensionY;
+
+    // Active Aero DRS Rear Wing (flattens low-drag during Straightaway Overdrive, tilts up as air-brake on braking!)
+    if (this.rearWingBlade) {
+      const targetWingX =
+        overdriveStage >= 2
+          ? -0.09
+          : overdriveStage === 1
+            ? -0.04
+            : isBraking && speed > 30
+              ? this.wingBaseAngle + 0.22
+              : this.wingBaseAngle;
+      this.rearWingBlade.rotation.x += (targetWingX - this.rearWingBlade.rotation.x) * Math.min(1, dt * 10);
+    }
+    if (this.rearWingFlap) {
+      const targetFlapX = overdriveStage >= 1 ? 0.0 : isBraking && speed > 30 ? 0.42 : 0.2;
+      this.rearWingFlap.rotation.x += (targetFlapX - this.rearWingFlap.rotation.x) * Math.min(1, dt * 10);
+    }
 
     // Reactive real Ferrari brake taillights + wet-tarmac crimson bounce + glowing hot brake rotors!
     this.brakeLightMat.emissiveIntensity = isBraking ? 3.2 : isDrifting ? 1.95 : 1.0;

@@ -476,7 +476,81 @@ body,
   color: rgba(255, 255, 255, 0.3);
 }
 
-/* Drift + Nitro Simultaneous Mode Switch Pill */
+/* Drift + Nitro Simultaneous Mode Switch Pill + Global Lap Selector */
+.menu-race-opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.lap-selector {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(8, 13, 30, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.lap-sel-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #cbd5e1;
+  margin-right: 2px;
+  letter-spacing: 0.4px;
+}
+
+.lap-opt-btn {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.lap-opt-btn:hover {
+  color: #ffffff;
+  border-color: rgba(0, 242, 255, 0.5);
+}
+
+.lap-opt-btn.active {
+  background: linear-gradient(110deg, rgba(0, 242, 255, 0.28), rgba(56, 249, 215, 0.28));
+  border-color: rgba(0, 242, 255, 0.82);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 242, 255, 0.28);
+}
+
+/* Straightaway Auto-Overdrive HUD Badge */
+.overdrive-pill {
+  align-self: flex-end;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #5eead4;
+  background: rgba(4, 34, 38, 0.84);
+  border: 1px solid rgba(45, 212, 191, 0.72);
+  box-shadow: 0 0 14px rgba(45, 212, 191, 0.35);
+  transition: all 0.18s ease;
+}
+
+.overdrive-pill.stage2 {
+  color: #fde047;
+  background: linear-gradient(110deg, rgba(16, 48, 72, 0.9), rgba(66, 32, 6, 0.88));
+  border-color: rgba(250, 204, 21, 0.88);
+  box-shadow: 0 0 20px rgba(250, 204, 21, 0.45);
+}
+
 .drift-nitro-toggle {
   pointer-events: auto;
   display: inline-flex;
@@ -2235,6 +2309,28 @@ body.touch-mode .drift-bar-bg {
     padding: 3px 10px;
     font-size: 10px;
     gap: 6px;
+  }
+
+  .menu-race-opts {
+    gap: 5px;
+  }
+
+  .lap-selector {
+    padding: 2px 5px 2px 8px;
+  }
+
+  .lap-sel-label,
+  .lap-opt-btn {
+    font-size: 9.5px;
+  }
+
+  .lap-opt-btn {
+    padding: 2px 7px;
+  }
+
+  .overdrive-pill {
+    font-size: 9.5px;
+    padding: 2px 8px;
   }
 
   .launch-btn {

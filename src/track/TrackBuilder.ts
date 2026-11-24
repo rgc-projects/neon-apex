@@ -505,7 +505,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     // Authentic Isle of Man TT: streetlamps only in Douglas, Kirk Michael/Ballaugh & Ramsey towns; A18 Snaefell Mountain is wild & open!
     if (cfg.theme === 'manx') {
       const inTown =
-        t < 0.055 || (t > 0.308 && t < 0.365) || (t > 0.525 && t < 0.568) || t > 0.948;
+        t < 0.052 || (t > 0.328 && t < 0.402) || (t > 0.558 && t < 0.590) || t > 0.962;
       if (!inTown) continue;
     }
     lampSamples.push(i);
@@ -584,18 +584,21 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
         ]
       : cfg.theme === 'manx'
         ? [
-            { t: 0.015, l1: 'DOUGLAS · BRAY HILL', l2: 'ISLE OF MAN TT · 30.1 KM HALF-SCALE', bg: '#991b1b' },
-            { t: 0.094, l1: 'CROSBY · A1 STRAIGHT', l2: 'BRADDAN S-BEND → GREEBA CASTLE', bg: '#065f46' },
-            { t: 0.150, l1: 'BALLACRAINE  A1 → A3', l2: 'GLEN HELEN · WOODED VALLEY S-BENDS', bg: '#065f46' },
-            { t: 0.252, l1: 'CRONK-Y-VODDY', l2: 'HIGH-SPEED RIDGE CREST JUMP AHEAD', bg: '#991b1b' },
-            { t: 0.306, l1: 'KIRK MICHAEL VILLAGE', l2: 'STONE WALL CHICANE → BALLAUGH', bg: '#065f46' },
-            { t: 0.346, l1: 'BALLAUGH BRIDGE', l2: 'ICONIC HUMPBACK FLYING JUMP!', bg: '#991b1b' },
-            { t: 0.410, l1: 'SULBY STRAIGHT', l2: '2KM FLAT-OUT PLAIN · 440 KM/H', bg: '#065f46' },
-            { t: 0.541, l1: 'RAMSEY HAIRPIN', l2: '180° TURN · GATEWAY TO SNAEFELL', bg: '#991b1b' },
-            { t: 0.608, l1: 'A18 MOUNTAIN ROAD', l2: 'GOOSENECK → GUTHRIE MEMORIAL', bg: '#065f46' },
-            { t: 0.666, l1: 'MOUNTAIN MILE', l2: 'HIGH-ALTITUDE CLIMB → VERANDAH 30°', bg: '#065f46' },
-            { t: 0.768, l1: 'HAILWOOD HEIGHT', l2: '150M SUMMIT · WINDY CORNER PLUNGE', bg: '#991b1b' },
-            { t: 0.873, l1: 'CREG-NY-BAA  34TH MS', l2: 'BRANDISH → GOVERNOR BRIDGE FINISH', bg: '#065f46' },
+            { t: 0.012, l1: 'DOUGLAS · BRAY HILL', l2: 'ISLE OF MAN TT · 60.7 KM (37.73 MI)', bg: '#991b1b' },
+            { t: 0.090, l1: 'CROSBY STRAIGHT', l2: 'A1 OVERDRIVE · GREEBA CASTLE AHEAD', bg: '#065f46' },
+            { t: 0.160, l1: 'BALLACRAINE  A1 → A3', l2: 'GLEN HELEN · WOODED VALLEY S-BENDS', bg: '#065f46' },
+            { t: 0.252, l1: 'CRONK-Y-VODDY', l2: 'RIDGE OVERDRIVE · CREST JUMP AHEAD', bg: '#991b1b' },
+            { t: 0.328, l1: 'KIRK MICHAEL VILLAGE', l2: 'STONE WALL CHICANE → BISHOPSCOURT', bg: '#065f46' },
+            { t: 0.384, l1: 'BALLAUGH BRIDGE', l2: 'FAMOUS HUMPBACK FLYING JUMP!', bg: '#991b1b' },
+            { t: 0.438, l1: 'SULBY STRAIGHT', l2: '3.5KM FLAT-OUT · HYPER OVERDRIVE II', bg: '#065f46' },
+            { t: 0.515, l1: 'KERROWMOAR · RAMSEY', l2: 'COUNTRY S-BENDS → PARLIAMENT SQ', bg: '#065f46' },
+            { t: 0.570, l1: 'RAMSEY HAIRPIN  24MI', l2: '180° TURN · GATEWAY TO SNAEFELL', bg: '#991b1b' },
+            { t: 0.618, l1: 'A18 MOUNTAIN ROAD', l2: 'THE GOOSENECK → GUTHRIE MEMORIAL', bg: '#065f46' },
+            { t: 0.674, l1: 'MOUNTAIN MILE  28MI', l2: 'HIGH-ALTITUDE OVERDRIVE → VERANDAH', bg: '#065f46' },
+            { t: 0.774, l1: 'HAILWOOD HEIGHT', l2: '422M SUMMIT · CREST JUMP → BRANDYWELL', bg: '#991b1b' },
+            { t: 0.822, l1: 'WINDY CORNER  32MI', l2: '28° MOORLAND PLUNGE → KEPPEL GATE', bg: '#065f46' },
+            { t: 0.892, l1: 'CREG-NY-BAA  34TH MS', l2: 'HISTORIC PUB CORNER → GOB-NY-GEAY', bg: '#991b1b' },
+            { t: 0.962, l1: 'SIGNPOST · GOVERNOR', l2: 'FINAL HAIRPIN → DOUGLAS GRANDSTAND', bg: '#065f46' },
           ]
         : [0.16, 0.48, 0.78].map((t) => {
           const [sL1, sL2, sBg] = signMeta[cfg.id] ?? signMeta[cfg.theme] ?? signMeta.city;

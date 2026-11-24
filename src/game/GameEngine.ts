@@ -47,6 +47,7 @@ export class GameEngine {
   private state: GameState = 'MENU';
   private selectedCarIndex = 0;
   private selectedTrackIndex = 0;
+  private selectedLaps = TRACK_CONFIGS[0].laps;
   private allowDriftNitro = false; // Default OFF: Nitro is disabled while actively drifting
 
   // Active Track World Objects
@@ -206,8 +207,13 @@ export class GameEngine {
       onSelectTrack: (idx) => {
         this.audio.unlock();
         this.selectedTrackIndex = idx;
+        this.selectedLaps = TRACK_CONFIGS[idx].laps;
         this.loadTrack(idx);
         this.positionShowcaseOnTrack();
+      },
+      onSelectLaps: (laps) => {
+        this.audio.unlock();
+        this.selectedLaps = clamp(Math.round(laps), 1, 3);
       },
       onStartRace: () => {
         this.audio.unlock();
@@ -492,7 +498,7 @@ export class GameEngine {
     this.destructibles?.resetAll();
     this.showcaseGroup.visible = false;
 
-    const trackCfg = TRACK_CONFIGS[this.selectedTrackIndex];
+    const raceLaps = this.selectedLaps || TRACK_CONFIGS[this.selectedTrackIndex].laps;
     const playerSpec = CAR_SPECS[this.selectedCarIndex];
 
     // Spawn 5 AI Racers + 1 Player = 6-car Grid (Player starts in P4 for instant action!)
@@ -516,7 +522,7 @@ export class GameEngine {
           model,
           isPlayer: true,
           colorHex: playerSpec.neonHex,
-          totalLaps: trackCfg.laps,
+          totalLaps: raceLaps,
         });
         racer.allowDriftNitro = this.allowDriftNitro;
         racer.placeOnGrid(this.spline, gridIdx);
@@ -534,7 +540,7 @@ export class GameEngine {
           model,
           isPlayer: false,
           colorHex: prof.overrideNeonHex,
-          totalLaps: trackCfg.laps,
+          totalLaps: raceLaps,
         });
         racer.allowDriftNitro = this.allowDriftNitro;
         racer.placeOnGrid(this.spline, gridIdx);
@@ -869,6 +875,15 @@ export class GameEngine {
           this.hud.pushCallout('🔥 SUPER NITRO OVERDRIVE!', 'magenta');
         }
       },
+      onOverdriveStage: (stage) => {
+        this.audio.playNitroStart(stage === 2);
+        this.cameraController.addShake(stage === 2 ? 0.36 : 0.16);
+        this.touchControls.vibrate(stage === 2 ? [18, 14, 30] : 16);
+        this.hud.pushCallout(
+          stage === 2 ? '⚡⚡ HYPER OVERDRIVE II!' : '⚡ DRS OVERDRIVE I',
+          stage === 2 ? 'gold' : 'green'
+        );
+      },
       onLapComplete: (newLap) => {
         const isFinal = newLap === player.totalLaps;
         this.audio.playLapChime(isFinal);
@@ -925,12 +940,15 @@ export class GameEngine {
       // Exhaust Particles & Player Dynamic Nitro Light Ribbon Trails
       // When drift-nitro lock is active during drift, cleanly shut off ALL exhaust flames & orange trails!
       const boostLockedInDrift = r.isDrifting && !r.allowDriftNitro;
-      const boosting = !boostLockedInDrift && (r.isNitroActive || r.miniBoostTimer > 0 || r.boostPadTimer > 0);
+      const boosting =
+        !boostLockedInDrift &&
+        (r.isNitroActive || r.miniBoostTimer > 0 || r.boostPadTimer > 0 || r.overdriveStage >= 1);
       if (boosting) {
         r.model.getExhaustWorldPositions(this._exL, this._exR);
         if (Math.random() < (r.isPlayer ? 0.9 : 0.4)) {
-          this.particles.emitNitroExhaust(this._exL, r.worldForward, r.isSuperNitro);
-          this.particles.emitNitroExhaust(this._exR, r.worldForward, r.isSuperNitro);
+          const blueFlame = r.isSuperNitro || (!r.isNitroActive && r.overdriveStage >= 1);
+          this.particles.emitNitroExhaust(this._exL, r.worldForward, blueFlame);
+          this.particles.emitNitroExhaust(this._exR, r.worldForward, blueFlame);
         }
       }
       if (r.isPlayer) {
@@ -940,7 +958,7 @@ export class GameEngine {
           this._exR,
           r.worldUp,
           !boostLockedInDrift && (boosting || r.speed > 92),
-          r.isSuperNitro
+          r.isSuperNitro || (!r.isNitroActive && r.overdriveStage === 2)
         );
         if (r.isSlipstreaming && Math.random() < 0.65) {
           const streakPos = r.worldPos
@@ -983,11 +1001,13 @@ export class GameEngine {
     const tel = player.getTelemetry(this.racers.length);
     this.hud.update(tel, this.racers, this.spline);
     this.touchControls.updateVisuals(tel, false);
+    const anyBoost =
+      tel.isNitroActive || player.miniBoostTimer > 0 || player.boostPadTimer > 0 || tel.overdriveStage >= 1;
     this.speedLines.update(
       rawDt,
       tel.speedKmh,
-      tel.isNitroActive || player.miniBoostTimer > 0 || player.boostPadTimer > 0,
-      tel.isSuperNitro,
+      anyBoost,
+      tel.isSuperNitro || tel.overdriveStage === 2,
       tel.isSlipstreaming,
       !isSlowMo
     );
@@ -998,8 +1018,8 @@ export class GameEngine {
       gear: tel.gear,
       isDrifting: tel.isDrifting,
       driftTier: tel.driftTier,
-      isNitro: tel.isNitroActive || player.miniBoostTimer > 0 || player.boostPadTimer > 0,
-      isSuperNitro: tel.isSuperNitro,
+      isNitro: anyBoost,
+      isSuperNitro: tel.isSuperNitro || tel.overdriveStage === 2,
       isAirborne: tel.isAirborne,
     });
 

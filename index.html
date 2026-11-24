@@ -68,18 +68,26 @@
             <span class="sep">|</span>
             <span id="showcase-track-name">NEO TOKYO OVERDRIVE</span>
           </div>
-          <button
-            id="btn-menu-drift-nitro"
-            class="drift-nitro-toggle"
-            type="button"
-            role="switch"
-            aria-checked="false"
-            title="默认关闭：漂移时禁止同时使用氮气；开启后可漂移与氮气同时触发"
-          >
-            <span class="dnt-label">🔥 漂移同步喷气</span>
-            <span class="dnt-track"><span class="dnt-thumb"></span></span>
-            <span id="drift-nitro-state" class="dnt-state">关 · 漂移禁氮</span>
-          </button>
+          <div class="menu-race-opts">
+            <button
+              id="btn-menu-drift-nitro"
+              class="drift-nitro-toggle"
+              type="button"
+              role="switch"
+              aria-checked="false"
+              title="默认关闭：漂移时禁止同时使用氮气；开启后可漂移与氮气同时触发"
+            >
+              <span class="dnt-label">🔥 漂移同步喷气</span>
+              <span class="dnt-track"><span class="dnt-thumb"></span></span>
+              <span id="drift-nitro-state" class="dnt-state">关 · 漂移禁氮</span>
+            </button>
+            <div id="lap-selector" class="lap-selector" role="group" aria-label="选择圈数">
+              <span class="lap-sel-label">🏁 圈数</span>
+              <button type="button" class="lap-opt-btn" data-laps="1">1 圈</button>
+              <button type="button" class="lap-opt-btn" data-laps="2">2 圈</button>
+              <button type="button" class="lap-opt-btn" data-laps="3">3 圈</button>
+            </div>
+          </div>
           <button id="btn-start-race" class="launch-btn">
             <span class="launch-bg"></span>
             <span class="launch-text">START RACE // 立即开赛</span>
@@ -227,8 +235,9 @@
         <span><kbd>R</kbd> 复位</span>
       </div>
 
-      <!-- Bottom Right: Speedometer + Nitro Gauge -->
+      <!-- Bottom Right: Speedometer + Nitro Gauge + Overdrive Pill -->
       <div class="hud-bottom-right">
+        <div id="overdrive-pill" class="overdrive-pill hidden">⚡ OVERDRIVE I · DRS</div>
         <div class="nitro-container glass-hud">
           <div class="nitro-header">
             <span class="hud-label">NITRO SYSTEM</span>

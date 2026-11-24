@@ -115,6 +115,8 @@ export interface RacerHUDTelemetry {
   isNitroActive: boolean;
   isSuperNitro: boolean;
   nitroLockedByDrift: boolean;
+  overdriveStage: 0 | 1 | 2;
+  overdriveProgress: number; // 0..1 progress across Stage 1 -> Stage 2
   isDrifting: boolean;
   driftTier: 0 | 1 | 2 | 3;
   driftChargeNorm: number;

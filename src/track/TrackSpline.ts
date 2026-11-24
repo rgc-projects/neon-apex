@@ -31,6 +31,8 @@ export class TrackSpline {
   public readonly sampleCount: number;
 
   private readonly _tmpA = new THREE.Vector3();
+  private spatialHash: Map<number, number[]> | null = null;
+  private readonly spatialCellSize = 240;
 
   constructor(config: TrackConfig) {
     this.config = config;
@@ -40,12 +42,16 @@ export class TrackSpline {
     const pts = config.points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
     // 'centripetal' Catmull-Rom prevents loops/overshoots on sharp 90° bends and tight 180° hairpins!
     this.curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal', 0.5);
+    // Ensure uniform arc-length parameterization even on 180+ control-point 60.7km endurance circuits!
+    this.curve.arcLengthDivisions = Math.max(200, pts.length * 16);
     this.totalLength = this.curve.getLength();
-    // Preserve exact 1500 samples for standard 3.4-4.3km circuits; scale density (~2.6m/sample) up to 35km+ mega loops
+    // Preserve exact 1500 samples for standard 3.4-4.3km circuits; scale density cleanly up to full 1:1 60.7km!
     this.sampleCount =
       this.totalLength <= 4500
         ? 1500
-        : Math.min(13000, Math.max(1500, Math.round(this.totalLength / 2.6)));
+        : this.totalLength <= 35000
+          ? Math.round(this.totalLength / 2.6)
+          : Math.min(22000, Math.round(this.totalLength / 3.0));
 
     const N = this.sampleCount;
     const ds = this.totalLength / N;
@@ -296,10 +302,84 @@ export class TrackSpline {
     return this.config.jumpRamps;
   }
 
-  public minHorizontalDistanceToTrack(x: number, z: number): number {
-    let minSq = Infinity;
-    const stride = this.sampleCount > 4500 ? 6 : 4;
+  private ensureSpatialHash(): Map<number, number[]> {
+    if (this.spatialHash) return this.spatialHash;
+    const map = new Map<number, number[]>();
+    const stride = this.sampleCount > 12000 ? 4 : 3;
+    const cell = this.spatialCellSize;
     for (let i = 0; i < this.sampleCount; i += stride) {
+      const p = this.samples[i].pos;
+      const gx = Math.floor(p.x / cell);
+      const gz = Math.floor(p.z / cell);
+      const key = ((gx + 8192) << 14) | (gz + 8192);
+      let b = map.get(key);
+      if (!b) {
+        b = [];
+        map.set(key, b);
+      }
+      b.push(i);
+    }
+    this.spatialHash = map;
+    return map;
+  }
+
+  /** Fast O(1) lookup of nearest road sample within ~240m (used by 60km terrain carving & landmark placement) */
+  public getNearestRoadInfo(
+    x: number,
+    z: number,
+    maxDist = 230
+  ): { dist: number; y: number; bankDrop: number } | null {
+    const map = this.ensureSpatialHash();
+    const cell = this.spatialCellSize;
+    const gx = Math.floor(x / cell);
+    const gz = Math.floor(z / cell);
+    let bestSq = maxDist * maxDist;
+    let bestIdx = -1;
+
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oz = -1; oz <= 1; oz++) {
+        const key = ((gx + ox + 8192) << 14) | (gz + oz + 8192);
+        const bucket = map.get(key);
+        if (!bucket) continue;
+        for (let k = 0; k < bucket.length; k++) {
+          const idx = bucket[k];
+          const p = this.samples[idx].pos;
+          const dx = p.x - x;
+          const dz = p.z - z;
+          const dSq = dx * dx + dz * dz;
+          if (dSq < bestSq) {
+            bestSq = dSq;
+            bestIdx = idx;
+          }
+        }
+      }
+    }
+    if (bestIdx < 0) return null;
+    const s = this.samples[bestIdx];
+    return {
+      dist: Math.sqrt(bestSq),
+      y: s.pos.y,
+      bankDrop: this.halfWidth * Math.sin(Math.abs(s.bank)),
+    };
+  }
+
+  public minHorizontalDistanceToTrack(x: number, z: number): number {
+    if (this.sampleCount > 4500) {
+      const near = this.getNearestRoadInfo(x, z, 235);
+      if (near) return near.dist;
+      let minSq = Infinity;
+      const coarse = Math.max(12, Math.round(this.sampleCount / 400));
+      for (let i = 0; i < this.sampleCount; i += coarse) {
+        const p = this.samples[i].pos;
+        const dx = p.x - x;
+        const dz = p.z - z;
+        const dSq = dx * dx + dz * dz;
+        if (dSq < minSq) minSq = dSq;
+      }
+      return Math.sqrt(minSq);
+    }
+    let minSq = Infinity;
+    for (let i = 0; i < this.sampleCount; i += 4) {
       const p = this.samples[i].pos;
       const dx = p.x - x;
       const dz = p.z - z;

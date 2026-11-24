@@ -54,7 +54,7 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     cfg.sunColorHex,
     isDusk
   );
-  const skyRadius = cfg.theme === 'manx' ? 5600 : cfg.theme === 'island' ? 3900 : 3200;
+  const skyRadius = cfg.theme === 'manx' ? 7200 : cfg.theme === 'island' ? 3900 : 3200;
   const skyGeo = new THREE.SphereGeometry(skyRadius, 48, 28);
   const skyMat = new THREE.MeshBasicMaterial({
     map: skyTex,
@@ -70,13 +70,13 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   // 2. Base Ground / Realistic Shimmering Ocean Water Plane
   const oceanNormal = createOceanNormalTexture();
   if (cfg.theme === 'manx') {
-    oceanNormal.repeat.set(170, 170);
+    oceanNormal.repeat.set(280, 280);
   } else if (cfg.theme === 'island') {
     oceanNormal.repeat.set(95, 95);
   }
   disposables.push(oceanNormal);
 
-  const groundSpan = cfg.theme === 'manx' ? 26000 : cfg.theme === 'island' ? 14000 : 7600;
+  const groundSpan = cfg.theme === 'manx' ? 44000 : cfg.theme === 'island' ? 14000 : 7600;
   const groundGeo = new THREE.PlaneGeometry(groundSpan, groundSpan);
   groundGeo.rotateX(-Math.PI / 2);
 
@@ -1376,7 +1376,9 @@ function buildIsleOfManWorld(
   waterY: number,
   animatedBeacons: THREE.Object3D[]
 ): void {
-  // 1. Sculpted 3D Emerald Rolling Hills + Snaefell Purple-Heather Moorland Massif
+  // 1. Dual-Layer 60.7km Isle of Man 3D Terrain:
+  //    Layer A: Curvature-safe 12m-resolution Roadside Rolling Hills Ribbon along ALL 60.7km (0% clipping by construction!)
+  //    Layer B: Macro 240x240 Whole-Island Massif + 621m Snaefell Peak carved generously >=14.5m below road corridors!
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const s of spline.samples) {
     if (s.pos.x < minX) minX = s.pos.x;
@@ -1384,141 +1386,69 @@ function buildIsleOfManWorld(
     if (s.pos.z < minZ) minZ = s.pos.z;
     if (s.pos.z > maxZ) maxZ = s.pos.z;
   }
-  const margin = 420;
-  const widthX = maxX - minX + margin * 2;
-  const depthZ = maxZ - minZ + margin * 2;
+  const spanX = Math.max(maxX - minX, 1000);
+  const spanZ = Math.max(maxZ - minZ, 1000);
   const centerX = (minX + maxX) * 0.5;
   const centerZ = (minZ + maxZ) * 0.5;
-
-  const segX = 260;
-  const segZ = 260;
-  const terrainGeo = new THREE.PlaneGeometry(widthX, depthZ, segX, segZ);
-  terrainGeo.rotateX(-Math.PI / 2);
+  const rx = spanX * 0.54;
+  const rz = spanZ * 0.54;
+  // Snaefell summit sits in the eastern-central uplands beside A18 Mountain Road!
+  const snaefellX = centerX + spanX * 0.25;
+  const snaefellZ = centerZ + spanZ * 0.04;
+  const westHillsX = centerX - spanX * 0.30;
+  const westHillsZ = centerZ - spanZ * 0.12;
+  const scaleFactor = spanX / 7500;
 
   const fbm = (x: number, z: number): number => {
-    const n1 = Math.sin(x * 0.0012 + 0.7) * Math.cos(z * 0.0011 - 0.5);
-    const n2 = Math.sin(x * 0.0031 - z * 0.0027 + 1.8) * 0.5;
-    const n3 = Math.cos(x * 0.0074 + z * 0.0068) * 0.22;
+    const f = 1 / Math.max(scaleFactor, 0.75);
+    const n1 = Math.sin(x * 0.0012 * f + 0.7) * Math.cos(z * 0.0011 * f - 0.5);
+    const n2 = Math.sin(x * 0.0031 * f - z * 0.0027 * f + 1.8) * 0.5;
+    const n3 = Math.cos(x * 0.0074 * f + z * 0.0068 * f) * 0.22;
     return (n1 + n2 + n3) * 0.5 + 0.5;
   };
 
-  // Spatial-hash accelerated roadbed carving (~15.6m spline spacing -> O(1) lookup per vertex, <55ms for 30km!)
-  type CoarseRoadPt = { x: number; y: number; z: number; bankDrop: number };
-  const HASH_CELL = 220;
-  const hashGrid = new Map<number, CoarseRoadPt[]>();
-  const hashKey = (gx: number, gz: number) => ((gx + 4096) << 13) | (gz + 4096);
-
-  for (let i = 0; i < spline.sampleCount; i += 6) {
-    const s = spline.samples[i];
-    const pt: CoarseRoadPt = {
-      x: s.pos.x,
-      y: s.pos.y,
-      z: s.pos.z,
-      bankDrop: spline.halfWidth * Math.sin(Math.abs(s.bank)),
-    };
-    const gx = Math.floor(pt.x / HASH_CELL);
-    const gz = Math.floor(pt.z / HASH_CELL);
-    const k = hashKey(gx, gz);
-    let bucket = hashGrid.get(k);
-    if (!bucket) {
-      bucket = [];
-      hashGrid.set(k, bucket);
-    }
-    bucket.push(pt);
-  }
-
-  const posAttr = terrainGeo.attributes.position as THREE.BufferAttribute;
-  const colors = new Float32Array(posAttr.count * 3);
-  const col = new THREE.Color();
-  const roadClearance = spline.halfWidth + 44; // 57.5m clearance buffer (~1.8x grid cell width!)
-  const maxCheckDistSq = 215 * 215;
-
-  for (let i = 0; i < posAttr.count; i++) {
-    const vx = posAttr.getX(i) + centerX;
-    const vz = posAttr.getZ(i) + centerZ;
-
-    // Organic 30km Isle of Man coastline mask surrounded by the Irish Sea
+  const computeRawManxY = (vx: number, vz: number): number => {
     const coastNoise = (fbm(vx * 0.55, vz * 0.55) - 0.5) * 0.22;
-    const u = (vx - 120) / 3980;
-    const v = (vz - -2420) / 4320;
+    const u = (vx - centerX) / rx;
+    const v = (vz - centerZ) / rz;
     const rad = Math.sqrt(u * u + v * v) + coastNoise;
     const landMask = smoothstep(1.08, 0.74, rad);
 
-    // Towering Snaefell Mountain Massif in eastern uplands + Western Cronk-y-Voddy rolling hills!
-    const snaefellDist = Math.hypot((vx - 2080) / 1820, (vz - -2100) / 2050);
-    const snaefellMassif = Math.pow(smoothstep(1.25, 0.0, snaefellDist), 1.55) * 345;
-    const westHillsDist = Math.hypot((vx - -2150) / 1650, (vz - -3450) / 1850);
-    const westHills = Math.pow(smoothstep(1.2, 0.0, westHillsDist), 1.6) * 105;
+    const sDist = Math.hypot((vx - snaefellX) / (spanX * 0.25), (vz - snaefellZ) / (spanZ * 0.26));
+    const snaefellMassif = Math.pow(smoothstep(1.25, 0.0, sDist), 1.55) * 485;
+    const wDist = Math.hypot((vx - westHillsX) / (spanX * 0.22), (vz - westHillsZ) / (spanZ * 0.24));
+    const westHills = Math.pow(smoothstep(1.2, 0.0, wDist), 1.6) * 145;
     const ridgeNoise = fbm(vx, vz);
 
-    const rawManxY =
-      waterY - 16 + landMask * (26 + ridgeNoise * 82 + snaefellMassif + westHills);
+    return waterY - 18 + landMask * (28 + ridgeNoise * 92 + snaefellMassif + westHills);
+  };
 
-    const gx = Math.floor(vx / HASH_CELL);
-    const gz = Math.floor(vz / HASH_CELL);
-    let minD2 = maxCheckDistSq;
-    let nearestY = waterY + 20;
-    let nearestBankDrop = 0;
-
-    for (let ox = -1; ox <= 1; ox++) {
-      for (let oz = -1; oz <= 1; oz++) {
-        const bucket = hashGrid.get(hashKey(gx + ox, gz + oz));
-        if (!bucket) continue;
-        for (let b = 0; b < bucket.length; b++) {
-          const p = bucket[b];
-          const dx = vx - p.x;
-          const dz = vz - p.z;
-          const d2 = dx * dx + dz * dz;
-          if (d2 < minD2) {
-            minD2 = d2;
-            nearestY = p.y;
-            nearestBankDrop = p.bankDrop;
-          }
-        }
-      }
-    }
-
-    let finalY = rawManxY;
-    if (minD2 < maxCheckDistSq) {
-      const dist = Math.sqrt(minD2);
-      const blend = smoothstep(roadClearance, roadClearance + 135, dist);
-      const carvedY = Math.min(rawManxY, nearestY - nearestBankDrop - 10.5);
-      finalY = carvedY * (1 - blend) + rawManxY * blend;
-    }
-
-    posAttr.setXYZ(i, vx, finalY, vz);
-
-    // Unmistakable Celtic Isle of Man biome shading: Emerald Pastures -> Golden Gorse & Purple Heather -> Slate Peak
+  const col = new THREE.Color();
+  const shadeManx = (vx: number, vz: number, finalY: number, outArr: Float32Array | number[], baseIdx: number) => {
     const elev = finalY - waterY;
-    const grain = ((Math.sin(vx * 0.065) * Math.cos(vz * 0.065)) * 0.5 + 0.5) * 0.028;
-    const hedgerowPatch = ((Math.sin(vx * 0.012) * Math.sin(vz * 0.012)) * 0.5 + 0.5) * 0.032;
+    const grain = ((Math.sin(vx * 0.055) * Math.cos(vz * 0.055)) * 0.5 + 0.5) * 0.028;
+    const hedgerowPatch = ((Math.sin(vx * 0.011) * Math.sin(vz * 0.011)) * 0.5 + 0.5) * 0.032;
     if (elev < 2.0) {
-      col.setRGB(0.035 + grain * 0.4, 0.068 + grain * 0.5, 0.082 + grain * 0.6); // Irish Sea slate coast
-    } else if (elev < 58) {
-      // Lush emerald-green Manx pastures & patchwork countryside fields
-      col.setRGB(0.042 + grain * 0.6 + hedgerowPatch * 0.4, 0.135 + grain + hedgerowPatch, 0.052 + grain * 0.5);
-    } else if (elev < 145) {
-      // Windswept Snaefell golden-gorse & purple-brown heather moorland
-      const m = clamp((elev - 58) / 87, 0, 1);
+      col.setRGB(0.035 + grain * 0.4, 0.068 + grain * 0.5, 0.082 + grain * 0.6);
+    } else if (elev < 68) {
+      col.setRGB(0.042 + grain * 0.6 + hedgerowPatch * 0.4, 0.138 + grain + hedgerowPatch, 0.052 + grain * 0.5);
+    } else if (elev < 185) {
+      const m = clamp((elev - 68) / 117, 0, 1);
       col.setRGB(
-        0.075 + m * 0.055 + grain,
-        0.118 - m * 0.025 + grain * 0.8,
-        0.058 + m * 0.042 + grain * 0.8
+        0.075 + m * 0.058 + grain,
+        0.118 - m * 0.028 + grain * 0.8,
+        0.058 + m * 0.045 + grain * 0.8
       );
     } else {
-      // Rugged misty Snaefell slate-granite summit ridge
-      col.setRGB(0.088 + grain, 0.092 + grain, 0.104 + grain);
+      col.setRGB(0.092 + grain, 0.096 + grain, 0.108 + grain);
     }
-    colors[i * 3] = col.r;
-    colors[i * 3 + 1] = col.g;
-    colors[i * 3 + 2] = col.b;
-  }
-
-  terrainGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  terrainGeo.computeVertexNormals();
+    outArr[baseIdx] = col.r;
+    outArr[baseIdx + 1] = col.g;
+    outArr[baseIdx + 2] = col.b;
+  };
 
   const manxGroundTex = createConcreteTexture();
-  manxGroundTex.repeat.set(120, 120);
+  manxGroundTex.repeat.set(160, 160);
   const manxTerrainMat = new THREE.MeshStandardMaterial({
     map: manxGroundTex,
     vertexColors: true,
@@ -1526,8 +1456,120 @@ function buildIsleOfManWorld(
     metalness: 0.02,
     envMapIntensity: 0.18,
   });
+  disposables.push(manxGroundTex, manxTerrainMat);
+
+  // Layer A: Curvature-safe High-Detail Roadside Rolling Hills Ribbon along ALL 60.7km!
+  const ribStep = spline.sampleCount > 14000 ? 5 : 4;
+  const ribIndices: number[] = [];
+  for (let i = 0; i < spline.sampleCount; i += ribStep) ribIndices.push(i);
+  const ribRows = ribIndices.length;
+  const latProfile = [-135, -82, -46, -26, 0, 26, 46, 82, 135];
+  const cols = latProfile.length;
+
+  const ribVertCount = (ribRows + 1) * cols;
+  const ribPos = new Float32Array(ribVertCount * 3);
+  const ribCol = new Float32Array(ribVertCount * 3);
+  const ribUv = new Float32Array(ribVertCount * 2);
+  const ribIdx: number[] = [];
+
+  for (let r = 0; r <= ribRows; r++) {
+    const s = spline.samples[ribIndices[r % ribRows]];
+    const bankDrop = spline.halfWidth * Math.sin(Math.abs(s.bank));
+    const bedY = s.pos.y - bankDrop - 10.5;
+    const absK = Math.abs(s.curvature);
+    const turnSign = Math.sign(s.curvature); // >0 turning right => +lat is inside of curve
+    const maxInsideSpan = absK > 0.002 ? Math.max(30, 0.72 / absK) : 135;
+    const vUv = (r === ribRows ? spline.totalLength : s.s) / 90;
+
+    for (let c = 0; c < cols; c++) {
+      let lat = latProfile[c];
+      // Prevent inner-wing self-folding on tight 180° hairpins!
+      if (turnSign !== 0 && lat * turnSign > 0 && Math.abs(lat) > maxInsideSpan) {
+        lat = Math.sign(lat) * maxInsideSpan;
+      }
+      const wx = s.pos.x + s.flatRight.x * lat;
+      const wz = s.pos.z + s.flatRight.z * lat;
+
+      const absLat = Math.abs(lat);
+      let fy: number;
+      if (absLat <= 28) {
+        fy = Math.min(bedY, computeRawManxY(wx, wz));
+      } else {
+        const rawY = computeRawManxY(wx, wz);
+        const wingBlend = smoothstep(28, 125, absLat);
+        // Sculpt gentle rolling Manx hedgerow banks rising naturally from road shoulder
+        const bankRise = Math.min(rawY, s.pos.y + (absLat - 28) * 0.28);
+        fy = bedY * (1 - wingBlend) + bankRise * wingBlend;
+        // Strict O(1) cross-road safety clamp: never poke near ANY adjacent road leg!
+        const near = spline.getNearestRoadInfo(wx, wz, 130);
+        if (near) {
+          const safeCap = near.y - near.bankDrop - 10.5;
+          const clrBlend = smoothstep(spline.halfWidth + 20, spline.halfWidth + 75, near.dist);
+          fy = Math.min(fy, safeCap) * (1 - clrBlend) + fy * clrBlend;
+        }
+      }
+
+      const vi = r * cols + c;
+      ribPos[vi * 3] = wx;
+      ribPos[vi * 3 + 1] = fy;
+      ribPos[vi * 3 + 2] = wz;
+      ribUv[vi * 2] = c / (cols - 1);
+      ribUv[vi * 2 + 1] = vUv;
+      shadeManx(wx, wz, fy, ribCol, vi * 3);
+    }
+
+    if (r < ribRows) {
+      for (let c = 0; c < cols - 1; c++) {
+        const a = r * cols + c;
+        const b = a + cols;
+        ribIdx.push(a, a + 1, b, a + 1, b + 1, b);
+      }
+    }
+  }
+
+  const ribGeo = new THREE.BufferGeometry();
+  ribGeo.setAttribute('position', new THREE.BufferAttribute(ribPos, 3));
+  ribGeo.setAttribute('color', new THREE.BufferAttribute(ribCol, 3));
+  ribGeo.setAttribute('uv', new THREE.BufferAttribute(ribUv, 2));
+  ribGeo.setIndex(ribIdx);
+  ribGeo.computeVertexNormals();
+  group.add(new THREE.Mesh(ribGeo, manxTerrainMat));
+  disposables.push(ribGeo);
+
+  // Layer B: Macro 240x240 Whole-Island Massif + 621m Snaefell Summit (carved strictly >=14.5m below road!)
+  const margin = 650;
+  const widthX = spanX + margin * 2;
+  const depthZ = spanZ + margin * 2;
+  const segX = 240;
+  const segZ = 240;
+  const terrainGeo = new THREE.PlaneGeometry(widthX, depthZ, segX, segZ);
+  terrainGeo.rotateX(-Math.PI / 2);
+
+  const posAttr = terrainGeo.attributes.position as THREE.BufferAttribute;
+  const colors = new Float32Array(posAttr.count * 3);
+  const macroClearance = Math.max(spline.halfWidth + 95, (widthX / segX) * 1.65);
+
+  for (let i = 0; i < posAttr.count; i++) {
+    const vx = posAttr.getX(i) + centerX;
+    const vz = posAttr.getZ(i) + centerZ;
+    const rawManxY = computeRawManxY(vx, vz);
+
+    let finalY = rawManxY;
+    const near = spline.getNearestRoadInfo(vx, vz, macroClearance + 145);
+    if (near) {
+      const blend = smoothstep(macroClearance, macroClearance + 140, near.dist);
+      const carvedY = Math.min(rawManxY, near.y - near.bankDrop - 15.0);
+      finalY = carvedY * (1 - blend) + rawManxY * blend;
+    }
+
+    posAttr.setXYZ(i, vx, finalY, vz);
+    shadeManx(vx, vz, finalY, colors, i * 3);
+  }
+
+  terrainGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  terrainGeo.computeVertexNormals();
   group.add(new THREE.Mesh(terrainGeo, manxTerrainMat));
-  disposables.push(manxGroundTex, terrainGeo, manxTerrainMat);
+  disposables.push(terrainGeo);
 
   // Shared Manx Architectural Materials
   const whitewashMat = new THREE.MeshStandardMaterial({ color: 0xe8e2d5, roughness: 0.78, metalness: 0.04 });
@@ -1608,15 +1650,15 @@ function buildIsleOfManWorld(
   );
   group.add(gsGroup);
 
-  // 3. Historic Ballaugh Bridge Weathered Stone Parapets framing Jump Ramp #2 (t = 0.354..0.357)
-  const bbFrame = spline.getFrameAtDistance(0.3555 * spline.totalLength);
+  // 3. Historic Ballaugh Bridge Weathered Stone Parapets framing Jump Ramp #2 (t = 0.391..0.3926)
+  const bbFrame = spline.getFrameAtDistance(0.3918 * spline.totalLength);
   const bbGroup = new THREE.Group();
   bbGroup.position.copy(bbFrame.pos);
   basis.makeBasis(bbFrame.right, bbFrame.up, bbFrame.tangent.clone().negate());
   bbGroup.quaternion.setFromRotationMatrix(basis);
 
-  const parapetGeo = new THREE.BoxGeometry(1.1, 3.6, 86);
-  const copingGeo = new THREE.BoxGeometry(1.4, 0.38, 87);
+  const parapetGeo = new THREE.BoxGeometry(1.1, 3.6, 94);
+  const copingGeo = new THREE.BoxGeometry(1.4, 0.38, 95);
   const pierButtGeo = new THREE.BoxGeometry(3.2, 18, 4.2);
   disposables.push(parapetGeo, copingGeo, pierButtGeo);
   for (const side of [-1, 1]) {
@@ -1630,7 +1672,7 @@ function buildIsleOfManWorld(
   }
   group.add(bbGroup);
 
-  // 4. 360 Traditional Whitewashed Manx Cottages & Village Streetscapes + Iconic Creg-ny-Baa Pub!
+  // 4. 560 Traditional Whitewashed Manx Cottages & Village Streetscapes + Iconic Creg-ny-Baa Pub!
   const cotWallGeo = new THREE.BoxGeometry(1, 1, 1);
   const cotRoofGeo = new THREE.ConeGeometry(0.76, 0.58, 4);
   cotRoofGeo.rotateY(Math.PI / 4);
@@ -1638,18 +1680,18 @@ function buildIsleOfManWorld(
   const cotChimGeo = new THREE.BoxGeometry(0.14, 0.38, 0.14);
   disposables.push(cotWallGeo, cotRoofGeo, cotWinGeo, cotChimGeo);
 
-  // Town & village t-windows faithful to the 30.1km Isle of Man course
+  // Town & village t-windows faithful to the 60.7km Isle of Man course
   const villageZones: [number, number][] = [
-    [0.004, 0.056], // Douglas, Bray Hill & Quarterbridge
-    [0.068, 0.162], // Braddan, Union Mills, Crosby & Ballacraine
-    [0.308, 0.368], // Kirk Michael & Ballaugh Village
-    [0.468, 0.562], // Sulby, Ginger Hall, Parliament Square & Ramsey Town
-    [0.945, 0.994], // Signpost Corner, Governor's Bridge & Douglas
+    [0.003, 0.055], // Douglas, Bray Hill & Quarterbridge
+    [0.065, 0.168], // Braddan, Union Mills, Crosby & Ballacraine
+    [0.328, 0.402], // Kirk Michael, Bishopscourt & Ballaugh Village
+    [0.485, 0.588], // Sulby, Ginger Hall, Parliament Square & Ramsey Town
+    [0.958, 0.996], // Signpost Corner, Governor's Bridge & Douglas
   ];
 
   const cottages: { x: number; y: number; z: number; w: number; h: number; d: number; rotY: number }[] = [];
   let cotAttempts = 0;
-  while (cottages.length < 360 && cotAttempts < 4200) {
+  while (cottages.length < 560 && cotAttempts < 6400) {
     cotAttempts++;
     const zone = villageZones[Math.floor(rand() * villageZones.length)];
     const t = zone[0] + rand() * (zone[1] - zone[0]);
@@ -1699,8 +1741,8 @@ function buildIsleOfManWorld(
   });
   group.add(cotWallInst, cotRoofInst, cotWinInst, cotChimInst);
 
-  // Iconic Creg-ny-Baa Pub Landmark perched overlooking the sweeping Creg-ny-Baa corner (t = 0.885)!
-  const cnbFrame = spline.getFrameAtDistance(0.885 * spline.totalLength);
+  // Iconic Creg-ny-Baa Pub Landmark perched overlooking the sweeping Creg-ny-Baa corner (t = 0.900)!
+  const cnbFrame = spline.getFrameAtDistance(0.900 * spline.totalLength);
   const cnbPos = cnbFrame.pos.clone().addScaledVector(cnbFrame.flatRight, -38);
   if (spline.minHorizontalDistanceToTrack(cnbPos.x, cnbPos.z) >= spline.halfWidth + 16) {
     const pubGroup = new THREE.Group();
@@ -1724,7 +1766,7 @@ function buildIsleOfManWorld(
     group.add(pubGroup);
   }
 
-  // 5. 1,050 Lush Rounded Broadleaf British Valley Trees (Lowlands ONLY — A18 Snaefell Mountain stays wild & tree-free!)
+  // 5. 1,600 Lush Rounded Broadleaf British Valley Trees (Lowlands ONLY — 18km A18 Snaefell Mountain stays wild & tree-free!)
   const trunkGeo = new THREE.CylinderGeometry(0.36, 0.58, 5.0, 7);
   const crownMainGeo = new THREE.DodecahedronGeometry(3.8, 1);
   const crownTopGeo = new THREE.DodecahedronGeometry(2.8, 1);
@@ -1735,14 +1777,14 @@ function buildIsleOfManWorld(
   disposables.push(trunkGeo, crownMainGeo, crownTopGeo, oakTrunkMat, oakDeepMat, oakBrightMat);
 
   const valleyTrees: { x: number; y: number; z: number; s: number }[] = [];
-  const valleyStartIdx = Math.floor(spline.sampleCount * 0.048);
-  const valleyEndIdx = Math.floor(spline.sampleCount * 0.545);
-  for (let i = 0; i < 5200 && valleyTrees.length < 1050; i++) {
+  const valleyStartIdx = Math.floor(spline.sampleCount * 0.045);
+  const valleyEndIdx = Math.floor(spline.sampleCount * 0.582);
+  for (let i = 0; i < 7800 && valleyTrees.length < 1600; i++) {
     const sampleIdx = valleyStartIdx + Math.floor(rand() * (valleyEndIdx - valleyStartIdx));
     const sample = spline.samples[sampleIdx];
-    if (sample.pos.y > 68) continue; // Strictly lowland valleys (Braddan, Glen Helen, Kirk Michael, Sulby, Ramsey)
+    if (sample.pos.y > 90) continue; // Strictly lowland valleys (Braddan, Glen Helen, Kirk Michael, Sulby, Ramsey)
     const side = rand() > 0.5 ? 1 : -1;
-    const offset = spline.halfWidth + 10.5 + rand() * 82;
+    const offset = spline.halfWidth + 10.5 + rand() * 88;
     const tx = sample.pos.x + sample.flatRight.x * side * offset + (rand() - 0.5) * 18;
     const tz = sample.pos.z + sample.flatRight.z * side * offset + (rand() - 0.5) * 18;
     if (spline.minHorizontalDistanceToTrack(tx, tz) < spline.halfWidth + 11.0) continue;
@@ -1775,7 +1817,7 @@ function buildIsleOfManWorld(
   });
   group.add(vTrunkInst, vCrown1Inst, vCrown2Inst);
 
-  // 6. Classic Black-and-White Manx Coastal Lighthouses overlooking Ramsey Bay (t=0.556) & Douglas Head (t=0.960)!
+  // 6. Classic Black-and-White Manx Coastal Lighthouses (Peel West Coast, Ramsey Bay & Douglas Head!)
   const glassLampMat = new THREE.MeshBasicMaterial({
     color: new THREE.Color(0xfff4c2).multiplyScalar(2.4),
     toneMapped: false,
@@ -1793,14 +1835,15 @@ function buildIsleOfManWorld(
   const blackBandGeo = new THREE.CylinderGeometry(4.6, 5.2, 13, 18);
   const lanternGeo = new THREE.CylinderGeometry(3.0, 3.0, 5.4, 16);
   const roofGeo = new THREE.ConeGeometry(4.0, 5.6, 16);
-  const beamGeo = new THREE.ConeGeometry(18, 240, 18, 1, true);
-  beamGeo.translate(0, -120, 0);
+  const beamGeo = new THREE.ConeGeometry(18, 260, 18, 1, true);
+  beamGeo.translate(0, -130, 0);
   beamGeo.rotateX(Math.PI / 2);
   disposables.push(glassLampMat, beamMat, rockGeo, towerGeo, blackBandGeo, lanternGeo, roofGeo, beamGeo);
 
   for (const [lhT, lhOffset] of [
-    [0.556, -125],
-    [0.960, -155],
+    [0.335, -140],
+    [0.580, -135],
+    [0.975, -165],
   ] as const) {
     const f = spline.getFrameAtDistance(lhT * spline.totalLength);
     const lhPos = f.pos.clone().addScaledVector(f.flatRight, lhOffset);

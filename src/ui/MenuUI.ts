@@ -5,6 +5,7 @@ import { TrackSpline } from '../track/TrackSpline';
 export interface MenuCallbacks {
   onSelectCar: (index: number) => void;
   onSelectTrack: (index: number) => void;
+  onSelectLaps: (laps: number) => void;
   onStartRace: () => void;
   onToggleAudio: () => boolean;
   onToggleTouch: () => boolean;
@@ -34,9 +35,13 @@ export class MenuUI {
   private readonly tabTracksBtn = document.getElementById('tab-tracks')!;
   private readonly panelCars = document.getElementById('menu-panel-cars')!;
   private readonly panelTracks = document.getElementById('menu-panel-tracks')!;
+  private readonly lapButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('#lap-selector .lap-opt-btn')
+  );
 
   private selectedCar = 0;
   private selectedTrack = 0;
+  private selectedLaps = TRACK_CONFIGS[0].laps;
   private readonly trackSvgPaths: string[] = [];
   private readonly trackLengths: number[] = [];
 
@@ -55,7 +60,19 @@ export class MenuUI {
 
     this.renderCars();
     this.renderTracks();
+    this.syncLapButtons();
     this.updateSelectionReadout();
+
+    this.lapButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const laps = Number(btn.dataset.laps) || 1;
+        this.selectedLaps = laps;
+        this.syncLapButtons();
+        this.renderTracks();
+        this.updateSelectionReadout();
+        this.callbacks.onSelectLaps(laps);
+      });
+    });
 
     this.startBtn.addEventListener('click', () => this.callbacks.onStartRace());
     this.fullscreenBtn.addEventListener('click', () => this.callbacks.onToggleFullscreen());
@@ -202,9 +219,12 @@ export class MenuUI {
       `;
       btn.addEventListener('click', () => {
         this.selectedTrack = idx;
+        this.selectedLaps = TRACK_CONFIGS[idx].laps;
+        this.syncLapButtons();
         this.renderTracks();
         this.updateSelectionReadout();
         this.callbacks.onSelectTrack(idx);
+        this.callbacks.onSelectLaps(this.selectedLaps);
       });
       this.trackListEl.appendChild(btn);
     });
@@ -212,11 +232,11 @@ export class MenuUI {
     const tr = TRACK_CONFIGS[this.selectedTrack];
     const rawLen = this.trackLengths[this.selectedTrack];
     const lenLabel = rawLen >= 10000 ? `${(rawLen / 1000).toFixed(1)} km` : `${rawLen}m`;
-    const lapWord = tr.laps === 1 ? '1 LAP' : `${tr.laps} LAPS`;
+    const lapWord = this.selectedLaps === 1 ? '1 LAP' : `${this.selectedLaps} LAPS`;
     this.trackInfoEl.innerHTML = `
       <div>${tr.description}</div>
       <div class="track-meta-pills">
-        <span class="meta-pill">长度 ${lenLabel}</span>
+        <span class="meta-pill">单圈 ${lenLabel}</span>
         <span class="meta-pill">${lapWord}</span>
         <span class="meta-pill">${tr.boostPads.length} 加速带</span>
         <span class="meta-pill">${tr.jumpRamps.length} 飞跃跳台</span>
@@ -225,18 +245,26 @@ export class MenuUI {
     `;
   }
 
+  private syncLapButtons(): void {
+    this.lapButtons.forEach((btn) => {
+      const laps = Number(btn.dataset.laps);
+      btn.classList.toggle('active', laps === this.selectedLaps);
+    });
+  }
+
   private updateSelectionReadout(): void {
     const car = CAR_SPECS[this.selectedCar];
     const track = TRACK_CONFIGS[this.selectedTrack];
     const rawLen = this.trackLengths[this.selectedTrack];
-    const lapWord = track.laps === 1 ? '1 LAP' : `${track.laps} LAPS`;
+    const totalKm = ((rawLen * this.selectedLaps) / 1000).toFixed(1);
+    const lapWord = this.selectedLaps === 1 ? '1 LAP' : `${this.selectedLaps} LAPS`;
     this.showcaseCarName.textContent = `${car.name} ${car.subtitle}`;
     this.showcaseTrackName.textContent = `${track.nameZh} // ${track.name}`;
     this.launchSubEl.textContent =
       track.id === 'isle-of-man'
-        ? `${lapWord} · 6 RACERS · ${(rawLen / 1000).toFixed(1)}KM ISLE OF MAN TT`
+        ? `${lapWord} · 总长 ${totalKm}KM · ISLE OF MAN TT`
         : rawLen >= 10000
-          ? `${lapWord} · 6 RACERS · ${(rawLen / 1000).toFixed(1)}KM GRAND ISLAND`
+          ? `${lapWord} · 总长 ${totalKm}KM · GRAND ISLAND`
           : `${lapWord} · 6 RACERS · DRIFT TO BOOST`;
   }
 }
