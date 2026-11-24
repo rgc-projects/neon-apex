@@ -11,6 +11,7 @@ export interface MenuCallbacks {
   onToggleTouch: () => boolean;
   onToggleFullscreen: () => void;
   onToggleDriftNitro: () => boolean;
+  onToggleOverdrive: () => boolean;
   onToggleHyperNitro: () => boolean;
 }
 
@@ -28,6 +29,8 @@ export class MenuUI {
   private readonly touchBtn = document.getElementById('btn-menu-touch')!;
   private readonly driftNitroBtn = document.getElementById('btn-menu-drift-nitro')!;
   private readonly driftNitroStateEl = document.getElementById('drift-nitro-state')!;
+  private readonly overdriveBtn = document.getElementById('btn-menu-overdrive')!;
+  private readonly overdriveStateEl = document.getElementById('overdrive-state')!;
   private readonly hyperNitroBtn = document.getElementById('btn-menu-hyper-nitro')!;
   private readonly hyperNitroStateEl = document.getElementById('hyper-nitro-state')!;
   private readonly controlsBtn = document.getElementById('btn-menu-controls')!;
@@ -91,6 +94,10 @@ export class MenuUI {
       const on = this.callbacks.onToggleDriftNitro();
       this.setDriftNitroEnabled(on);
     });
+    this.overdriveBtn.addEventListener('click', () => {
+      const on = this.callbacks.onToggleOverdrive();
+      this.setOverdriveEnabled(on);
+    });
     this.hyperNitroBtn.addEventListener('click', () => {
       const on = this.callbacks.onToggleHyperNitro();
       this.setHyperNitroEnabled(on);
@@ -149,13 +156,19 @@ export class MenuUI {
   public setDriftNitroEnabled(enabled: boolean): void {
     this.driftNitroBtn.classList.toggle('active', enabled);
     this.driftNitroBtn.setAttribute('aria-checked', String(enabled));
-    this.driftNitroStateEl.textContent = enabled ? '开 · 允许同喷' : '关 · 漂移禁氮';
+    this.driftNitroStateEl.textContent = enabled ? '开' : '关';
+  }
+
+  public setOverdriveEnabled(enabled: boolean): void {
+    this.overdriveBtn.classList.toggle('active', enabled);
+    this.overdriveBtn.setAttribute('aria-checked', String(enabled));
+    this.overdriveStateEl.textContent = enabled ? '开' : '关';
   }
 
   public setHyperNitroEnabled(enabled: boolean): void {
     this.hyperNitroBtn.classList.toggle('active', enabled);
     this.hyperNitroBtn.setAttribute('aria-checked', String(enabled));
-    this.hyperNitroStateEl.textContent = enabled ? '开 · 长直道满氮' : '关 · 常规氮气';
+    this.hyperNitroStateEl.textContent = enabled ? '开' : '关';
   }
 
   private renderCars(): void {

@@ -77,9 +77,21 @@
               aria-checked="false"
               title="默认关闭：漂移时禁止同时使用氮气；开启后可漂移与氮气同时触发"
             >
-              <span class="dnt-label">🔥 漂移同步喷气</span>
+              <span class="dnt-label">🔥 漂移同喷</span>
               <span class="dnt-track"><span class="dnt-thumb"></span></span>
-              <span id="drift-nitro-state" class="dnt-state">关 · 漂移禁氮</span>
+              <span id="drift-nitro-state" class="dnt-state">关</span>
+            </button>
+            <button
+              id="btn-menu-overdrive"
+              class="drift-nitro-toggle overdrive-toggle"
+              type="button"
+              role="switch"
+              aria-checked="false"
+              title="仅极境环岛与曼岛生效：默认关闭（原版极速）；开启后直道持续满油将自动触发二阶超频提速与出弯零掉速惯性接力"
+            >
+              <span class="dnt-label">🚀 环岛超频</span>
+              <span class="dnt-track"><span class="dnt-thumb"></span></span>
+              <span id="overdrive-state" class="dnt-state">关</span>
             </button>
             <button
               id="btn-menu-hyper-nitro"
@@ -89,9 +101,9 @@
               aria-checked="false"
               title="仅极境环岛与曼岛超长直道生效：默认关闭（常规氮气）；开启后进入超长直道自动锁定无限氮气"
             >
-              <span class="dnt-label">⚡ 环岛直道满氮</span>
+              <span class="dnt-label">⚡ 环岛满氮</span>
               <span class="dnt-track"><span class="dnt-thumb"></span></span>
-              <span id="hyper-nitro-state" class="dnt-state">关 · 常规氮气</span>
+              <span id="hyper-nitro-state" class="dnt-state">关</span>
             </button>
             <div id="lap-selector" class="lap-selector" role="group" aria-label="选择圈数">
               <span class="lap-sel-label">🏁 圈数</span>
@@ -334,6 +346,7 @@
         <div class="pause-actions">
           <button id="btn-resume" class="cyber-btn primary">RESUME // 继续比赛</button>
           <button id="btn-pause-drift-nitro" class="cyber-btn">🔥 漂移同步喷气：关（漂移禁氮）</button>
+          <button id="btn-pause-overdrive" class="cyber-btn">🚀 环岛直道超频：关（原版极速）</button>
           <button id="btn-pause-hyper-nitro" class="cyber-btn">⚡ 环岛直道满氮：关（常规氮气）</button>
           <button id="btn-pause-restart" class="cyber-btn">RESTART // 重新开赛</button>
           <button id="btn-pause-menu" class="cyber-btn ghost">MAIN MENU // 返回主菜单</button>

@@ -628,6 +628,20 @@ body,
   color: var(--green);
 }
 
+.drift-nitro-toggle.overdrive-toggle.active {
+  border-color: rgba(45, 212, 191, 0.85);
+  background: linear-gradient(110deg, rgba(4, 38, 48, 0.88), rgba(6, 56, 62, 0.84));
+  box-shadow: 0 0 18px rgba(45, 212, 191, 0.28);
+}
+
+.drift-nitro-toggle.overdrive-toggle.active .dnt-track {
+  background: linear-gradient(90deg, #06b6d4, #2dd4bf);
+}
+
+.drift-nitro-toggle.overdrive-toggle.active .dnt-state {
+  color: #5eead4;
+}
+
 .drift-nitro-toggle.hyper-toggle.active {
   border-color: rgba(250, 204, 21, 0.85);
   background: linear-gradient(110deg, rgba(6, 40, 56, 0.88), rgba(58, 34, 6, 0.84));

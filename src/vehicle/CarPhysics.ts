@@ -68,6 +68,7 @@ export class RacerPhysics {
   public isNitroActive = false;
   public isSuperNitro = false;
   public allowDriftNitro = false; // Default OFF: simultaneous Nitro is disabled while drifting
+  public enableStraightOverdrive = false; // Default OFF: optional 2-stage auto-overdrive & momentum lock on mega island straights
   public enableHyperNitro = false; // Default OFF: optional infinite-nitro corridors on mega island straightaways
   public boostPadTimer = 0;
   private boostPadCooldown = 0;
@@ -468,9 +469,12 @@ export class RacerPhysics {
       else this.driftTier = 0;
     }
 
-    // 4.4. Open-Road Mega Island Circuit (Apex Island & Isle of Man) Hyper Straight Infinite-Nitro Zone & Straightaway Overdrive
-    // Standard tracks & dedicated hairpin drift touges (Nujiang 72, Aurora Fjord) stay 100% pure classic drift & manual nitro!
+    // 4.4. Open-Road Mega Island Circuit (Apex Island & Isle of Man) — TWO INDEPENDENT OPT-IN SWITCHES (both default OFF!):
+    // - `enableHyperNitro`: infinite 100% Nitro inside strict arrow-straight corridors (Sulby / Mountain Mile / Apex Bridge)
+    // - `enableStraightOverdrive`: 2-stage automatic DRS/Hyper speed boost + zero-drop momentum handoff on clean straights
+    // When BOTH are OFF, mega island circuits behave with 100% pure classic speed caps & manual Nitro!
     const isMegaCircuit = spline.config.theme === 'island' || spline.config.theme === 'manx';
+    const overdriveAllowed = isMegaCircuit && this.enableStraightOverdrive;
     const hz =
       isMegaCircuit && this.enableHyperNitro && this.totalProgress > 18
         ? spline.getHyperZoneAt(this.s)
@@ -500,13 +504,13 @@ export class RacerPhysics {
       !this.isWrongWay &&
       this.wallCooldown <= 0;
     const cleanStraightRun =
-      isMegaCircuit &&
+      overdriveAllowed &&
       fullThrottleClean &&
       this.speed > baseMax * 0.72 &&
       Math.abs(effCurv) < 0.0068 &&
       steeringCalm;
 
-    if (!isMegaCircuit) {
+    if (!overdriveAllowed) {
       this.straightOverdriveTimer = 0;
       this.overdriveStage = 0;
       this.momentumFloor = 0;
@@ -540,7 +544,7 @@ export class RacerPhysics {
       this.straightOverdriveTimer = Math.max(0, this.straightOverdriveTimer - dt * 0.85);
     }
 
-    this.overdriveStage = isMegaCircuit
+    this.overdriveStage = overdriveAllowed
       ? this.straightOverdriveTimer >= 5.2
         ? 2
         : this.straightOverdriveTimer >= 2.0
@@ -634,9 +638,9 @@ export class RacerPhysics {
       boostAccelAdd += 20 * this.slipstreamLevel;
     }
 
-    // Zero-Drop Momentum Lock (Mega Island circuits only — standard circuits keep classic speed-cap decay!)
+    // Zero-Drop Momentum Lock (active only when Straightaway Overdrive switch is ON!)
     const cruiseCap = baseMax + (this.overdriveStage === 2 ? 29.0 : this.overdriveStage === 1 ? 14.5 : 0);
-    if (!isMegaCircuit || !fullThrottleClean) {
+    if (!overdriveAllowed || !fullThrottleClean) {
       this.momentumFloor = 0;
     } else if (this.isNitroActive || this.miniBoostTimer > 0 || this.boostPadTimer > 0 || this.inHyperZone) {
       this.momentumFloor = Math.max(this.momentumFloor, Math.min(this.speed, baseMax + 37));
@@ -647,7 +651,9 @@ export class RacerPhysics {
     }
 
     // Real slip-angle tire scrub reduced dramatically by steep inward banking!
-    let effectiveMaxSpeed = isMegaCircuit ? Math.max(baseMax + boostMaxAdd, this.momentumFloor) : baseMax + boostMaxAdd;
+    let effectiveMaxSpeed = overdriveAllowed
+      ? Math.max(baseMax + boostMaxAdd, this.momentumFloor)
+      : baseMax + boostMaxAdd;
     if (this.isDrifting) {
       const flatCornerCap = lerp(baseMax * 0.92, baseMax * 0.62, cornerSharpness);
       const bankedCornerCap = lerp(baseMax * 0.97, baseMax * 0.87, cornerSharpness);
@@ -666,11 +672,11 @@ export class RacerPhysics {
         if (this.speed < effectiveMaxSpeed) {
           this.speed = Math.min(effectiveMaxSpeed, this.speed + Math.max(4, accel) * dt);
         } else {
-          // Ultra-low aerodynamic coasting drag on mega-circuit full-throttle straights; classic 2.2 on standard tracks!
+          // Ultra-low aerodynamic coasting drag when Overdrive is enabled; classic 2.2 otherwise!
           const scrubLambda =
             this.isDrifting && cornerSharpness > 0.2
               ? 4.4 - clamp(bankNorm, 0, 1) * 1.6
-              : isMegaCircuit && fullThrottleClean
+              : overdriveAllowed && fullThrottleClean
                 ? 0.35
                 : 2.2;
           this.speed = damp(this.speed, effectiveMaxSpeed, scrubLambda, dt);

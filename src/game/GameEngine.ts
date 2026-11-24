@@ -43,6 +43,7 @@ export class GameEngine {
   private readonly touchControls: TouchControls;
   private readonly pauseOverlay = document.getElementById('pause-overlay')!;
   private readonly pauseDriftNitroBtn = document.getElementById('btn-pause-drift-nitro')!;
+  private readonly pauseOverdriveBtn = document.getElementById('btn-pause-overdrive')!;
   private readonly pauseHyperNitroBtn = document.getElementById('btn-pause-hyper-nitro')!;
 
   private state: GameState = 'MENU';
@@ -50,6 +51,7 @@ export class GameEngine {
   private selectedTrackIndex = 0;
   private selectedLaps = TRACK_CONFIGS[0].laps;
   private allowDriftNitro = false; // Default OFF: Nitro is disabled while actively drifting
+  private enableStraightOverdrive = false; // Default OFF: opt-in straightaway 2-stage overdrive on mega islands
   private enableHyperNitro = false; // Default OFF: opt-in infinite nitro on mega island straightaways
 
   // Active Track World Objects
@@ -192,12 +194,14 @@ export class GameEngine {
     });
     this.cameraController.setMobileMode(this.touchControls.enabled);
 
-    // Restore saved preferences (both default to false!)
+    // Restore saved preferences (all 3 default to false!)
     try {
       this.allowDriftNitro = localStorage.getItem('neon_apex_allow_drift_nitro') === 'true';
+      this.enableStraightOverdrive = localStorage.getItem('neon_apex_enable_straight_overdrive') === 'true';
       this.enableHyperNitro = localStorage.getItem('neon_apex_enable_hyper_nitro') === 'true';
     } catch {
       this.allowDriftNitro = false;
+      this.enableStraightOverdrive = false;
       this.enableHyperNitro = false;
     }
 
@@ -241,6 +245,10 @@ export class GameEngine {
         this.audio.unlock();
         return this.toggleDriftNitro();
       },
+      onToggleOverdrive: () => {
+        this.audio.unlock();
+        return this.toggleStraightOverdrive();
+      },
       onToggleHyperNitro: () => {
         this.audio.unlock();
         return this.toggleHyperNitro();
@@ -249,8 +257,10 @@ export class GameEngine {
     this.menuUI.setTouchEnabled(this.touchControls.enabled);
     this.menuUI.setFullscreen(this.touchControls.isFullscreen());
     this.menuUI.setDriftNitroEnabled(this.allowDriftNitro);
+    this.menuUI.setOverdriveEnabled(this.enableStraightOverdrive);
     this.menuUI.setHyperNitroEnabled(this.enableHyperNitro);
     this.syncPauseDriftNitroLabel();
+    this.syncPauseOverdriveLabel();
     this.syncPauseHyperNitroLabel();
     this.hud.setTouchLabel(this.touchControls.enabled);
     this.hud.setHyperZonesVisible(this.enableHyperNitro);
@@ -295,6 +305,11 @@ export class GameEngine {
       this.audio.unlock();
       const enabled = this.toggleDriftNitro();
       this.menuUI.setDriftNitroEnabled(enabled);
+    });
+    this.pauseOverdriveBtn.addEventListener('click', () => {
+      this.audio.unlock();
+      const enabled = this.toggleStraightOverdrive();
+      this.menuUI.setOverdriveEnabled(enabled);
     });
     this.pauseHyperNitroBtn.addEventListener('click', () => {
       this.audio.unlock();
@@ -563,6 +578,7 @@ export class GameEngine {
           totalLaps: raceLaps,
         });
         racer.allowDriftNitro = this.allowDriftNitro;
+        racer.enableStraightOverdrive = this.enableStraightOverdrive;
         racer.enableHyperNitro = this.enableHyperNitro;
         racer.placeOnGrid(this.spline, gridIdx);
         this.racers.push(racer);
@@ -582,6 +598,7 @@ export class GameEngine {
           totalLaps: raceLaps,
         });
         racer.allowDriftNitro = this.allowDriftNitro;
+        racer.enableStraightOverdrive = this.enableStraightOverdrive;
         racer.enableHyperNitro = this.enableHyperNitro;
         racer.placeOnGrid(this.spline, gridIdx);
         this.racers.push(racer);
@@ -629,6 +646,37 @@ export class GameEngine {
       );
     }
     return this.allowDriftNitro;
+  }
+
+  private syncPauseOverdriveLabel(): void {
+    this.pauseOverdriveBtn.textContent = this.enableStraightOverdrive
+      ? '🚀 环岛直道超频：开（自动超频）'
+      : '🚀 环岛直道超频：关（原版极速）';
+    this.pauseOverdriveBtn.style.borderColor = this.enableStraightOverdrive ? '#2dd4bf' : '';
+  }
+
+  private toggleStraightOverdrive(): boolean {
+    this.enableStraightOverdrive = !this.enableStraightOverdrive;
+    try {
+      localStorage.setItem('neon_apex_enable_straight_overdrive', String(this.enableStraightOverdrive));
+    } catch {
+      // Ignore storage failures
+    }
+    for (const r of this.racers) {
+      r.enableStraightOverdrive = this.enableStraightOverdrive;
+      if (!this.enableStraightOverdrive) {
+        r.straightOverdriveTimer = 0;
+        r.overdriveStage = 0;
+      }
+    }
+    this.syncPauseOverdriveLabel();
+    if (this.state === 'RACING' || this.state === 'PAUSED') {
+      this.hud.pushCallout(
+        this.enableStraightOverdrive ? '🚀 环岛直道超频：已开启' : '🔒 环岛直道超频：已关闭',
+        this.enableStraightOverdrive ? 'green' : 'cyan'
+      );
+    }
+    return this.enableStraightOverdrive;
   }
 
   private syncPauseHyperNitroLabel(): void {
