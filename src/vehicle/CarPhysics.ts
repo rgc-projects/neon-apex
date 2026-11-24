@@ -467,8 +467,10 @@ export class RacerPhysics {
       else this.driftTier = 0;
     }
 
-    // 4.4. Auto-Detected Hyper Straight Infinite-Nitro Zone + Zero-Drop Overdrive Ignition
-    const hz = this.totalProgress > 18 ? spline.getHyperZoneAt(this.s) : null;
+    // 4.4. Mega Island Circuit (>= 8 km) Hyper Straight Infinite-Nitro Zone & Straightaway Overdrive
+    // Standard 3–4.2 km circuits stay 100% classic original nitro & speed-cap gameplay!
+    const isMegaCircuit = spline.totalLength >= 8000;
+    const hz = isMegaCircuit && this.totalProgress > 18 ? spline.getHyperZoneAt(this.s) : null;
     this.inHyperZone = hz !== null;
     if (hz) {
       this.hyperZoneRemaining = hz.remainingMeters;
@@ -494,12 +496,17 @@ export class RacerPhysics {
       !this.isWrongWay &&
       this.wallCooldown <= 0;
     const cleanStraightRun =
+      isMegaCircuit &&
       fullThrottleClean &&
       this.speed > baseMax * 0.72 &&
       Math.abs(effCurv) < 0.0068 &&
       steeringCalm;
 
-    if (cleanStraightRun) {
+    if (!isMegaCircuit) {
+      this.straightOverdriveTimer = 0;
+      this.overdriveStage = 0;
+      this.momentumFloor = 0;
+    } else if (cleanStraightRun) {
       if (!this.isAirborne) {
         // Nitro / Drift Boost / Hyper Zone rapidly ignite Stage 2 Overdrive so boost handoff has ZERO speed dip!
         const boostIgniting = this.isNitroActive || this.miniBoostTimer > 0 || this.boostPadTimer > 0;
@@ -529,8 +536,13 @@ export class RacerPhysics {
       this.straightOverdriveTimer = Math.max(0, this.straightOverdriveTimer - dt * 0.85);
     }
 
-    this.overdriveStage =
-      this.straightOverdriveTimer >= 5.2 ? 2 : this.straightOverdriveTimer >= 2.0 ? 1 : 0;
+    this.overdriveStage = isMegaCircuit
+      ? this.straightOverdriveTimer >= 5.2
+        ? 2
+        : this.straightOverdriveTimer >= 2.0
+          ? 1
+          : 0
+      : 0;
     if (this.overdriveStage > prevOverdriveStage && this.overdriveStage >= 1 && !this.inHyperZone) {
       events?.onOverdriveStage?.(this.overdriveStage as 1 | 2);
     }
@@ -618,10 +630,9 @@ export class RacerPhysics {
       boostAccelAdd += 20 * this.slipstreamLevel;
     }
 
-    // Zero-Drop Momentum Lock: once Nitro/Boost rockets you up on a full-throttle straight,
-    // preserve earned velocity seamlessly into Overdrive cruise instead of snapping down to low speed!
+    // Zero-Drop Momentum Lock (Mega Island circuits only — standard circuits keep classic speed-cap decay!)
     const cruiseCap = baseMax + (this.overdriveStage === 2 ? 29.0 : this.overdriveStage === 1 ? 14.5 : 0);
-    if (!fullThrottleClean) {
+    if (!isMegaCircuit || !fullThrottleClean) {
       this.momentumFloor = 0;
     } else if (this.isNitroActive || this.miniBoostTimer > 0 || this.boostPadTimer > 0 || this.inHyperZone) {
       this.momentumFloor = Math.max(this.momentumFloor, Math.min(this.speed, baseMax + 37));
@@ -632,7 +643,7 @@ export class RacerPhysics {
     }
 
     // Real slip-angle tire scrub reduced dramatically by steep inward banking!
-    let effectiveMaxSpeed = Math.max(baseMax + boostMaxAdd, this.momentumFloor);
+    let effectiveMaxSpeed = isMegaCircuit ? Math.max(baseMax + boostMaxAdd, this.momentumFloor) : baseMax + boostMaxAdd;
     if (this.isDrifting) {
       const flatCornerCap = lerp(baseMax * 0.92, baseMax * 0.62, cornerSharpness);
       const bankedCornerCap = lerp(baseMax * 0.97, baseMax * 0.87, cornerSharpness);
@@ -651,13 +662,13 @@ export class RacerPhysics {
         if (this.speed < effectiveMaxSpeed) {
           this.speed = Math.min(effectiveMaxSpeed, this.speed + Math.max(4, accel) * dt);
         } else {
-          // Ultra-low aerodynamic coasting drag on full-throttle straights eliminates abrupt deceleration cliffs after Nitro ends!
+          // Ultra-low aerodynamic coasting drag on mega-circuit full-throttle straights; classic 2.2 on standard tracks!
           const scrubLambda =
             this.isDrifting && cornerSharpness > 0.2
               ? 4.4 - clamp(bankNorm, 0, 1) * 1.6
-              : fullThrottleClean
+              : isMegaCircuit && fullThrottleClean
                 ? 0.35
-                : 2.0;
+                : 2.2;
           this.speed = damp(this.speed, effectiveMaxSpeed, scrubLambda, dt);
         }
       } else {

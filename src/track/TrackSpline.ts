@@ -216,15 +216,21 @@ export class TrackSpline {
   }
 
   private detectHyperZones(): void {
+    // Only enable Hyper Straight infinite-nitro corridors on mega island circuits (>= 8 km);
+    // all standard 3–4.2 km circuits remain 100% classic original gameplay!
+    if (this.totalLength < 8000) return;
+
     const N = this.sampleCount;
     const ds = this.totalLength / N;
-    const maxCurv = 0.0038;
-    const bridgeMaxCurv = 0.0046;
-    const maxBridgeSteps = Math.max(1, Math.round(65 / ds));
-    const minRawLength = 740;
-    const trimEntry = 22;
-    const trimExit = 95;
-    const minEffectiveLength = 620;
+    const isUltraMega = this.totalLength >= 25000;
+    // Strict ruler-straight curvature thresholds so sweeping curves stay classic normal-nitro driving!
+    const maxCurv = isUltraMega ? 0.0009 : 0.0018;
+    const bridgeMaxCurv = isUltraMega ? 0.0014 : 0.0023;
+    const maxBridgeSteps = Math.max(1, Math.round((isUltraMega ? 25 : 22) / ds));
+    const minRawLength = isUltraMega ? 1800 : 760;
+    const trimEntry = isUltraMega ? 45 : 35;
+    const trimExit = isUltraMega ? 120 : 110;
+    const minEffectiveLength = isUltraMega ? 1620 : 600;
 
     // 13-sample smoothed curvature avoids single-sample jitter when scanning straight corridors
     const sm = new Float32Array(N);
