@@ -7,6 +7,7 @@ import {
   createCurbTexture,
   createDistanceBoardTexture,
   createHighwaySignTexture,
+  createHyperZoneGateTexture,
   createRampTexture,
   createRoadPBRTextures,
   createStartFinishTexture,
@@ -777,6 +778,112 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   studInst.count = stIdx;
   group.add(studInst);
 
+  // 9. Auto-Detected Hyper Straight Infinite-Nitro Zone Entry/Exit Portals + Luminous Corridor Strips
+  let hyperStripMat: THREE.MeshBasicMaterial | null = null;
+  if (spline.hyperZones.length > 0) {
+    const entryBannerTex = createHyperZoneGateTexture(true);
+    const exitBannerTex = createHyperZoneGateTexture(false);
+    const entryBannerMat = new THREE.MeshBasicMaterial({ map: entryBannerTex, toneMapped: false });
+    const exitBannerMat = new THREE.MeshBasicMaterial({ map: exitBannerTex, toneMapped: false });
+    const entryNeonMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, toneMapped: false });
+    const exitNeonMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, toneMapped: false });
+    const gatePillarGeo = new THREE.BoxGeometry(0.65, 11.4, 0.85);
+    const gateTrimGeo = new THREE.BoxGeometry(0.26, 11.0, 0.28);
+    const gateArchGeo = new THREE.BoxGeometry(cfg.roadWidth + 2.8, 0.55, 0.65);
+    const gateBannerGeo = new THREE.BoxGeometry(15.2, 3.6, 0.24);
+    disposables.push(
+      entryBannerTex,
+      exitBannerTex,
+      entryBannerMat,
+      exitBannerMat,
+      entryNeonMat,
+      exitNeonMat,
+      gatePillarGeo,
+      gateTrimGeo,
+      gateArchGeo,
+      gateBannerGeo
+    );
+
+    const placeHyperPortal = (sPos: number, isEntry: boolean) => {
+      // Avoid clipping with the Start/Finish F1 truss gantry near s = 0
+      const distToStart = Math.min(sPos, spline.totalLength - sPos);
+      if (distToStart < 45) return;
+      const tPos = sPos / spline.totalLength;
+      if (spline.isInTunnel(tPos)) return;
+
+      const f = spline.getFrameAtDistance(sPos);
+      const portal = new THREE.Group();
+      portal.position.copy(f.pos);
+      basisMat.makeBasis(f.right, f.up, f.tangent.clone().negate());
+      portal.quaternion.setFromRotationMatrix(basisMat);
+
+      const neonMat = isEntry ? entryNeonMat : exitNeonMat;
+      const bannerMat = isEntry ? entryBannerMat : exitBannerMat;
+
+      for (const side of [-1, 1] as const) {
+        const p = new THREE.Mesh(gatePillarGeo, trussMat);
+        p.position.set(side * (halfW + 0.95), 5.7, 0);
+        const strip = new THREE.Mesh(gateTrimGeo, neonMat);
+        strip.position.set(side * (halfW + 0.58), 5.7, 0.35);
+        portal.add(p, strip);
+      }
+
+      const topArch = new THREE.Mesh(gateArchGeo, neonMat);
+      topArch.position.set(0, 11.4, 0);
+      const banner = new THREE.Mesh(gateBannerGeo, bannerMat);
+      banner.position.set(0, 10.1, 0.32);
+      portal.add(topArch, banner);
+      group.add(portal);
+    };
+
+    // Build single merged glowing roadside strip mesh across ALL Hyper Straight Zones (1 draw call!)
+    const hzStripPos: number[] = [];
+    const hzStripIdx: number[] = [];
+    let hzVertBase = 0;
+
+    for (const z of spline.hyperZones) {
+      placeHyperPortal(z.sStart, true);
+      placeHyperPortal(z.sEnd, false);
+
+      const segStep = Math.max(12, Math.min(28, z.length / 40));
+      const segs = Math.max(8, Math.ceil(z.length / segStep));
+      for (const side of [-1, 1] as const) {
+        const innerD = side * (halfW - 0.85);
+        const outerD = side * (halfW - 0.32);
+        for (let i = 0; i <= segs; i++) {
+          const sCur = z.sStart + (i / segs) * z.length;
+          const f = spline.getFrameAtDistance(sCur);
+          const pA = f.pos.clone().addScaledVector(f.right, innerD).addScaledVector(f.up, 0.09);
+          const pB = f.pos.clone().addScaledVector(f.right, outerD).addScaledVector(f.up, 0.09);
+          hzStripPos.push(pA.x, pA.y, pA.z, pB.x, pB.y, pB.z);
+          if (i < segs) {
+            const a = hzVertBase + i * 2;
+            hzStripIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+          }
+        }
+        hzVertBase += (segs + 1) * 2;
+      }
+    }
+
+    if (hzStripIdx.length > 0) {
+      const hzGeo = new THREE.BufferGeometry();
+      hzGeo.setAttribute('position', new THREE.Float32BufferAttribute(hzStripPos, 3));
+      hzGeo.setIndex(hzStripIdx);
+      hyperStripMat = new THREE.MeshBasicMaterial({
+        color: 0x00f2ff,
+        transparent: true,
+        opacity: 0.78,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        toneMapped: false,
+      });
+      group.add(new THREE.Mesh(hzGeo, hyperStripMat));
+      disposables.push(hzGeo, hyperStripMat);
+    }
+  }
+
   const setCountdownState = (stage: number) => {
     for (let i = 0; i < 4; i++) {
       const mat = countdownLights[i];
@@ -800,8 +907,11 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     group,
     boostTexture,
     countdownLights,
-    update: (dt: number) => {
+    update: (dt: number, elapsed = 0) => {
       boostTexture.offset.y -= dt * 2.0;
+      if (hyperStripMat) {
+        hyperStripMat.opacity = 0.62 + 0.24 * Math.sin(elapsed * 5.2);
+      }
     },
     setCountdownState,
     dispose: () => {

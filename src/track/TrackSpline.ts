@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BoostPadDef, JumpRampDef, TrackConfig } from '../types';
+import { BoostPadDef, HyperStraightZone, HyperZoneStatus, JumpRampDef, TrackConfig } from '../types';
 import { clamp, lerp, smoothstep, wrapDistance, WORLD_UP } from '../utils/math';
 
 export interface SplineSample {
@@ -29,6 +29,7 @@ export class TrackSpline {
   public readonly roadWidth: number;
   public readonly halfWidth: number;
   public readonly sampleCount: number;
+  public readonly hyperZones: HyperStraightZone[] = [];
 
   private readonly _tmpA = new THREE.Vector3();
   private spatialHash: Map<number, number[]> | null = null;
@@ -209,6 +210,128 @@ export class TrackSpline {
         curvature: rawCurv[i],
       });
     }
+
+    // 6. Auto-detect long straightaway "Hyper Straight" infinite-nitro corridors geometrically
+    this.detectHyperZones();
+  }
+
+  private detectHyperZones(): void {
+    const N = this.sampleCount;
+    const ds = this.totalLength / N;
+    const maxCurv = 0.0038;
+    const bridgeMaxCurv = 0.0046;
+    const maxBridgeSteps = Math.max(1, Math.round(65 / ds));
+    const minRawLength = 740;
+    const trimEntry = 22;
+    const trimExit = 95;
+    const minEffectiveLength = 620;
+
+    // 13-sample smoothed curvature avoids single-sample jitter when scanning straight corridors
+    const sm = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      let sum = 0;
+      for (let k = -6; k <= 6; k++) {
+        sum += this.samples[(i + k + N) % N].curvature;
+      }
+      sm[i] = sum / 13;
+    }
+
+    const isStraight = new Uint8Array(N);
+    for (let i = 0; i < N; i++) {
+      if (Math.abs(sm[i]) <= maxCurv) isStraight[i] = 1;
+    }
+
+    // Bridge brief gentle crests/kinks (<= 65m & |k| <= 0.0046) so iconic mega straights stay contiguous
+    let startZero = -1;
+    for (let i = 0; i < N; i++) {
+      if (!isStraight[i]) {
+        startZero = i;
+        break;
+      }
+    }
+    if (startZero >= 0) {
+      let gapStart = -1;
+      let gapOk = true;
+      for (let off = 0; off <= N; off++) {
+        const idx = (startZero + off) % N;
+        if (!isStraight[idx]) {
+          if (gapStart < 0) {
+            gapStart = off;
+            gapOk = true;
+          }
+          if (Math.abs(sm[idx]) > bridgeMaxCurv) gapOk = false;
+        } else if (gapStart >= 0) {
+          if (gapOk && off - gapStart <= maxBridgeSteps) {
+            for (let g = gapStart; g < off; g++) {
+              isStraight[(startZero + g) % N] = 1;
+            }
+          }
+          gapStart = -1;
+        }
+      }
+    }
+
+    let firstNon = -1;
+    for (let i = 0; i < N; i++) {
+      if (!isStraight[i]) {
+        firstNon = i;
+        break;
+      }
+    }
+    if (firstNon < 0) return;
+
+    let runStart = -1;
+    let nextId = 0;
+    for (let off = 0; off <= N; off++) {
+      const idx = (firstNon + off) % N;
+      if (isStraight[idx]) {
+        if (runStart < 0) runStart = off;
+      } else if (runStart >= 0) {
+        const rawLen = (off - runStart) * ds;
+        const effLen = rawLen - trimEntry - trimExit;
+        if (rawLen >= minRawLength && effLen >= minEffectiveLength) {
+          const sStart = wrapDistance(((firstNon + runStart) % N) * ds + trimEntry, this.totalLength);
+          const sEnd = wrapDistance(((firstNon + off) % N) * ds - trimExit, this.totalLength);
+          this.hyperZones.push({
+            id: nextId++,
+            sStart,
+            sEnd,
+            length: effLen,
+            wraps: sEnd < sStart,
+          });
+        }
+        runStart = -1;
+      }
+    }
+  }
+
+  public getHyperZoneAt(sRaw: number): HyperZoneStatus | null {
+    if (this.hyperZones.length === 0) return null;
+    const s = wrapDistance(sRaw, this.totalLength);
+    for (let i = 0; i < this.hyperZones.length; i++) {
+      const z = this.hyperZones[i];
+      const inside = z.wraps ? s >= z.sStart || s <= z.sEnd : s >= z.sStart && s <= z.sEnd;
+      if (inside) {
+        const traveled = z.wraps
+          ? s >= z.sStart
+            ? s - z.sStart
+            : this.totalLength - z.sStart + s
+          : s - z.sStart;
+        const remainingMeters = Math.max(0, z.length - traveled);
+        return {
+          active: true,
+          zoneId: z.id,
+          remainingMeters,
+          totalMeters: z.length,
+          progress: clamp(traveled / Math.max(z.length, 1), 0, 1),
+        };
+      }
+    }
+    return null;
+  }
+
+  public isInHyperZone(sRaw: number): boolean {
+    return this.getHyperZoneAt(sRaw) !== null;
   }
 
   public getFrameAtDistance(sRaw: number, out?: SplineSample): SplineSample {

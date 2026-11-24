@@ -95,10 +95,13 @@ export class AIDriver {
     // With corner-flow drift physics, AI smoothly glides through hairpins without harsh braking
     const needsEntryBrake = false;
 
-    // 6. Smart Nitro deployment on straightaways or chasing player
+    // 6. Smart Nitro deployment on straightaways, Hyper Straight Infinite Zones, or chasing player
     const straightAhead = Math.abs(fNear.curvature) < 0.004 && Math.abs(fMid.curvature) < 0.004 && Math.abs(fFar.curvature) < 0.0045;
+    const progressGap = self.totalProgress - player.totalProgress;
     let nitro = false;
-    if (self.isNitroActive && self.nitro > 14 && straightAhead) {
+    if (self.inHyperZone && straightAhead && self.speed > 55 && (progressGap < 120 || this.profile.aggression > 0.65)) {
+      nitro = true;
+    } else if (self.isNitroActive && self.nitro > 14 && straightAhead) {
       nitro = true;
     } else if (
       this.nitroCooldown <= 0 &&
@@ -111,7 +114,6 @@ export class AIDriver {
     }
 
     // 7. Gentle, Fun Rubber-Banding so races stay intense without ever feeling unfair!
-    const progressGap = self.totalProgress - player.totalProgress;
     let rubberBand = 0;
     if (!player.finished) {
       if (progressGap > 65) {

@@ -56,6 +56,7 @@ export class HUD {
     minZ: number;
     maxZ: number;
   } | null = null;
+  private minimapHyperSegments: { x: number; y: number }[][] = [];
   private trackAccent = '#00f2ff';
   private lastCalloutText = '';
   private lastCalloutAt = 0;
@@ -68,6 +69,21 @@ export class HUD {
     this.minimapOutline = spline.getMinimapOutline(6);
     this.trackAccent = spline.config.accentColorHex;
     this.trackLabelEl.textContent = spline.config.nameZh;
+
+    // Pre-project auto-detected Hyper Straight Infinite-Nitro corridors for zero-overhead minimap rendering
+    this.minimapHyperSegments = [];
+    if (this.minimapOutline && spline.hyperZones.length > 0) {
+      for (const z of spline.hyperZones) {
+        const segPts: { x: number; y: number }[] = [];
+        const steps = Math.max(8, Math.min(48, Math.ceil(z.length / 120)));
+        for (let i = 0; i <= steps; i++) {
+          const sCur = z.sStart + (i / steps) * z.length;
+          const f = spline.getFrameAtDistance(sCur);
+          segPts.push(spline.projectToMinimap(f.pos, this.minimapOutline));
+        }
+        this.minimapHyperSegments.push(segPts);
+      }
+    }
   }
 
   public setCameraLabel(mode: CameraMode): void {
@@ -149,27 +165,41 @@ export class HUD {
     const rpmDash = 280 * (1 - clamp(telemetry.rpmNorm, 0, 1));
     this.rpmArc.setAttribute('stroke-dashoffset', rpmDash.toFixed(1));
 
-    // Straightaway Auto-Escalating Overdrive Pill (Stage 1 DRS -> Stage 2 Hyper!)
-    if (telemetry.overdriveStage >= 1 && !telemetry.isDrifting) {
-      this.overdrivePill.classList.remove('hidden');
+    // Hyper Straight Infinite-Nitro Zone / Straightaway Auto-Escalating Overdrive Pill
+    if (telemetry.inHyperZone && !telemetry.nitroLockedByDrift) {
+      const rem = telemetry.hyperZoneRemaining;
+      const remTxt = rem >= 1000 ? `${(rem / 1000).toFixed(1)} KM` : `${rem}M`;
+      this.overdrivePill.classList.remove('hidden', 'stage2');
+      this.overdrivePill.classList.add('hyper-zone');
+      this.overdrivePill.textContent = `⚡ ∞ 无限氮气直道 · ${remTxt}`;
+    } else if (telemetry.overdriveStage >= 1 && !telemetry.isDrifting) {
+      this.overdrivePill.classList.remove('hidden', 'hyper-zone');
       this.overdrivePill.classList.toggle('stage2', telemetry.overdriveStage === 2);
       this.overdrivePill.textContent =
         telemetry.overdriveStage === 2 ? '⚡⚡ HYPER OVERDRIVE II' : '⚡ DRS OVERDRIVE I';
     } else {
       this.overdrivePill.classList.add('hidden');
-      this.overdrivePill.classList.remove('stage2');
+      this.overdrivePill.classList.remove('stage2', 'hyper-zone');
     }
 
     // Nitro Bar
     const nPct = clamp(telemetry.nitro, 0, 100);
-    this.nitroFill.style.width = `${nPct.toFixed(1)}%`;
+    const isInfZone = telemetry.inHyperZone && !telemetry.nitroLockedByDrift;
+    this.nitroFill.style.width = `${isInfZone ? 100 : nPct.toFixed(1)}%`;
     const isSuperState = telemetry.isSuperNitro || nPct >= 82;
-    this.nitroFill.classList.toggle('super', isSuperState);
+    this.nitroFill.classList.toggle('super', isSuperState && !isInfZone);
+    this.nitroFill.classList.toggle('infinite', isInfZone);
 
-    this.nitroStatus.classList.remove('ready', 'super', 'locked');
+    this.nitroStatus.classList.remove('ready', 'super', 'locked', 'infinite');
     if (telemetry.nitroLockedByDrift) {
       this.nitroStatus.textContent = '漂移禁用氮气';
       this.nitroStatus.classList.add('locked');
+    } else if (isInfZone && telemetry.isNitroActive) {
+      this.nitroStatus.textContent = '★ ∞ 无限氮气爆发!';
+      this.nitroStatus.classList.add('infinite');
+    } else if (isInfZone) {
+      this.nitroStatus.textContent = '∞ 无限 [SHIFT]';
+      this.nitroStatus.classList.add('infinite');
     } else if (telemetry.isSuperNitro) {
       this.nitroStatus.textContent = '★ SUPER NITRO!';
       this.nitroStatus.classList.add('super');
@@ -268,6 +298,27 @@ export class HUD {
     ctx.strokeStyle = this.trackAccent;
     ctx.lineWidth = 4;
     ctx.stroke();
+
+    // Highlight auto-detected Hyper Straight Infinite-Nitro corridors in electric cyan-gold!
+    if (this.minimapHyperSegments.length > 0) {
+      ctx.lineCap = 'round';
+      for (const seg of this.minimapHyperSegments) {
+        if (seg.length < 2) continue;
+        ctx.beginPath();
+        seg.forEach((p, idx) => {
+          const px = pad + p.x * drawW;
+          const py = pad + p.y * drawH;
+          if (idx === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.strokeStyle = 'rgba(0, 242, 255, 0.55)';
+        ctx.lineWidth = 7;
+        ctx.stroke();
+        ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 2.6;
+        ctx.stroke();
+      }
+    }
 
     // Start/Finish marker dot
     const sp = pts[0];

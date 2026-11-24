@@ -15,6 +15,7 @@ export interface PhysicsEvents {
   onRaceFinish?: (totalTime: number) => void;
   onNitroStart?: (isSuper: boolean) => void;
   onOverdriveStage?: (stage: 1 | 2) => void;
+  onHyperZoneEnter?: (lengthMeters: number) => void;
 }
 
 /**
@@ -70,9 +71,14 @@ export class RacerPhysics {
   public boostPadTimer = 0;
   private boostPadCooldown = 0;
 
-  // Global Straightaway Auto-Escalating Overdrive (Stage 1 DRS ~405 km/h -> Stage 2 Hyper ~460 km/h on long straights!)
+  // Global Straightaway Auto-Escalating Overdrive + Zero-Drop Momentum Handoff + Hyper Straight Infinite Nitro
   public straightOverdriveTimer = 0;
   public overdriveStage: 0 | 1 | 2 = 0;
+  public inHyperZone = false;
+  public hyperZoneRemaining = 0;
+  public hyperZoneTotal = 0;
+  private lastHyperZoneId = -1;
+  private momentumFloor = 0;
 
   // Slipstream & air states
   public slipstreamLevel = 0;
@@ -196,6 +202,11 @@ export class RacerPhysics {
     this.isSuperNitro = false;
     this.straightOverdriveTimer = 0;
     this.overdriveStage = 0;
+    this.inHyperZone = false;
+    this.hyperZoneRemaining = 0;
+    this.hyperZoneTotal = 0;
+    this.lastHyperZoneId = -1;
+    this.momentumFloor = 0;
     this.slipstreamLevel = 0;
     this.isSlipstreaming = false;
     this.isAirborne = false;
@@ -245,6 +256,11 @@ export class RacerPhysics {
     this.exitStraightenTimer = 0;
     this.straightOverdriveTimer = 0;
     this.overdriveStage = 0;
+    this.inHyperZone = false;
+    this.hyperZoneRemaining = 0;
+    this.hyperZoneTotal = 0;
+    this.lastHyperZoneId = -1;
+    this.momentumFloor = 0;
     this.isAirborne = false;
     this.currentAirTime = 0;
     this.isWrongWay = false;
@@ -451,40 +467,80 @@ export class RacerPhysics {
       else this.driftTier = 0;
     }
 
-    // 4.4. Straightaway Auto-Escalating Overdrive (Global across all maps: Stage 1 DRS @ 2.0s -> Stage 2 Hyper @ 5.2s!)
+    // 4.4. Auto-Detected Hyper Straight Infinite-Nitro Zone + Zero-Drop Overdrive Ignition
+    const hz = this.totalProgress > 18 ? spline.getHyperZoneAt(this.s) : null;
+    this.inHyperZone = hz !== null;
+    if (hz) {
+      this.hyperZoneRemaining = hz.remainingMeters;
+      this.hyperZoneTotal = hz.totalMeters;
+      if (hz.zoneId !== this.lastHyperZoneId) {
+        this.lastHyperZoneId = hz.zoneId;
+        events?.onHyperZoneEnter?.(hz.totalMeters);
+      }
+    } else {
+      this.hyperZoneRemaining = 0;
+      this.hyperZoneTotal = 0;
+      this.lastHyperZoneId = -1;
+    }
+
     const baseMax = this.spec.maxSpeed * paceScale;
     const prevOverdriveStage = this.overdriveStage;
-    const cleanStraightRun =
+    // Use smoothed steering + actual yaw angle so brief digital A/D lane corrections NEVER kill Overdrive!
+    const steeringCalm = Math.abs(this.steerSmooth) < 0.78 && Math.abs(this.yawOffset) < 0.22;
+    const fullThrottleClean =
       input.throttle &&
       !input.brake &&
       !this.isDrifting &&
-      !this.isAirborne &&
       !this.isWrongWay &&
-      this.wallCooldown <= 0 &&
-      this.speed > baseMax * 0.78 &&
-      Math.abs(effCurv) < 0.0052 &&
-      Math.abs(rawSteer) < 0.68;
+      this.wallCooldown <= 0;
+    const cleanStraightRun =
+      fullThrottleClean &&
+      this.speed > baseMax * 0.72 &&
+      Math.abs(effCurv) < 0.0068 &&
+      steeringCalm;
 
     if (cleanStraightRun) {
-      const chargeMult = this.isSlipstreaming ? 1.5 : 1.0;
-      this.straightOverdriveTimer = Math.min(6.0, this.straightOverdriveTimer + dt * chargeMult);
-    } else if (this.isDrifting || input.brake || !input.throttle || this.wallCooldown > 0 || this.isWrongWay) {
+      if (!this.isAirborne) {
+        // Nitro / Drift Boost / Hyper Zone rapidly ignite Stage 2 Overdrive so boost handoff has ZERO speed dip!
+        const boostIgniting = this.isNitroActive || this.miniBoostTimer > 0 || this.boostPadTimer > 0;
+        const chargeMult = this.inHyperZone
+          ? 2.8
+          : boostIgniting
+            ? 2.6
+            : this.isSlipstreaming
+              ? 1.5
+              : 1.0;
+        this.straightOverdriveTimer = Math.min(6.0, this.straightOverdriveTimer + dt * chargeMult);
+
+        // Velocity-assisted ignition: once Nitro/Boost already rockets you to Overdrive velocity on a straight, lock the stage in!
+        if (boostIgniting || this.inHyperZone) {
+          if (this.speed >= baseMax + 24) {
+            this.straightOverdriveTimer = Math.max(this.straightOverdriveTimer, 5.25);
+          } else if (this.speed >= baseMax + 11) {
+            this.straightOverdriveTimer = Math.max(this.straightOverdriveTimer, 2.15);
+          }
+        }
+      }
+    } else if (!fullThrottleClean) {
       this.straightOverdriveTimer = 0;
-    } else {
-      // Gentle decay on sweeping curves / airborne crests so brief jumps or mild lane weaves don't feel harsh
-      this.straightOverdriveTimer = Math.max(0, this.straightOverdriveTimer - dt * 2.4);
+      this.momentumFloor = 0;
+    } else if (!this.isAirborne) {
+      // Gentle decay on sweeping curves or quick lane weaves so momentum stays fluid
+      this.straightOverdriveTimer = Math.max(0, this.straightOverdriveTimer - dt * 0.85);
     }
 
     this.overdriveStage =
       this.straightOverdriveTimer >= 5.2 ? 2 : this.straightOverdriveTimer >= 2.0 ? 1 : 0;
-    if (this.overdriveStage > prevOverdriveStage && this.overdriveStage >= 1) {
+    if (this.overdriveStage > prevOverdriveStage && this.overdriveStage >= 1 && !this.inHyperZone) {
       events?.onOverdriveStage?.(this.overdriveStage as 1 | 2);
     }
 
-    // 4.5. Nitro & Boost Cutoff Logic (when `allowDriftNitro` is OFF, drifting cleanly shuts off ALL boosts & flames!)
+    // 4.5. Nitro, Hyper Zone Infinite Nitro & Drift Cutoff Logic
     const overdriveRegen = this.overdriveStage === 2 ? 9.2 : this.overdriveStage === 1 ? 6.2 : this.speed > 55 ? 2.0 : 0.4;
     const slipRegen = this.isSlipstreaming ? 13.5 : 0;
     const nitroBlockedByDrift = this.isDrifting && !this.allowDriftNitro;
+    const infiniteNitroActive = this.inHyperZone && !nitroBlockedByDrift && !this.isWrongWay;
+
     if (nitroBlockedByDrift) {
       this.isNitroActive = false;
       this.isSuperNitro = false;
@@ -493,8 +549,23 @@ export class RacerPhysics {
       this.boostPadTimer = 0;
       this.straightOverdriveTimer = 0;
       this.overdriveStage = 0;
+      this.momentumFloor = 0;
       const passive = (this.speed > 55 ? 1.8 : 0.4) + slipRegen;
       this.nitro = Math.min(100, this.nitro + passive * dt);
+    } else if (infiniteNitroActive) {
+      // Inside a Hyper Straight Zone: Nitro locks at 100% with ZERO drain!
+      this.nitro = 100;
+      if (input.nitro) {
+        if (!this.isNitroActive) {
+          this.isSuperNitro = true;
+          events?.onNitroStart?.(true);
+        }
+        this.isNitroActive = true;
+        this.isSuperNitro = true;
+      } else {
+        this.isNitroActive = false;
+        this.isSuperNitro = false;
+      }
     } else if (input.nitro && this.nitro > (this.isNitroActive ? 0.5 : 12)) {
       if (!this.isNitroActive) {
         this.isSuperNitro = this.nitro >= 82;
@@ -513,12 +584,12 @@ export class RacerPhysics {
       this.nitro = Math.min(100, this.nitro + (overdriveRegen + slipRegen) * dt);
     }
 
-    // 5. Longitudinal Speed, Banking-Driven Corner Speed & Slope Gravity
+    // 5. Longitudinal Speed, Zero-Drop Momentum Lock, Banking Corner Speed & Slope Gravity
     let boostMaxAdd = 0;
     let boostAccelAdd = 0;
 
     // Straightaway Overdrive breaks base speed limit smoothly without burning Nitro!
-    // Stage 1 (DRS): +52 km/h (~405 km/h); Stage 2 (Hyper): +104 km/h (~460 km/h on long straights!)
+    // Stage 1 (DRS): +52 km/h (~405 km/h); Stage 2 (Hyper): +104 km/h (~460–495 km/h on long straights!)
     if (this.overdriveStage === 2) {
       boostMaxAdd += 29.0;
       boostAccelAdd += 28;
@@ -529,7 +600,7 @@ export class RacerPhysics {
 
     if (this.isNitroActive) {
       const nMult = this.spec.nitroPower;
-      // Manual Nitro stacks thrillingly on top of Overdrive (for 515–540 km/h slingshot finishes!), softly capped for control
+      // Manual Nitro stacks thrillingly on top of Overdrive (515–540 km/h slingshot & Hyper Straight runs!)
       const nitroAdd = (this.isSuperNitro ? 28 : 18) * nMult;
       boostMaxAdd = Math.min(48, boostMaxAdd + nitroAdd * (this.overdriveStage === 2 ? 0.65 : this.overdriveStage === 1 ? 0.82 : 1.0));
       boostAccelAdd += (this.isSuperNitro ? 54 : 36) * nMult;
@@ -547,8 +618,21 @@ export class RacerPhysics {
       boostAccelAdd += 20 * this.slipstreamLevel;
     }
 
+    // Zero-Drop Momentum Lock: once Nitro/Boost rockets you up on a full-throttle straight,
+    // preserve earned velocity seamlessly into Overdrive cruise instead of snapping down to low speed!
+    const cruiseCap = baseMax + (this.overdriveStage === 2 ? 29.0 : this.overdriveStage === 1 ? 14.5 : 0);
+    if (!fullThrottleClean) {
+      this.momentumFloor = 0;
+    } else if (this.isNitroActive || this.miniBoostTimer > 0 || this.boostPadTimer > 0 || this.inHyperZone) {
+      this.momentumFloor = Math.max(this.momentumFloor, Math.min(this.speed, baseMax + 37));
+    } else if (this.momentumFloor > cruiseCap) {
+      this.momentumFloor = damp(this.momentumFloor, cruiseCap, 0.2, dt);
+    } else {
+      this.momentumFloor = cruiseCap;
+    }
+
     // Real slip-angle tire scrub reduced dramatically by steep inward banking!
-    let effectiveMaxSpeed = baseMax + boostMaxAdd;
+    let effectiveMaxSpeed = Math.max(baseMax + boostMaxAdd, this.momentumFloor);
     if (this.isDrifting) {
       const flatCornerCap = lerp(baseMax * 0.92, baseMax * 0.62, cornerSharpness);
       const bankedCornerCap = lerp(baseMax * 0.97, baseMax * 0.87, cornerSharpness);
@@ -567,8 +651,14 @@ export class RacerPhysics {
         if (this.speed < effectiveMaxSpeed) {
           this.speed = Math.min(effectiveMaxSpeed, this.speed + Math.max(4, accel) * dt);
         } else {
-          const scrubLambda = this.isDrifting && cornerSharpness > 0.2 ? 4.4 - clamp(bankNorm, 0, 1) * 1.6 : 2.2;
-          this.speed = damp(this.speed, effectiveMaxSpeed, Math.max(1.2, scrubLambda), dt);
+          // Ultra-low aerodynamic coasting drag on full-throttle straights eliminates abrupt deceleration cliffs after Nitro ends!
+          const scrubLambda =
+            this.isDrifting && cornerSharpness > 0.2
+              ? 4.4 - clamp(bankNorm, 0, 1) * 1.6
+              : fullThrottleClean
+                ? 0.35
+                : 2.0;
+          this.speed = damp(this.speed, effectiveMaxSpeed, scrubLambda, dt);
         }
       } else {
         this.speed = Math.max(0, this.speed - (11 + this.speed * 0.14 - roadSlopeAccel) * dt);
@@ -773,7 +863,8 @@ export class RacerPhysics {
         this.boostPadCooldown = 0.85;
         if (!this.isDrifting || this.allowDriftNitro) {
           this.boostPadTimer = 1.15;
-          this.speed = Math.min(baseMax + 24, Math.max(this.speed + 12, baseMax + 18));
+          // Boost pads must NEVER slow down a car already running in Overdrive II / Hyper Zone!
+          this.speed = Math.max(this.speed, Math.min(baseMax + 46, Math.max(this.speed + 10, baseMax + 22)));
         }
         this.nitro = Math.min(100, this.nitro + 14);
         this.styleScore += 120;
@@ -959,6 +1050,8 @@ export class RacerPhysics {
       nitroLockedByDrift: this.isDrifting && !this.allowDriftNitro,
       overdriveStage: this.overdriveStage,
       overdriveProgress: clamp(this.straightOverdriveTimer / 5.2, 0, 1),
+      inHyperZone: this.inHyperZone,
+      hyperZoneRemaining: Math.round(this.hyperZoneRemaining),
       isDrifting: this.isDrifting,
       driftTier: this.driftTier,
       driftChargeNorm: clamp(this.driftCharge / 2.35, 0, 1),

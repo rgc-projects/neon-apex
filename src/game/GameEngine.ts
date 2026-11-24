@@ -884,6 +884,14 @@ export class GameEngine {
           stage === 2 ? 'gold' : 'green'
         );
       },
+      onHyperZoneEnter: (lengthMeters) => {
+        const lenLabel =
+          lengthMeters >= 1000 ? `${(lengthMeters / 1000).toFixed(1)} KM` : `${Math.round(lengthMeters)}M`;
+        this.audio.playBoostPad();
+        this.cameraController.addShake(0.24);
+        this.touchControls.vibrate([16, 12, 26]);
+        this.hud.pushCallout(`⚡ HYPER STRAIGHT · ∞ 无限氮气 (${lenLabel})`, 'gold');
+      },
       onLapComplete: (newLap) => {
         const isFinal = newLap === player.totalLaps;
         this.audio.playLapChime(isFinal);

@@ -425,6 +425,58 @@ export function createHighwaySignTexture(
   return tex;
 }
 
+/** Glowing electric cyan-gold overhead banner for auto-detected Hyper Straight Infinite Nitro Zones */
+export function createHyperZoneGateTexture(isEntry: boolean): THREE.CanvasTexture {
+  const [canvas, ctx] = makeCanvas(768, 192);
+  const grad = ctx.createLinearGradient(0, 0, 768, 0);
+  if (isEntry) {
+    grad.addColorStop(0, '#042f3e');
+    grad.addColorStop(0.5, '#0b3b52');
+    grad.addColorStop(1, '#3b2406');
+  } else {
+    grad.addColorStop(0, '#3b1c06');
+    grad.addColorStop(0.5, '#451a03');
+    grad.addColorStop(1, '#2a1205');
+  }
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 768, 192);
+
+  // Outer electric neon frame
+  ctx.strokeStyle = isEntry ? '#00f2ff' : '#f59e0b';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(8, 8, 752, 176);
+
+  // Inner accent line
+  ctx.strokeStyle = isEntry ? '#fde047' : '#fbbf24';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(20, 20, 728, 152);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = isEntry ? '#e0faff' : '#fef3c7';
+  ctx.font = '900 48px sans-serif';
+  ctx.fillText(
+    isEntry ? '⚡ HYPER STRAIGHT · ∞ 无限氮气区' : '⚠ HYPER ZONE END · 准备入弯',
+    384,
+    74,
+    690
+  );
+
+  ctx.fillStyle = isEntry ? '#fde047' : '#fb923c';
+  ctx.font = '800 28px sans-serif';
+  ctx.fillText(
+    isEntry ? 'INFINITE NITRO ACTIVE // HOLD SHIFT FLAT-OUT' : 'CORNER AHEAD // MOMENTUM LOCK ACTIVE',
+    384,
+    134,
+    690
+  );
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
 /** Photorealistic atmospheric twilight / dusk / night sky dome with natural clouds & horizon glow */
 export function createRealisticSkyTexture(
   topHex: string,

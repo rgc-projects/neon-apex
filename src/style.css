@@ -551,6 +551,14 @@ body,
   box-shadow: 0 0 20px rgba(250, 204, 21, 0.45);
 }
 
+.overdrive-pill.hyper-zone {
+  color: #fffbeb;
+  background: linear-gradient(110deg, rgba(0, 128, 168, 0.92), rgba(14, 165, 233, 0.84), rgba(202, 138, 4, 0.9));
+  border-color: #fde047;
+  box-shadow: 0 0 22px rgba(0, 242, 255, 0.65), 0 0 12px rgba(250, 204, 21, 0.55);
+  animation: pulse 0.9s infinite;
+}
+
 .drift-nitro-toggle {
   pointer-events: auto;
   display: inline-flex;
@@ -1192,7 +1200,8 @@ kbd {
 .nitro-status {
   font-size: 10px;
   font-weight: 900;
-  letter-spacing: 1.2px;
+  letter-spacing: 1px;
+  white-space: nowrap;
   color: var(--text-dim);
 }
 
@@ -1209,6 +1218,12 @@ kbd {
 .nitro-status.locked {
   color: var(--gold);
   opacity: 0.9;
+}
+
+.nitro-status.infinite {
+  color: #fde047;
+  text-shadow: 0 0 14px rgba(0, 242, 255, 0.85);
+  animation: pulse 0.65s infinite;
 }
 
 .nitro-bar-track {
@@ -1231,6 +1246,11 @@ kbd {
 .nitro-bar-fill.super {
   background: linear-gradient(90deg, #00f2ff, #a855f7, #ff2a9d);
   box-shadow: 0 0 20px rgba(255, 42, 157, 0.8);
+}
+
+.nitro-bar-fill.infinite {
+  background: linear-gradient(90deg, #00f2ff, #fde047, #00f2ff, #ff2a9d);
+  box-shadow: 0 0 24px rgba(0, 242, 255, 0.9), 0 0 14px rgba(253, 224, 71, 0.75);
 }
 
 .nitro-super-marker {

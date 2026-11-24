@@ -107,6 +107,22 @@ export interface UpcomingCornerInfo {
   bankDeg: number;
 }
 
+export interface HyperStraightZone {
+  id: number;
+  sStart: number;
+  sEnd: number;
+  length: number;
+  wraps: boolean;
+}
+
+export interface HyperZoneStatus {
+  active: boolean;
+  zoneId: number;
+  remainingMeters: number;
+  totalMeters: number;
+  progress: number;
+}
+
 export interface RacerHUDTelemetry {
   speedKmh: number;
   rpmNorm: number;       // 0..1
@@ -117,6 +133,8 @@ export interface RacerHUDTelemetry {
   nitroLockedByDrift: boolean;
   overdriveStage: 0 | 1 | 2;
   overdriveProgress: number; // 0..1 progress across Stage 1 -> Stage 2
+  inHyperZone: boolean;
+  hyperZoneRemaining: number; // meters remaining in current Hyper Straight infinite-nitro zone
   isDrifting: boolean;
   driftTier: 0 | 1 | 2 | 3;
   driftChargeNorm: number;
