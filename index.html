@@ -119,13 +119,44 @@
           </button>
         </section>
 
-        <!-- Right Panel: Track Selection -->
+        <!-- Right Panel: Scalable Compact Circuit Hub -->
         <section id="menu-panel-tracks" class="glass-panel panel-right">
           <div class="panel-heading">
             <span class="accent-bar magenta"></span>
             <h2>SELECT CIRCUIT / 选择赛道</h2>
+            <button id="btn-open-catalog" class="catalog-trigger-btn" type="button" title="展开全屏赛道图库（支持搜索、分类、排序与收藏）">
+              <span>🌐 图库</span>
+              <span id="track-total-count" class="catalog-count">10</span>
+            </button>
           </div>
-          <div id="track-cards" class="track-list"></div>
+
+          <!-- Active Circuit Hero Preview with Quick Prev/Next & Favorite -->
+          <div id="track-hero-card" class="track-hero-card">
+            <div class="track-hero-top">
+              <button id="btn-prev-track" class="hero-step-btn" type="button" aria-label="上一条赛道" title="上一条赛道">◀</button>
+              <div class="track-hero-title">
+                <div class="track-hero-name-row">
+                  <span id="hero-track-name" class="hero-track-name">东京湾岸高速</span>
+                  <span id="hero-track-badge" class="card-badge">MEDIUM</span>
+                </div>
+                <div id="hero-track-sub" class="hero-track-sub">TOKYO BAYSHORE EXPWY</div>
+              </div>
+              <button id="btn-hero-fav" class="fav-star-btn" type="button" aria-label="收藏赛道" title="收藏/取消收藏此赛道">☆</button>
+              <button id="btn-next-track" class="hero-step-btn" type="button" aria-label="下一条赛道" title="下一条赛道">▶</button>
+            </div>
+            <div class="track-hero-blueprint" id="hero-blueprint-box" title="点击展开全屏赛道图库">
+              <svg id="hero-track-svg" class="hero-track-svg" viewBox="0 0 100 80"></svg>
+              <div id="hero-quick-chips" class="hero-quick-chips"></div>
+            </div>
+          </div>
+
+          <!-- Compact Category Filter Chips -->
+          <div id="sidebar-cat-tabs" class="cat-filter-row" role="tablist" aria-label="赛道分类"></div>
+
+          <!-- Bounded Internal Scrollable Quick-Pick List (never stretches the sidebar!) -->
+          <div id="track-cards" class="track-list track-list-bounded"></div>
+
+          <!-- Always-Visible Pinned Active Track Details -->
           <div id="track-info" class="track-detail"></div>
         </section>
       </div>
@@ -140,6 +171,44 @@
           <span class="credit-note">3D Car: Ferrari 458 (vicent091036, CC BY 4.0) + GT3 Carbon Aero</span>
         </div>
       </footer>
+    </div>
+
+    <!-- Full-Catalog Scalable Circuit Browser Modal (Forza / GT7 / ACC Style) -->
+    <div id="circuit-catalog-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="全球赛道图库">
+      <div class="modal-card glass-panel catalog-modal-card">
+        <div class="catalog-header">
+          <div class="catalog-title-row">
+            <div class="panel-heading">
+              <span class="accent-bar magenta"></span>
+              <h2>CIRCUIT CATALOG // 全球赛道图库</h2>
+              <span id="catalog-match-badge" class="catalog-match-badge">10 / 10</span>
+            </div>
+            <button id="btn-close-catalog" class="close-btn" type="button" aria-label="关闭赛道图库">✕</button>
+          </div>
+          <div class="catalog-toolbar">
+            <div class="catalog-search-wrap">
+              <span class="search-ico">🔍</span>
+              <input
+                id="catalog-search-input"
+                class="catalog-search-input"
+                type="search"
+                placeholder="搜索赛道名、特点（如 秋名山 / 漂移 / 60km）..."
+                autocomplete="off"
+              />
+            </div>
+            <select id="catalog-sort-select" class="catalog-sort-select" aria-label="赛道排序">
+              <option value="default">排序：默认推荐</option>
+              <option value="len-asc">里程：短 → 长</option>
+              <option value="len-desc">里程：长 → 短</option>
+              <option value="bank-desc">倾角：高 → 低</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="catalog-cat-tabs" class="catalog-cat-tabs" role="tablist" aria-label="图库分类筛选"></div>
+
+        <div id="catalog-grid" class="catalog-grid"></div>
+      </div>
     </div>
 
     <!-- Controls Modal -->
