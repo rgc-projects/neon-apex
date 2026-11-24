@@ -474,6 +474,16 @@ export class GameEngine {
       this.dirKeyLight.position.set(-180, 220, -240);
       this.dirRimLight.color.setHex(0x5eead4);
       this.dirRimLight.intensity = 1.15;
+    } else if (cfg.theme === 'akina') {
+      // Moonlit Mt. Haruna autumn-midnight pass: cool alpine indigo zenith + warm amber valley glow
+      this.hemiLight.color.setHex(0x9fc2eb);
+      this.hemiLight.groundColor.setHex(0x281e1c);
+      this.hemiLight.intensity = 1.42;
+      this.dirKeyLight.color.setHex(0xffd29d);
+      this.dirKeyLight.intensity = 2.02;
+      this.dirKeyLight.position.set(220, 195, -180);
+      this.dirRimLight.color.setHex(0x8bb8f0);
+      this.dirRimLight.intensity = 1.02;
     } else if (cfg.theme === 'tunnel') {
       // Modern illuminated sub-surface expressway tunnel
       this.hemiLight.color.setHex(0xcbd5e1);
@@ -650,8 +660,8 @@ export class GameEngine {
 
   private syncPauseOverdriveLabel(): void {
     this.pauseOverdriveBtn.textContent = this.enableStraightOverdrive
-      ? '🚀 环岛直道超频：开（自动超频）'
-      : '🚀 环岛直道超频：关（原版极速）';
+      ? '🚀 长道自动超频：开（自动超频）'
+      : '🚀 长道自动超频：关（原版极速）';
     this.pauseOverdriveBtn.style.borderColor = this.enableStraightOverdrive ? '#2dd4bf' : '';
   }
 
@@ -672,7 +682,7 @@ export class GameEngine {
     this.syncPauseOverdriveLabel();
     if (this.state === 'RACING' || this.state === 'PAUSED') {
       this.hud.pushCallout(
-        this.enableStraightOverdrive ? '🚀 环岛直道超频：已开启' : '🔒 环岛直道超频：已关闭',
+        this.enableStraightOverdrive ? '🚀 长道自动超频：已开启' : '🔒 长道自动超频：已关闭',
         this.enableStraightOverdrive ? 'green' : 'cyan'
       );
     }
@@ -681,8 +691,8 @@ export class GameEngine {
 
   private syncPauseHyperNitroLabel(): void {
     this.pauseHyperNitroBtn.textContent = this.enableHyperNitro
-      ? '⚡ 环岛直道满氮：开（长直道满氮）'
-      : '⚡ 环岛直道满氮：关（常规氮气）';
+      ? '⚡ 长道直道满氮：开（长直道满氮）'
+      : '⚡ 长道直道满氮：关（常规氮气）';
     this.pauseHyperNitroBtn.style.borderColor = this.enableHyperNitro ? '#fde047' : '';
   }
 
@@ -706,7 +716,7 @@ export class GameEngine {
     this.syncPauseHyperNitroLabel();
     if (this.state === 'RACING' || this.state === 'PAUSED') {
       this.hud.pushCallout(
-        this.enableHyperNitro ? '⚡ 环岛超长直道无限氮气：已开启' : '🔒 环岛超长直道无限氮气：已关闭',
+        this.enableHyperNitro ? '⚡ 超长直道无限氮气：已开启' : '🔒 超长直道无限氮气：已关闭',
         this.enableHyperNitro ? 'gold' : 'cyan'
       );
     }

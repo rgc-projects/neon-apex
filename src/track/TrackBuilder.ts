@@ -267,7 +267,9 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
           ? 0x8e8072
           : cfg.theme === 'fjord'
             ? 0x475569
-            : 0xffffff,
+            : cfg.theme === 'akina'
+              ? 0xdbe2ea
+              : 0xffffff,
     roughness: cfg.theme === 'manx' || cfg.theme === 'nujiang' ? 0.92 : 0.82,
     metalness: cfg.theme === 'manx' || cfg.theme === 'nujiang' ? 0.04 : 0.14,
     side: THREE.DoubleSide,
@@ -519,6 +521,9 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     } else if (cfg.theme === 'nujiang') {
       const inZone = t < 0.048 || (t > 0.485 && t < 0.545) || t > 0.955;
       if (!inZone) continue;
+    } else if (cfg.theme === 'akina') {
+      // Generous warm sodium streetlamps spacing across 27.2km touge while keeping draw-call instancing light & atmospheric!
+      if (i % (lampInterval * 2) !== 0 && !(t < 0.07 || (t > 0.57 && t < 0.67) || t > 0.94)) continue;
     }
     lampSamples.push(i);
   }
@@ -536,7 +541,8 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     cfg.theme === 'bridge' ||
     cfg.theme === 'island' ||
     cfg.theme === 'manx' ||
-    cfg.theme === 'nujiang';
+    cfg.theme === 'nujiang' ||
+    cfg.theme === 'akina';
   const lampLensMat = new THREE.MeshBasicMaterial({
     color: new THREE.Color(isWarmLamp ? 0xffd28a : 0xe0f2fe).multiplyScalar(1.6),
     toneMapped: false,
@@ -588,6 +594,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     manx: ['ISLE OF MAN TT', 'SNAEFELL MOUNTAIN COURSE · 37.73 MI', '#991b1b'],
     nujiang: ['G318 怒江72拐', 'YELA PASS 4658M · HAIRPIN TOUGE', '#046a38'],
     fjord: ['极光星湾  AURORA FJORD', '20.8KM RADIAL HAIRPIN LABYRINTH', '#035388'],
+    akina: ['超级秋名山  SUPER AKINA', '27.2KM SERPENTINE TOUGE · 41 S-BENDS', '#046a38'],
   };
 
   const gantrySpecs: { t: number; l1: string; l2: string; bg: string }[] =
@@ -608,6 +615,19 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
             { t: 0.545, l1: '深渊回旋臂  ABYSS FJORD', l2: 'SOUTH SEA-ARM → SOUTHWEST CLAW', bg: '#0f4c5c' },
             { t: 0.690, l1: '西南巨钳弯  CLAW BAY', l2: 'TECHNICAL HOOKED HAIRPIN LOOP', bg: '#035388' },
             { t: 0.855, l1: '西月三连角  WEST CRESCENTS', l2: '3 SWEEPING HORNS → AURORA FINISH', bg: '#0f4c5c' },
+          ]
+      : cfg.theme === 'akina'
+        ? [
+            { t: 0.012, l1: '榛名湖大直道  LAKE HARUNA', l2: 'SUPER AKINA · 27.2KM GRAND TOUGE', bg: '#046a38' },
+            { t: 0.088, l1: '北岭十连巨蟒  PYTHON ESSES', l2: '11-BEND DOWNHILL SERPENTINE DRIFT', bg: '#991b1b' },
+            { t: 0.242, l1: '苍松六连急蛇  CEDAR SNAKE', l2: 'RAPID LEFT ↔ RIGHT SWITCHBACKS', bg: '#046a38' },
+            { t: 0.342, l1: '秋名传奇五连发卡  5 HAIRPINS', l2: 'ICONIC TERRACED CLIFF DESCENT', bg: '#991b1b' },
+            { t: 0.478, l1: '山麓七连蛇道  FOOTHILL ESSES', l2: '7 FLOWING S-BENDS → IKAHO VALLEY', bg: '#046a38' },
+            { t: 0.578, l1: '伊香保温泉大直道  IKAHO EXPWY', l2: '2.55KM SUPER-STRAIGHT · TUNNEL & JUMP', bg: '#035388' },
+            { t: 0.688, l1: '赤城峡谷九连大蛇  AKAGI GORGE', l2: 'HIGH-SPEED FLOWING SERPENTINE DRIFT', bg: '#991b1b' },
+            { t: 0.818, l1: '榛名西壁八连天梯  WEST CLIMB', l2: '8-BEND UPHILL SERPENTINE ASCENT', bg: '#046a38' },
+            { t: 0.914, l1: '高岭穿山大直道  SUMMIT TUNNEL', l2: '1.85KM RIDGE CLIMB → LAKE HARUNA', bg: '#035388' },
+            { t: 0.985, l1: '秋名山顶冲刺  HARUNA FINISH', l2: 'FINAL STRAIGHT · WATER TOWER GRANDSTAND', bg: '#991b1b' },
           ]
       : cfg.theme === 'nujiang'
         ? [

@@ -289,12 +289,14 @@ export class MenuUI {
     this.launchSubEl.textContent =
       track.id === 'isle-of-man'
         ? `${lapWord} · 总长 ${totalKm}KM · ISLE OF MAN TT`
-        : track.id === 'aurora-fjord'
-          ? `${lapWord} · 总长 ${totalKm}KM · AURORA FJORD`
-          : track.id === 'nujiang-72'
-            ? `${lapWord} · 总长 ${totalKm}KM · NUJIANG 72 BENDS`
-            : rawLen >= 10000
-              ? `${lapWord} · 总长 ${totalKm}KM · GRAND ISLAND`
-              : `${lapWord} · 6 RACERS · DRIFT TO BOOST`;
+        : track.id === 'super-akina'
+          ? `${lapWord} · 总长 ${totalKm}KM · SUPER AKINA TOUGE`
+          : track.id === 'aurora-fjord'
+            ? `${lapWord} · 总长 ${totalKm}KM · AURORA FJORD`
+            : track.id === 'nujiang-72'
+              ? `${lapWord} · 总长 ${totalKm}KM · NUJIANG 72 BENDS`
+              : rawLen >= 10000
+                ? `${lapWord} · 总长 ${totalKm}KM · GRAND ISLAND`
+                : `${lapWord} · 6 RACERS · DRIFT TO BOOST`;
   }
 }

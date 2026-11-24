@@ -1,6 +1,6 @@
 export type GameState = 'MENU' | 'COUNTDOWN' | 'RACING' | 'PAUSED' | 'FINISH_SLOWMO' | 'RESULTS';
 export type CameraMode = 'CHASE' | 'HOOD';
-export type TrackTheme = 'city' | 'bridge' | 'tunnel' | 'mountain' | 'island' | 'manx' | 'nujiang' | 'fjord';
+export type TrackTheme = 'city' | 'bridge' | 'tunnel' | 'mountain' | 'island' | 'manx' | 'nujiang' | 'fjord' | 'akina';
 
 export interface CarSpec {
   id: string;

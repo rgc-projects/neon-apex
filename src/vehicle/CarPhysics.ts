@@ -148,6 +148,17 @@ export class RacerPhysics {
     bank: 0,
     curvature: 0,
   };
+  private readonly _lookFarFrame: SplineSample = {
+    s: 0,
+    t: 0,
+    pos: new THREE.Vector3(),
+    tangent: new THREE.Vector3(0, 0, -1),
+    flatRight: new THREE.Vector3(1, 0, 0),
+    right: new THREE.Vector3(1, 0, 0),
+    up: new THREE.Vector3(0, 1, 0),
+    bank: 0,
+    curvature: 0,
+  };
 
   private readonly _basisMat = new THREE.Matrix4();
   private readonly _quatA = new THREE.Quaternion();
@@ -305,6 +316,7 @@ export class RacerPhysics {
     // 2. Road Frame & Upcoming Corner Telemetry Scan (for player HUD callouts!)
     spline.getFrameAtDistance(this.s, this.frame);
     spline.getFrameAtDistance(this.s + 18, this._lookFrame);
+    spline.getFrameAtDistance(this.s + 38, this._lookFarFrame);
     if (this.isPlayer) {
       this.upcomingCorner = this.scanUpcomingCorner(spline);
     }
@@ -369,13 +381,15 @@ export class RacerPhysics {
         }
       } else {
         // Seamless S-curve Switchback Drift Transition!
-        // If you steer hard in the opposite direction while entering an opposite corner,
+        // If you steer hard in the opposite direction as the current bend finishes into an opposite bend,
         // cash in the current drift boost and smoothly flip into the next bend without fighting the lock!
-        const opposingSteer = rawSteer * this.driftDir < -0.7;
-        const opposingCorner = effCurv * this.driftDir < -0.0052;
-        if (opposingSteer && opposingCorner && this.driftDuration > 0.22) {
+        const opposingSteer = rawSteer * this.driftDir < -0.68;
+        const curveExited = this.frame.curvature * this.driftDir < 0.0018;
+        const nextOpposite = this._lookFarFrame.curvature * this.driftDir < -0.0046;
+        const opposingCorner = effCurv * this.driftDir < -0.0046 || (curveExited && nextOpposite);
+        if (opposingSteer && opposingCorner && this.driftDuration > 0.2) {
           this.switchbackTimer += dt;
-          if (this.switchbackTimer >= 0.14) {
+          if (this.switchbackTimer >= 0.11) {
             if (this.driftDistance > this.longestDriftMeters) {
               this.longestDriftMeters = this.driftDistance;
             }
@@ -469,11 +483,14 @@ export class RacerPhysics {
       else this.driftTier = 0;
     }
 
-    // 4.4. Open-Road Mega Island Circuit (Apex Island & Isle of Man) — TWO INDEPENDENT OPT-IN SWITCHES (both default OFF!):
-    // - `enableHyperNitro`: infinite 100% Nitro inside strict arrow-straight corridors (Sulby / Mountain Mile / Apex Bridge)
+    // 4.4. Mega Straightaway Circuits (Apex Island, Isle of Man & Super Akina) — TWO INDEPENDENT OPT-IN SWITCHES (both default OFF!):
+    // - `enableHyperNitro`: infinite 100% Nitro inside strict arrow-straight corridors (never on serpentine S-bends!)
     // - `enableStraightOverdrive`: 2-stage automatic DRS/Hyper speed boost + zero-drop momentum handoff on clean straights
-    // When BOTH are OFF, mega island circuits behave with 100% pure classic speed caps & manual Nitro!
-    const isMegaCircuit = spline.config.theme === 'island' || spline.config.theme === 'manx';
+    // When BOTH are OFF, mega circuits behave with 100% pure classic speed caps & manual Nitro!
+    const isMegaCircuit =
+      spline.config.theme === 'island' ||
+      spline.config.theme === 'manx' ||
+      spline.config.theme === 'akina';
     const overdriveAllowed = isMegaCircuit && this.enableStraightOverdrive;
     const hz =
       isMegaCircuit && this.enableHyperNitro && this.totalProgress > 18
@@ -969,6 +986,7 @@ export class RacerPhysics {
   private scanUpcomingCorner(spline: TrackSpline): UpcomingCornerInfo | null {
     let peakAbsK = 0;
     let peakSign: -1 | 1 = 1;
+    let firstSign: -1 | 0 | 1 = 0;
     let firstDist = -1;
     let peakBankDeg = 0;
     let totalTurnRad = 0;
@@ -979,14 +997,21 @@ export class RacerPhysics {
       const k = this._lookFrame.curvature;
       const absK = Math.abs(k);
       if (absK > 0.0052) {
-        if (firstDist < 0) firstDist = dist;
+        const kSign: -1 | 1 = k >= 0 ? 1 : -1;
+        if (firstDist < 0) {
+          firstDist = dist;
+          firstSign = kSign;
+        } else if (kSign !== firstSign) {
+          // Stop before the next opposite bend of a serpentine S-curve so HUD always telegraphs the IMMEDIATE bend!
+          break;
+        }
         if (absK > peakAbsK) {
           peakAbsK = absK;
-          peakSign = k >= 0 ? 1 : -1;
+          peakSign = kSign;
         }
         const bDeg = Math.abs(THREE.MathUtils.radToDeg(this._lookFrame.bank));
         if (bDeg > peakBankDeg) peakBankDeg = bDeg;
-        if (Math.sign(k) === peakSign) {
+        if (kSign === peakSign) {
           totalTurnRad += absK * step;
         }
       } else if (firstDist >= 0 && dist - firstDist > 55) {

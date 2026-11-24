@@ -54,7 +54,14 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     cfg.sunColorHex,
     isDusk
   );
-  const skyRadius = cfg.theme === 'manx' ? 7200 : cfg.theme === 'island' || cfg.theme === 'fjord' ? 4200 : 3200;
+  const skyRadius =
+    cfg.theme === 'manx'
+      ? 7200
+      : cfg.theme === 'akina'
+        ? 5600
+        : cfg.theme === 'island' || cfg.theme === 'fjord'
+          ? 4200
+          : 3200;
   const skyGeo = new THREE.SphereGeometry(skyRadius, 48, 28);
   const skyMat = new THREE.MeshBasicMaterial({
     map: skyTex,
@@ -75,10 +82,19 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     oceanNormal.repeat.set(110, 110);
   } else if (cfg.theme === 'nujiang') {
     oceanNormal.repeat.set(70, 70);
+  } else if (cfg.theme === 'akina') {
+    oceanNormal.repeat.set(28, 28);
   }
   disposables.push(oceanNormal);
 
-  const groundSpan = cfg.theme === 'manx' ? 44000 : cfg.theme === 'island' || cfg.theme === 'fjord' ? 16000 : 7600;
+  const groundSpan =
+    cfg.theme === 'manx'
+      ? 44000
+      : cfg.theme === 'akina'
+        ? 22000
+        : cfg.theme === 'island' || cfg.theme === 'fjord'
+          ? 16000
+          : 7600;
   const groundGeo = new THREE.PlaneGeometry(groundSpan, groundSpan);
   groundGeo.rotateX(-Math.PI / 2);
 
@@ -109,14 +125,14 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     });
   } else {
     groundMat = new THREE.MeshStandardMaterial({
-      color: cfg.theme === 'mountain' ? 0x0c1317 : 0x0b0f17,
+      color: cfg.theme === 'mountain' || cfg.theme === 'akina' ? 0x0a1116 : 0x0b0f17,
       roughness: 0.92,
       metalness: 0.05,
     });
   }
   const groundPlane = new THREE.Mesh(groundGeo, groundMat);
   groundPlane.position.set(
-    isMegaSea || cfg.theme === 'nujiang' ? trackCenterX : 0,
+    isMegaSea || cfg.theme === 'nujiang' || cfg.theme === 'akina' ? trackCenterX : 0,
     cfg.theme === 'nujiang'
       ? 4
       : cfg.theme === 'fjord'
@@ -125,10 +141,12 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
           ? -2
           : cfg.theme === 'tunnel'
             ? -56
-            : cfg.theme === 'mountain'
-              ? -18
-              : -22,
-    isMegaSea || cfg.theme === 'nujiang' ? trackCenterZ : 0
+            : cfg.theme === 'akina'
+              ? -14
+              : cfg.theme === 'mountain'
+                ? -18
+                : -22,
+    isMegaSea || cfg.theme === 'nujiang' || cfg.theme === 'akina' ? trackCenterZ : 0
   );
   group.add(groundPlane);
   disposables.push(groundGeo, groundMat);
@@ -146,7 +164,8 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     cfg.theme === 'island' ||
     cfg.theme === 'manx' ||
     cfg.theme === 'nujiang' ||
-    cfg.theme === 'fjord'
+    cfg.theme === 'fjord' ||
+    cfg.theme === 'akina'
   ) {
     const floorY = groundPlane.position.y;
     const pierList: {
@@ -260,6 +279,8 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
       animatedBeacons,
       animatedAuroras
     );
+  } else if (cfg.theme === 'akina') {
+    buildSuperAkinaWorld(spline, group, disposables, rand, groundPlane.position.y, oceanNormal);
   } else {
     buildRealisticSubterraneanCavern(spline, group, disposables, rand, animatedFans);
   }
@@ -268,8 +289,8 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     group,
     update: (dt: number, elapsed: number, camPos: THREE.Vector3) => {
       skyDome.position.set(camPos.x, 0, camPos.z);
-      if (cfg.theme === 'bridge' || cfg.theme === 'city' || isMegaSea || cfg.theme === 'nujiang') {
-        oceanNormal.offset.y += dt * (cfg.theme === 'nujiang' ? 0.18 : 0.08);
+      if (cfg.theme === 'bridge' || cfg.theme === 'city' || isMegaSea || cfg.theme === 'nujiang' || cfg.theme === 'akina') {
+        oceanNormal.offset.y += dt * (cfg.theme === 'nujiang' ? 0.18 : cfg.theme === 'akina' ? 0.045 : 0.08);
         oceanNormal.offset.x = Math.sin(elapsed * 0.25) * 0.08;
       }
       for (const fan of animatedFans) {
@@ -2728,5 +2749,493 @@ function buildAuroraFjordWorld(
     animatedBeacons.push(pivot);
     lhGroup.add(tower, lantern, pivot);
     group.add(lhGroup);
+  }
+}
+
+/**
+ * 超级秋名山 · 蛇形天道 // SUPER AKINA MOUNT HARUNA GRAND TOUGE WORLD (27.25 km):
+ * - Sculpted 240x240 Mount Haruna nocturnal volcanic massif + towering 455m Mt. Haruna Fuji central cone,
+ *   moonlit alpine Lake Haruna crater lake (Y=196m) beside Sector 1, and strict multi-sample zero-clipping
+ *   roadbed carving (>= 9.5m clearance below EVERY serpentine ribbon & hairpin deck!).
+ * - Iconic Akina Summit Water Tower & warm-lit Timber Pass Pavilion framing the Start/Finish straight.
+ * - 9 traditional vermilion Shinto Torii gates with glowing lanterns across key serpentine & summit gateways.
+ * - 1,100 instanced Japanese cedar pines & autumn crimson-gold Momiji maple trees seated cleanly on mesh height.
+ * - 160 glowing Ikaho Onsen foothill Japanese Ryokan inns lining Sector 4's 2.55km valley super-straight!
+ */
+function buildSuperAkinaWorld(
+  spline: TrackSpline,
+  group: THREE.Group,
+  disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[],
+  rand: () => number,
+  floorY: number,
+  lakeNormal: THREE.CanvasTexture
+): void {
+  // 1. Fast 90m local spatial grid over all spline samples (stride 2) for strict zero-clipping roadbed carving!
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const s of spline.samples) {
+    if (s.pos.x < minX) minX = s.pos.x;
+    if (s.pos.x > maxX) maxX = s.pos.x;
+    if (s.pos.z < minZ) minZ = s.pos.z;
+    if (s.pos.z > maxZ) maxZ = s.pos.z;
+  }
+
+  const cellSize = 90;
+  const gridMap = new Map<number, number[]>();
+  for (let i = 0; i < spline.sampleCount; i += 2) {
+    const p = spline.samples[i].pos;
+    const gx = Math.floor(p.x / cellSize);
+    const gz = Math.floor(p.z / cellSize);
+    const key = ((gx + 4096) << 13) | (gz + 4096);
+    let b = gridMap.get(key);
+    if (!b) {
+      b = [];
+      gridMap.set(key, b);
+    }
+    b.push(i);
+  }
+
+  const hw = spline.halfWidth;
+  const queryRoadEnvelope = (wx: number, wz: number) => {
+    const gx = Math.floor(wx / cellSize);
+    const gz = Math.floor(wz / cellSize);
+    let minDistSq = Infinity;
+    let nearestY = 120;
+    let strictSafeFloor = Infinity;
+    const hardRadiusSq = (hw + 25) * (hw + 25);
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oz = -1; oz <= 1; oz++) {
+        const bucket = gridMap.get(((gx + ox + 4096) << 13) | (gz + oz + 4096));
+        if (!bucket) continue;
+        for (let k = 0; k < bucket.length; k++) {
+          const s = spline.samples[bucket[k]];
+          const dx = s.pos.x - wx;
+          const dz = s.pos.z - wz;
+          const dSq = dx * dx + dz * dz;
+          if (dSq < minDistSq) {
+            minDistSq = dSq;
+            nearestY = s.pos.y;
+          }
+          if (dSq < hardRadiusSq) {
+            const bankDrop = hw * Math.sin(Math.abs(s.bank));
+            const floor = s.pos.y - bankDrop - 9.5;
+            if (floor < strictSafeFloor) strictSafeFloor = floor;
+          }
+        }
+      }
+    }
+    return {
+      minDist: minDistSq === Infinity ? 999 : Math.sqrt(minDistSq),
+      strictSafeFloor,
+      nearestY,
+    };
+  };
+
+  // 2. Sculpted 240x240 Mount Haruna Massif + Haruna Fuji Volcanic Peak + Lake Haruna Crater Basin
+  const margin = 680;
+  const widthX = maxX - minX + margin * 2;
+  const depthZ = maxZ - minZ + margin * 2;
+  const centerX = (minX + maxX) * 0.5;
+  const centerZ = (minZ + maxZ) * 0.5;
+  const segs = 240;
+
+  const terrGeo = new THREE.PlaneGeometry(widthX, depthZ, segs, segs);
+  terrGeo.rotateX(-Math.PI / 2);
+  const posAttr = terrGeo.attributes.position as THREE.BufferAttribute;
+  const colors = new Float32Array(posAttr.count * 3);
+  const terrHeights = new Float32Array((segs + 1) * (segs + 1));
+
+  // Iconic Mount Haruna geography inside the vast central bowl
+  const peakX = 1620;
+  const peakZ = -940;
+  const lakeX = 640;
+  const lakeZ = -960;
+  const lakeY = 196;
+  const lakeRadius = 465;
+
+  const cValleyRock = new THREE.Color(0x101720);
+  const cCedarDeep = new THREE.Color(0x0c2118);
+  const cCedarMid = new THREE.Color(0x163325);
+  const cMomijiRed = new THREE.Color(0x5c201a);
+  const cMomijiGold = new THREE.Color(0x75421b);
+  const cVolcanicSlate = new THREE.Color(0x2d3748);
+  const cSummitMist = new THREE.Color(0x64748b);
+  const tmpColor = new THREE.Color();
+
+  for (let i = 0; i < posAttr.count; i++) {
+    const wx = posAttr.getX(i) + centerX;
+    const wz = posAttr.getZ(i) + centerZ;
+    const env = queryRoadEnvelope(wx, wz);
+
+    const fbm =
+      Math.sin(wx * 0.0024 + 0.6) * Math.cos(wz * 0.0022 - 0.5) * 42 +
+      Math.sin(wx * 0.0062 + 1.4) * Math.sin(wz * 0.0058 + 0.8) * 19 +
+      Math.cos((wx - wz) * 0.012) * 8;
+
+    // Natural Gunma mountain gradient: elevated alpine caldera North -> deep Ikaho valley South (Z > 2200)
+    const northAlpineSlope = smoothstep(2350, -1400, wz) * 195;
+
+    // Towering Mount Haruna Fuji Volcanic Cone inside the crater interior!
+    const distPeak = Math.hypot(wx - peakX, wz - peakZ);
+    const harunaPeak = Math.exp(-(distPeak * distPeak) / (560 * 560)) * 310;
+
+    // Secondary Akagi distant ridge mass in the southwest interior (cleanly clear of all roads!)
+    const distWestPeak = Math.hypot(wx - -1080, wz - 1480);
+    const westRidge = Math.exp(-(distWestPeak * distWestPeak) / (460 * 460)) * 185;
+
+    // Dramatic outer Japanese mountain walls framing the distant perimeter
+    const rimNorth = smoothstep(-2250, -2950, wz) * 230;
+    const rimEast = smoothstep(3720, 4450, wx) * 240;
+    const rimWest = smoothstep(-2460, -3150, wx) * 225;
+    const rimSouth = smoothstep(2850, 3550, wz) * 190;
+
+    let h = 8 + northAlpineSlope + harunaPeak + westRidge + rimNorth + rimEast + rimWest + rimSouth + fbm;
+
+    // Sculpt smooth volcanic crater depression for Lake Haruna beneath lakeY=196m!
+    const distLake = Math.hypot(wx - lakeX, wz - lakeZ);
+    if (distLake < lakeRadius + 160) {
+      const basinMask = 1 - smoothstep(lakeRadius - 70, lakeRadius + 150, distLake);
+      const lakeBed = lakeY - 22;
+      h = h * (1 - basinMask) + Math.min(h, lakeBed) * basinMask;
+    }
+
+    // Strict multi-sample zero-clipping road corridor carve (>= 9.5m below EVERY road edge!)
+    const clearInner = hw + 16;
+    const clearOuter = hw + 62;
+    if (env.minDist < clearOuter) {
+      const targetFloor = env.strictSafeFloor < Infinity ? env.strictSafeFloor : env.nearestY - 12.5;
+      const blend = smoothstep(clearInner, clearOuter, env.minDist);
+      h = Math.min(h, targetFloor + (Math.max(h, targetFloor) - targetFloor) * blend);
+    }
+    if (env.strictSafeFloor < Infinity) {
+      h = Math.min(h, env.strictSafeFloor);
+    }
+
+    posAttr.setY(i, h);
+    terrHeights[i] = h;
+
+    // Rich nocturnal Gunma cedar forest + subtle glowing autumn Japanese maple (Momiji) patches
+    const groveNoise = 0.5 + 0.5 * Math.sin(wx * 0.0085 + wz * 0.0072);
+    const maplePatch = smoothstep(0.62, 0.88, 0.5 + 0.5 * Math.sin(wx * 0.011 - wz * 0.009 + 1.7));
+    if (h < 22) {
+      tmpColor.copy(cValleyRock).lerp(cCedarDeep, clamp((h + 6) / 28, 0, 1));
+    } else if (h < 215) {
+      tmpColor.copy(cCedarDeep).lerp(cCedarMid, groveNoise * 0.8);
+      if (maplePatch > 0.05) {
+        const autumnTint = groveNoise > 0.5 ? cMomijiRed : cMomijiGold;
+        tmpColor.lerp(autumnTint, maplePatch * 0.52);
+      }
+    } else if (h < 330) {
+      tmpColor.copy(cCedarMid).lerp(cVolcanicSlate, clamp((h - 215) / 115, 0, 1));
+    } else {
+      tmpColor.copy(cVolcanicSlate).lerp(cSummitMist, clamp((h - 330) / 120, 0, 1));
+    }
+    colors[i * 3] = tmpColor.r;
+    colors[i * 3 + 1] = tmpColor.g;
+    colors[i * 3 + 2] = tmpColor.b;
+  }
+
+  terrGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  terrGeo.computeVertexNormals();
+
+  const terrTex = createConcreteTexture();
+  terrTex.repeat.set(72, 72);
+  const terrMat = new THREE.MeshStandardMaterial({
+    map: terrTex,
+    vertexColors: true,
+    roughness: 0.94,
+    metalness: 0.03,
+    envMapIntensity: 0.18,
+  });
+  const terrMesh = new THREE.Mesh(terrGeo, terrMat);
+  terrMesh.position.set(centerX, 0, centerZ);
+  group.add(terrMesh);
+  disposables.push(terrTex, terrGeo, terrMat);
+
+  const sampleMeshY = (wx: number, wz: number): number => {
+    const fx = ((wx - (centerX - widthX * 0.5)) / widthX) * segs;
+    const fz = ((wz - (centerZ - depthZ * 0.5)) / depthZ) * segs;
+    const ix = clamp(Math.floor(fx), 0, segs - 1);
+    const iz = clamp(Math.floor(fz), 0, segs - 1);
+    const tx = clamp(fx - ix, 0, 1);
+    const tz = clamp(fz - iz, 0, 1);
+    const stride = segs + 1;
+    const h00 = terrHeights[iz * stride + ix];
+    const h10 = terrHeights[iz * stride + ix + 1];
+    const h01 = terrHeights[(iz + 1) * stride + ix];
+    const h11 = terrHeights[(iz + 1) * stride + ix + 1];
+    return (h00 * (1 - tx) + h10 * tx) * (1 - tz) + (h01 * (1 - tx) + h11 * tx) * tz;
+  };
+
+  // 3. Shimmering Moonlit Alpine Lake Haruna Water Surface (nestled cleanly inside the summit crater!)
+  const lakeGeo = new THREE.CircleGeometry(lakeRadius, 56);
+  lakeGeo.rotateX(-Math.PI / 2);
+  const lakeMat = new THREE.MeshStandardMaterial({
+    color: 0x09203a,
+    normalMap: lakeNormal,
+    normalScale: new THREE.Vector2(0.65, 0.65),
+    roughness: 0.18,
+    metalness: 0.62,
+    envMapIntensity: 1.35,
+  });
+  const lakeMesh = new THREE.Mesh(lakeGeo, lakeMat);
+  lakeMesh.position.set(lakeX, lakeY, lakeZ);
+  group.add(lakeMesh);
+  disposables.push(lakeGeo, lakeMat);
+
+  // 4. Iconic Akina Summit Water Tower & Pass Overlook Tea Pavilion right beside Start/Finish!
+  const steelTowerMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.45, metalness: 0.68 });
+  const tankMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.5, metalness: 0.25 });
+  const redBandMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.52, metalness: 0.14 });
+  const darkTimberMat = new THREE.MeshStandardMaterial({ color: 0x2a1f19, roughness: 0.88 });
+  const kawaraRoofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.62, metalness: 0.25 });
+  const warmShojiMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xffcc70).multiplyScalar(1.65),
+    toneMapped: false,
+  });
+  const beaconAmberMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xf97316).multiplyScalar(2.2),
+    toneMapped: false,
+  });
+  disposables.push(steelTowerMat, tankMat, redBandMat, darkTimberMat, kawaraRoofMat, warmShojiMat, beaconAmberMat);
+
+  // Summit Water Tower on the West shoulder of Start Straight (s = 82m, d = -42m)
+  const wtFrame = spline.getFrameAtDistance(82);
+  const wtPos = wtFrame.pos.clone().addScaledVector(wtFrame.flatRight, -42);
+  if (queryRoadEnvelope(wtPos.x, wtPos.z).minDist > hw + 18) {
+    const wtGroup = new THREE.Group();
+    const wtBaseY = Math.max(floorY, wtFrame.pos.y - 6);
+    wtGroup.position.set(wtPos.x, wtBaseY, wtPos.z);
+
+    const wtLegGeo = new THREE.CylinderGeometry(0.45, 0.65, 24, 8);
+    const wtTankGeo = new THREE.CylinderGeometry(5.6, 5.6, 9.2, 20);
+    const wtBandGeo = new THREE.CylinderGeometry(5.72, 5.72, 1.8, 20);
+    const wtDomeGeo = new THREE.ConeGeometry(5.8, 3.4, 20);
+    const wtLampGeo = new THREE.SphereGeometry(0.8, 8, 8);
+    disposables.push(wtLegGeo, wtTankGeo, wtBandGeo, wtDomeGeo, wtLampGeo);
+
+    for (const [lx, lz] of [
+      [-3.4, -3.4],
+      [3.4, -3.4],
+      [-3.4, 3.4],
+      [3.4, 3.4],
+    ]) {
+      const leg = new THREE.Mesh(wtLegGeo, steelTowerMat);
+      leg.position.set(lx, 12, lz);
+      wtGroup.add(leg);
+    }
+    const tank = new THREE.Mesh(wtTankGeo, tankMat);
+    tank.position.y = 28.4;
+    const band = new THREE.Mesh(wtBandGeo, redBandMat);
+    band.position.y = 28.4;
+    const dome = new THREE.Mesh(wtDomeGeo, steelTowerMat);
+    dome.position.y = 34.7;
+    const lamp = new THREE.Mesh(wtLampGeo, beaconAmberMat);
+    lamp.position.y = 36.8;
+    wtGroup.add(tank, band, dome, lamp);
+    group.add(wtGroup);
+  }
+
+  // Warm-lit Akina Pass Timber Rest Pavilion on the East overlook facing Lake Haruna (s = 128m, d = +40m)
+  const pavFrame = spline.getFrameAtDistance(128);
+  const pavPos = pavFrame.pos.clone().addScaledVector(pavFrame.flatRight, 40);
+  if (queryRoadEnvelope(pavPos.x, pavPos.z).minDist > hw + 18) {
+    const pavGroup = new THREE.Group();
+    pavGroup.position.set(pavPos.x, Math.max(floorY, pavFrame.pos.y - 4.5), pavPos.z);
+    pavGroup.rotation.y = Math.atan2(pavFrame.tangent.x, pavFrame.tangent.z);
+
+    const pBody = new THREE.Mesh(new THREE.BoxGeometry(16, 6.2, 10), darkTimberMat);
+    pBody.position.y = 3.1;
+    const pWin = new THREE.Mesh(new THREE.BoxGeometry(16.25, 2.2, 8.2), warmShojiMat);
+    pWin.position.y = 3.4;
+    const pRoof = new THREE.Mesh(new THREE.ConeGeometry(12.2, 4.6, 4), kawaraRoofMat);
+    pRoof.rotation.y = Math.PI / 4;
+    pRoof.scale.set(1.18, 1, 0.78);
+    pRoof.position.y = 8.5;
+    disposables.push(pBody.geometry, pWin.geometry, pRoof.geometry);
+    pavGroup.add(pBody, pWin, pRoof);
+    group.add(pavGroup);
+  }
+
+  // 5. 9 Traditional Vermilion Shinto Torii Gates (鳥居) straddling Key Serpentine & Summit Gateways!
+  const blackEaveMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.55, metalness: 0.2 });
+  const tLegGeo = new THREE.CylinderGeometry(0.65, 0.82, 15.0, 10);
+  const tKasagiGeo = new THREE.BoxGeometry(spline.roadWidth + 10.6, 1.15, 1.6);
+  const tEaveGeo = new THREE.BoxGeometry(spline.roadWidth + 11.6, 0.45, 1.9);
+  const tNukiGeo = new THREE.BoxGeometry(spline.roadWidth + 6.0, 0.74, 1.0);
+  const tLanternGeo = new THREE.BoxGeometry(0.7, 1.25, 0.7);
+  disposables.push(blackEaveMat, tLegGeo, tKasagiGeo, tEaveGeo, tNukiGeo, tLanternGeo);
+
+  const basis = new THREE.Matrix4();
+  const gateHalfW = hw + 2.2;
+  for (const gt of [0.072, 0.155, 0.248, 0.352, 0.472, 0.682, 0.778, 0.875, 0.986]) {
+    if (spline.isInTunnel(gt)) continue;
+    const f = spline.getFrameAtDistance(gt * spline.totalLength);
+    const gate = new THREE.Group();
+    gate.position.copy(f.pos);
+    basis.makeBasis(f.right, f.up, f.tangent.clone().negate());
+    gate.quaternion.setFromRotationMatrix(basis);
+
+    const lL = new THREE.Mesh(tLegGeo, redBandMat);
+    lL.position.set(-gateHalfW, 7.5, 0);
+    const lR = new THREE.Mesh(tLegGeo, redBandMat);
+    lR.position.set(gateHalfW, 7.5, 0);
+    const kasagi = new THREE.Mesh(tKasagiGeo, redBandMat);
+    kasagi.position.set(0, 14.9, 0);
+    const eave = new THREE.Mesh(tEaveGeo, blackEaveMat);
+    eave.position.set(0, 15.6, 0);
+    const nuki = new THREE.Mesh(tNukiGeo, redBandMat);
+    nuki.position.set(0, 12.1, 0);
+    const lanL = new THREE.Mesh(tLanternGeo, warmShojiMat);
+    lanL.position.set(-gateHalfW + 1.3, 10.9, 0);
+    const lanR = new THREE.Mesh(tLanternGeo, warmShojiMat);
+    lanR.position.set(gateHalfW - 1.3, 10.9, 0);
+
+    gate.add(lL, lR, kasagi, eave, nuki, lanL, lanR);
+    group.add(gate);
+  }
+
+  // 6. 1,100 Instanced Nocturnal Japanese Cedar Pines + Autumn Crimson-Gold Momiji Maple Trees!
+  const trunkGeo = new THREE.CylinderGeometry(0.36, 0.58, 4.8, 7);
+  const pine1Geo = new THREE.ConeGeometry(3.6, 8.6, 9);
+  const pine2Geo = new THREE.ConeGeometry(2.6, 7.2, 9);
+  const mapleCrownGeo = new THREE.DodecahedronGeometry(3.7, 1);
+
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1d15, roughness: 0.94 });
+  const pineDarkMat = new THREE.MeshStandardMaterial({ color: 0x0c241a, roughness: 0.9 });
+  const pineMidMat = new THREE.MeshStandardMaterial({ color: 0x133526, roughness: 0.88 });
+  const mapleRedMat = new THREE.MeshStandardMaterial({ color: 0x8b261d, roughness: 0.84 });
+  const mapleGoldMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.84 });
+  disposables.push(trunkGeo, pine1Geo, pine2Geo, mapleCrownGeo, trunkMat, pineDarkMat, pineMidMat, mapleRedMat, mapleGoldMat);
+
+  const cedars: { x: number; y: number; z: number; s: number }[] = [];
+  const maplesRed: { x: number; y: number; z: number; s: number }[] = [];
+  const maplesGold: { x: number; y: number; z: number; s: number }[] = [];
+
+  for (let i = 0; i < 6500 && cedars.length + maplesRed.length + maplesGold.length < 1100; i++) {
+    const sample = spline.samples[Math.floor(rand() * spline.sampleCount)];
+    const side = rand() > 0.5 ? 1 : -1;
+    const offset = hw + 14 + rand() * 92;
+    const wx = sample.pos.x + sample.flatRight.x * side * offset + (rand() - 0.5) * 20;
+    const wz = sample.pos.z + sample.flatRight.z * side * offset + (rand() - 0.5) * 20;
+
+    if (Math.hypot(wx - lakeX, wz - lakeZ) < lakeRadius + 30) continue;
+    const env = queryRoadEnvelope(wx, wz);
+    if (env.minDist < hw + 13.5) continue;
+
+    const wy = sampleMeshY(wx, wz);
+    if (wy < floorY + 2 || wy > 315) continue;
+
+    const sc = 0.85 + rand() * 1.15;
+    const rPick = rand();
+    if (rPick < 0.72) {
+      cedars.push({ x: wx, y: wy - 0.8, z: wz, s: sc });
+    } else if (rPick < 0.88) {
+      maplesRed.push({ x: wx, y: wy - 0.7, z: wz, s: sc });
+    } else {
+      maplesGold.push({ x: wx, y: wy - 0.7, z: wz, s: sc });
+    }
+  }
+
+  const dummy = new THREE.Object3D();
+  if (cedars.length > 0) {
+    const tInst = new THREE.InstancedMesh(trunkGeo, trunkMat, cedars.length);
+    const c1Inst = new THREE.InstancedMesh(pine1Geo, pineDarkMat, cedars.length);
+    const c2Inst = new THREE.InstancedMesh(pine2Geo, pineMidMat, cedars.length);
+    cedars.forEach((tr, idx) => {
+      dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+      dummy.scale.setScalar(tr.s);
+      dummy.position.set(tr.x, tr.y + 2.4 * tr.s, tr.z);
+      dummy.updateMatrix();
+      tInst.setMatrixAt(idx, dummy.matrix);
+      dummy.position.set(tr.x, tr.y + 7.2 * tr.s, tr.z);
+      dummy.updateMatrix();
+      c1Inst.setMatrixAt(idx, dummy.matrix);
+      dummy.position.set(tr.x, tr.y + 11.6 * tr.s, tr.z);
+      dummy.updateMatrix();
+      c2Inst.setMatrixAt(idx, dummy.matrix);
+    });
+    group.add(tInst, c1Inst, c2Inst);
+  }
+
+  const buildMapleInst = (list: { x: number; y: number; z: number; s: number }[], mat: THREE.Material) => {
+    if (list.length === 0) return;
+    const tInst = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
+    const mInst = new THREE.InstancedMesh(mapleCrownGeo, mat, list.length);
+    list.forEach((tr, idx) => {
+      dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+      dummy.scale.setScalar(tr.s);
+      dummy.position.set(tr.x, tr.y + 2.3 * tr.s, tr.z);
+      dummy.updateMatrix();
+      tInst.setMatrixAt(idx, dummy.matrix);
+      dummy.position.set(tr.x, tr.y + 6.4 * tr.s, tr.z);
+      dummy.scale.set(tr.s * 1.15, tr.s * 0.88, tr.s * 1.15);
+      dummy.updateMatrix();
+      mInst.setMatrixAt(idx, dummy.matrix);
+    });
+    group.add(tInst, mInst);
+  };
+  buildMapleInst(maplesRed, mapleRedMat);
+  buildMapleInst(maplesGold, mapleGoldMat);
+
+  // 7. Glowing Ikaho Onsen Night Town (160 Japanese Timber Ryokan Inns lining Sector 4's 2.55km Super-Straight!)
+  const innWallGeo = new THREE.BoxGeometry(1, 1, 1);
+  const innRoofGeo = new THREE.ConeGeometry(0.78, 0.52, 4);
+  innRoofGeo.rotateY(Math.PI / 4);
+  const innWinGeo = new THREE.BoxGeometry(1.03, 0.18, 1.03);
+  disposables.push(innWallGeo, innRoofGeo, innWinGeo);
+
+  const inns: { x: number; y: number; z: number; w: number; h: number; d: number; rotY: number }[] = [];
+  for (let i = 0; i < 1600 && inns.length < 160; i++) {
+    const t = 0.604 + rand() * 0.066; // Right along Ikaho Valley Super-Straight #2 after Tunnel #1!
+    const f = spline.getFrameAtDistance(t * spline.totalLength);
+    const side = rand() > 0.5 ? 1 : -1;
+    const w = 10 + rand() * 9;
+    const d = 8.5 + rand() * 7;
+    const h = 7.5 + rand() * 8.5;
+    const offset = hw + 20 + Math.max(w, d) * 0.55 + rand() * 95;
+    const ix = f.pos.x + f.flatRight.x * side * offset + (rand() - 0.5) * 18;
+    const iz = f.pos.z + f.flatRight.z * side * offset + (rand() - 0.5) * 18;
+    if (queryRoadEnvelope(ix, iz).minDist < hw + Math.max(w, d) * 0.72 + 12) continue;
+    const iy = Math.max(floorY, sampleMeshY(ix, iz) - 0.6);
+    inns.push({
+      x: ix,
+      y: iy,
+      z: iz,
+      w,
+      h,
+      d,
+      rotY: Math.atan2(f.tangent.x, f.tangent.z) + (rand() - 0.5) * 0.18,
+    });
+  }
+
+  if (inns.length > 0) {
+    const wInst = new THREE.InstancedMesh(innWallGeo, darkTimberMat, inns.length);
+    const rInst = new THREE.InstancedMesh(innRoofGeo, kawaraRoofMat, inns.length);
+    const l1Inst = new THREE.InstancedMesh(innWinGeo, warmShojiMat, inns.length);
+    const l2Inst = new THREE.InstancedMesh(innWinGeo, warmShojiMat, inns.length);
+    inns.forEach((b, idx) => {
+      dummy.rotation.set(0, b.rotY, 0);
+      dummy.position.set(b.x, b.y + b.h * 0.5, b.z);
+      dummy.scale.set(b.w, b.h, b.d);
+      dummy.updateMatrix();
+      wInst.setMatrixAt(idx, dummy.matrix);
+
+      const roofH = b.h * 0.44;
+      dummy.position.set(b.x, b.y + b.h + roofH * 0.5, b.z);
+      dummy.scale.set(b.w * 1.15, roofH, b.d * 1.15);
+      dummy.updateMatrix();
+      rInst.setMatrixAt(idx, dummy.matrix);
+
+      dummy.position.set(b.x, b.y + b.h * 0.34, b.z);
+      dummy.scale.set(b.w, b.h, b.d);
+      dummy.updateMatrix();
+      l1Inst.setMatrixAt(idx, dummy.matrix);
+
+      dummy.position.set(b.x, b.y + b.h * 0.72, b.z);
+      dummy.scale.set(b.w, b.h, b.d);
+      dummy.updateMatrix();
+      l2Inst.setMatrixAt(idx, dummy.matrix);
+    });
+    group.add(wInst, rInst, l1Inst, l2Inst);
   }
 }

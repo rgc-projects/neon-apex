@@ -216,21 +216,22 @@ export class TrackSpline {
   }
 
   private detectHyperZones(): void {
-    // Only enable Hyper Straight infinite-nitro corridors on open-road mega island circuits (Apex Island & Isle of Man);
-    // standard tracks & pure technical hairpin drift circuits (Nujiang 72, Aurora Fjord) stay pure classic drift!
-    if (this.config.theme !== 'island' && this.config.theme !== 'manx') return;
+    // Only enable Hyper Straight infinite-nitro corridors on mega circuits with true 1km+ super-straights
+    // (Apex Island, Isle of Man & Super Akina); standard tracks & pure hairpin labyrinths stay pure classic drift!
+    if (this.config.theme !== 'island' && this.config.theme !== 'manx' && this.config.theme !== 'akina') return;
 
     const N = this.sampleCount;
     const ds = this.totalLength / N;
-    const isUltraMega = this.totalLength >= 25000;
-    // Strict ruler-straight curvature thresholds so sweeping curves stay classic normal-nitro driving!
-    const maxCurv = isUltraMega ? 0.0009 : 0.0018;
-    const bridgeMaxCurv = isUltraMega ? 0.0014 : 0.0023;
+    const isUltraMega = this.totalLength >= 35000;
+    const isAkina = this.config.theme === 'akina';
+    // Strict ruler-straight curvature thresholds so sweeping curves & serpentine S-bends stay classic normal-nitro driving!
+    const maxCurv = isUltraMega ? 0.0009 : isAkina ? 0.0012 : 0.0018;
+    const bridgeMaxCurv = isUltraMega ? 0.0014 : isAkina ? 0.0018 : 0.0023;
     const maxBridgeSteps = Math.max(1, Math.round((isUltraMega ? 25 : 22) / ds));
-    const minRawLength = isUltraMega ? 1800 : 760;
-    const trimEntry = isUltraMega ? 45 : 35;
-    const trimExit = isUltraMega ? 120 : 110;
-    const minEffectiveLength = isUltraMega ? 1620 : 600;
+    const minRawLength = isUltraMega ? 1800 : isAkina ? 1200 : 760;
+    const trimEntry = isUltraMega ? 45 : isAkina ? 45 : 35;
+    const trimExit = isUltraMega ? 120 : isAkina ? 120 : 110;
+    const minEffectiveLength = isUltraMega ? 1620 : isAkina ? 1020 : 600;
 
     // 13-sample smoothed curvature avoids single-sample jitter when scanning straight corridors
     const sm = new Float32Array(N);

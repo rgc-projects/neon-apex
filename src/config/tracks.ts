@@ -2,6 +2,7 @@ import { TrackConfig } from '../types';
 import { ISLE_OF_MAN_TRACK } from './isleOfManTrack';
 import { NUJIANG_72_TRACK } from './nujiangTrack';
 import { AURORA_FJORD_TRACK } from './auroraFjordTrack';
+import { SUPER_AKINA_TRACK } from './superAkinaTrack';
 
 /** Helper to cleanly scale track XZ coordinates by modern highway factor while keeping elevation natural */
 function scalePoints(
@@ -568,4 +569,5 @@ export const TRACK_CONFIGS: TrackConfig[] = [
   ISLE_OF_MAN_TRACK,
   NUJIANG_72_TRACK,
   AURORA_FJORD_TRACK,
+  SUPER_AKINA_TRACK,
 ];
