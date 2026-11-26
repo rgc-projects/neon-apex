@@ -1,3 +1,6 @@
+import { i18n, t } from '../i18n/i18n';
+import { nativeBridge } from '../platform/NativeBridge';
+import { ControlSettings, settingsManager, SteerMode } from '../settings/SettingsManager';
 import { InputState, RacerHUDTelemetry } from '../types';
 import { clamp } from '../utils/math';
 
@@ -6,15 +9,12 @@ interface DeviceOrientationEventIOS extends DeviceOrientationEvent {
 }
 
 /**
- * Mobile-First Multi-Touch Dynamic Floating Joystick + Thumb-Arc Arcade Controller:
- * - Native TouchEvent (`passive: false`) multi-touch engine for rock-solid iOS Safari / Android Chrome / WeChat support,
- *   plus mouse PointerEvent fallback so desktop users can also test touch controls.
- * - True Dynamic Floating Virtual Joystick across the ENTIRE lower-left half of the screen:
- *   touching down ANYWHERE ALWAYS spawns the joystick origin at the EXACT touchdown coordinates (0.00 steering bias!),
- *   so slightly off-center presses NEVER jerk the car or cause loss of control.
- *   Includes smooth anti-slip origin follow when dragged past 1.35× max radius for instant counter-steer reversals.
- * - Ergonomic Right-Thumb Arc Layout (DRIFT, NITRO, BRAKE, contextual REV/GAS).
- * - Full Mobile Fullscreen support (Android/Chrome native Fullscreen API + orientation hint + iOS Safari PWA tip).
+ * Mobile-First Multi-Touch Arcade Controller:
+ * - Supports 3 player-selectable steering modes:
+ *   1. Dynamic Floating Virtual Analog Joystick (zero-bias touchdown origin + anti-slip follow)
+ *   2. Classic Left / Right Digital Steering Buttons (smooth analog ramp for crisp touge drifts)
+ *   3. DeviceOrientation Gyroscope Tilt Steering (with customizable sensitivity)
+ * - Customizable button scale, opacity, steering sensitivity, auto-throttle & native/web haptics.
  */
 export class TouchControls {
   private readonly container = document.getElementById('touch-controls')!;
@@ -23,6 +23,9 @@ export class TouchControls {
   private readonly joystickStick = document.getElementById('joystick-stick')!;
   private readonly steerLeftVis = document.getElementById('steer-left-vis')!;
   private readonly steerRightVis = document.getElementById('steer-right-vis')!;
+  private readonly steerButtonsWrap = document.getElementById('touch-steer-buttons')!;
+  private readonly steerLeftBtn = document.getElementById('touch-steer-left')!;
+  private readonly steerRightBtn = document.getElementById('touch-steer-right')!;
   private readonly driftBtn = document.getElementById('touch-drift')!;
   private readonly nitroBtn = document.getElementById('touch-nitro')!;
   private readonly brakeBtn = document.getElementById('touch-brake')!;
@@ -32,8 +35,11 @@ export class TouchControls {
   private readonly fullscreenBtn = document.getElementById('btn-hud-fullscreen')!;
 
   public enabled = false;
+  public steerMode: SteerMode = 'joystick';
   public autoThrottle = true;
   public tiltEnabled = false;
+  public steerSensitivity = 1.0;
+  public hapticsEnabled = true;
 
   // Dynamic floating analog joystick state
   private steerTouchId: number | null = null;
@@ -43,15 +49,17 @@ export class TouchControls {
   private joyOriginX = 0;
   private joyOriginY = 0;
   private joyMaxRadius = 48;
-  private touchSteerAxis = 0; // -1..+1
-  private tiltSteerAxis = 0;  // -1..+1
+  private touchSteerAxis = 0;
+  private tiltSteerAxis = 0;
+  private buttonSteerAxis = 0;
 
-  // Multi-touch active button trackers (keys are 't:<touchId>' or 'p:<pointerId>')
   private readonly activeHold = {
     drift: new Set<string>(),
     nitro: new Set<string>(),
     brake: new Set<string>(),
     gas: new Set<string>(),
+    steerLeft: new Set<string>(),
+    steerRight: new Set<string>(),
   };
 
   private onToggleChange?: (enabled: boolean) => void;
@@ -70,14 +78,13 @@ export class TouchControls {
     this.onAnyInteract = opts?.onAnyInteract;
     this.onStatusMessage = opts?.onStatusMessage;
 
-    // Auto-detect phones / tablets
     const isTouchDevice =
+      nativeBridge.isNative ||
       window.matchMedia?.('(pointer: coarse)').matches ||
       'ontouchstart' in window ||
       navigator.maxTouchPoints > 0;
     this.setEnabled(isTouchDevice);
 
-    // Auto-enable & unlock audio on first physical touch anywhere
     window.addEventListener(
       'touchstart',
       () => {
@@ -89,7 +96,6 @@ export class TouchControls {
       { passive: true, once: true }
     );
 
-    // iOS Safari requires AudioContext unlock inside touchend too
     window.addEventListener(
       'touchend',
       () => {
@@ -98,7 +104,6 @@ export class TouchControls {
       { passive: true }
     );
 
-    // Prevent pinch-zoom / multi-finger browser gestures during active racing
     this.container.addEventListener(
       'gesturestart',
       (e) => e.preventDefault(),
@@ -106,6 +111,8 @@ export class TouchControls {
     );
 
     this.bindVirtualJoystick();
+    this.bindHoldButton(this.steerLeftBtn, 'steerLeft', 8);
+    this.bindHoldButton(this.steerRightBtn, 'steerRight', 8);
     this.bindHoldButton(this.driftBtn, 'drift', 14);
     this.bindHoldButton(this.nitroBtn, 'nitro', 18);
     this.bindHoldButton(this.brakeBtn, 'brake', 10);
@@ -114,14 +121,14 @@ export class TouchControls {
     this.autoGasBtn.addEventListener('click', () => {
       this.onAnyInteract?.();
       this.vibrate(10);
-      this.autoThrottle = !this.autoThrottle;
-      this.syncAutoGasUI();
-      this.onStatusMessage?.(this.autoThrottle ? 'AUTO GAS: ON' : 'MANUAL GAS PEDAL');
+      const next = !this.autoThrottle;
+      settingsManager.updateControls({ autoThrottle: next });
+      this.onStatusMessage?.(next ? t('msgAutoGasOn') : t('msgAutoGasOff'));
     });
 
     this.tiltBtn.addEventListener('click', () => {
       this.onAnyInteract?.();
-      void this.toggleTiltSteering();
+      void this.toggleTiltQuickButton();
     });
 
     this.fullscreenBtn.addEventListener('click', () => {
@@ -129,31 +136,65 @@ export class TouchControls {
       void this.toggleFullscreen();
     });
 
-    // Keep HUD + Menu fullscreen buttons synced whenever user exits fullscreen via gesture/ESC
     const syncFs = () => this.syncFullscreenUI();
     document.addEventListener('fullscreenchange', syncFs);
     document.addEventListener('webkitfullscreenchange', syncFs);
 
-    // Clear stuck touches if app goes to background or loses focus
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.resetAllInputs();
     });
     window.addEventListener('blur', () => this.resetAllInputs());
 
+    // Apply initial saved control settings
+    this.applySettings(settingsManager.settings.controls, true);
+    this.syncFullscreenUI();
+
+    i18n.subscribe(() => {
+      this.syncAutoGasUI();
+      this.syncTiltUI();
+    });
+  }
+
+  public applySettings(ctrl: ControlSettings, silent = false): void {
+    this.autoThrottle = ctrl.autoThrottle;
+    this.steerSensitivity = clamp(ctrl.steerSensitivity, 0.7, 1.4);
+    this.hapticsEnabled = ctrl.haptics;
+
+    // Visual scale & opacity applied smoothly via CSS custom properties
+    this.container.style.setProperty('--touch-scale', ctrl.buttonScale.toFixed(2));
+    this.container.style.setProperty('--touch-opacity', ctrl.buttonOpacity.toFixed(2));
+
+    if (ctrl.steerMode !== this.steerMode) {
+      this.steerMode = ctrl.steerMode;
+      if (ctrl.steerMode === 'tilt') {
+        void this.enableTiltMode(silent);
+      } else {
+        this.disableTiltListener();
+        if (!silent) {
+          this.onStatusMessage?.(
+            ctrl.steerMode === 'buttons' ? t('msgSteerButtons') : t('msgSteerJoystick')
+          );
+        }
+      }
+    } else if (ctrl.steerMode === 'tilt' && !this.tiltEnabled) {
+      void this.enableTiltMode(silent);
+    }
+
+    this.syncSteerModeUI();
     this.syncAutoGasUI();
     this.syncTiltUI();
-    this.syncFullscreenUI();
+  }
+
+  private syncSteerModeUI(): void {
+    const showButtons = this.steerMode === 'buttons';
+    this.joystickZone.classList.toggle('hidden', showButtons);
+    this.steerButtonsWrap.classList.toggle('hidden', !showButtons);
+    this.joystickBase.classList.toggle('tilt-active', this.tiltEnabled);
   }
 
   public vibrate(pattern: number | number[]): void {
-    if (!this.enabled) return;
-    try {
-      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-        navigator.vibrate(pattern);
-      }
-    } catch {
-      // Ignore on browsers without Vibration API (e.g. iOS Safari)
-    }
+    if (!this.enabled || !this.hapticsEnabled) return;
+    nativeBridge.haptic(pattern);
   }
 
   public setEnabled(enabled: boolean): void {
@@ -163,6 +204,7 @@ export class TouchControls {
     if (!enabled) {
       this.resetAllInputs();
     }
+    this.syncSteerModeUI();
     this.syncAutoGasUI();
     this.syncTiltUI();
     this.onToggleChange?.(enabled);
@@ -174,6 +216,7 @@ export class TouchControls {
   }
 
   public isFullscreen(): boolean {
+    if (nativeBridge.isNative) return true;
     const doc = document as Document & {
       webkitFullscreenElement?: Element;
       mozFullScreenElement?: Element;
@@ -195,7 +238,6 @@ export class TouchControls {
   private syncFullscreenUI(): void {
     const fs = this.isFullscreen();
     this.fullscreenBtn.classList.toggle('active-pill', fs);
-    // Crisp inline SVG so Android / iOS / Windows never render missing Unicode tofu boxes!
     this.fullscreenBtn.innerHTML = fs
       ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>'
       : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
@@ -203,6 +245,7 @@ export class TouchControls {
   }
 
   public async toggleFullscreen(): Promise<void> {
+    if (nativeBridge.isNative) return;
     const doc = document as Document & {
       webkitFullscreenElement?: Element;
       webkitExitFullscreen?: () => Promise<void>;
@@ -228,13 +271,11 @@ export class TouchControls {
         } else if (root.msRequestFullscreen) {
           await root.msRequestFullscreen();
         } else {
-          // iOS Safari browser tabs restrict Fullscreen API: minimize bar & guide user to PWA Fullscreen
           window.scrollTo(0, 1);
-          this.onStatusMessage?.('iOS 请点底部分享 →「添加到主屏幕」享无边框真全屏');
+          this.onStatusMessage?.(t('msgIosFsTip'));
           return;
         }
         this.vibrate(14);
-        // Optional gentle landscape lock hint on phones (silent fallback if unsupported)
         const orient = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
         if (this.enabled && typeof orient?.lock === 'function') {
           orient.lock('landscape').catch(() => {});
@@ -252,7 +293,7 @@ export class TouchControls {
       }
     } catch {
       window.scrollTo(0, 1);
-      this.onStatusMessage?.('当前浏览器限制全屏，可「添加到主屏幕」全屏畅玩');
+      this.onStatusMessage?.(t('msgBrowserFsTip'));
     } finally {
       this.syncFullscreenUI();
     }
@@ -262,6 +303,7 @@ export class TouchControls {
     this.steerTouchId = null;
     this.steerMouseActive = false;
     this.touchSteerAxis = 0;
+    this.buttonSteerAxis = 0;
     this.joystickBase.classList.remove('dragging');
     this.joystickBase.style.transform = 'translate3d(0px, 0px, 0px)';
     this.updateJoystickStickVisual(0, 0, 0);
@@ -270,39 +312,52 @@ export class TouchControls {
     this.activeHold.nitro.clear();
     this.activeHold.brake.clear();
     this.activeHold.gas.clear();
+    this.activeHold.steerLeft.clear();
+    this.activeHold.steerRight.clear();
 
     this.driftBtn.classList.remove('pressed');
     this.nitroBtn.classList.remove('pressed');
     this.brakeBtn.classList.remove('pressed');
     this.gasBtn.classList.remove('pressed');
+    this.steerLeftBtn.classList.remove('pressed');
+    this.steerRightBtn.classList.remove('pressed');
   }
 
   private syncAutoGasUI(): void {
-    this.autoGasBtn.textContent = this.autoThrottle ? 'AUTO' : 'MANUAL';
+    this.autoGasBtn.textContent = this.autoThrottle ? t('hudAutoGas') : t('hudManualGas');
     this.autoGasBtn.classList.toggle('active-pill', this.autoThrottle);
     this.gasBtn.classList.toggle('manual-gas', !this.autoThrottle);
   }
 
   private syncTiltUI(): void {
-    this.tiltBtn.textContent = this.tiltEnabled ? 'TILT: ON' : 'TILT';
+    this.tiltBtn.textContent = this.tiltEnabled ? t('hudTiltOn') : t('hudTiltOff');
     this.tiltBtn.classList.toggle('active-pill', this.tiltEnabled);
     this.joystickBase.classList.toggle('tilt-active', this.tiltEnabled);
   }
 
-  private async toggleTiltSteering(): Promise<void> {
+  private disableTiltListener(): void {
+    this.tiltEnabled = false;
+    this.tiltSteerAxis = 0;
+    window.removeEventListener('deviceorientation', this.onDeviceOrientation, true);
+    this.updateJoystickStickVisual(0, 0, 0);
+  }
+
+  private async toggleTiltQuickButton(): Promise<void> {
     if (this.tiltEnabled) {
-      this.tiltEnabled = false;
-      this.tiltSteerAxis = 0;
-      window.removeEventListener('deviceorientation', this.onDeviceOrientation);
-      this.syncTiltUI();
-      this.updateJoystickStickVisual(0, 0, 0);
-      this.onStatusMessage?.('JOYSTICK STEERING');
+      settingsManager.updateControls({ steerMode: 'joystick' });
       return;
     }
+    const ok = await this.enableTiltMode(false);
+    if (ok) {
+      this.steerMode = 'tilt';
+      settingsManager.updateControls({ steerMode: 'tilt' });
+    }
+  }
 
+  private async enableTiltMode(silent: boolean): Promise<boolean> {
     if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) {
-      this.onStatusMessage?.('TILT NOT SUPPORTED');
-      return;
+      if (!silent) this.onStatusMessage?.(t('msgTiltUnsupported'));
+      return false;
     }
 
     const DOE = window.DeviceOrientationEvent as unknown as DeviceOrientationEventIOS;
@@ -310,20 +365,23 @@ export class TouchControls {
       try {
         const res = await DOE.requestPermission();
         if (res !== 'granted') {
-          this.onStatusMessage?.('TILT PERMISSION DENIED');
-          return;
+          if (!silent) this.onStatusMessage?.(t('msgTiltDenied'));
+          return false;
         }
       } catch {
-        this.onStatusMessage?.('TILT UNAVAILABLE');
-        return;
+        if (!silent) this.onStatusMessage?.(t('msgTiltUnavailable'));
+        return false;
       }
     }
 
     this.tiltEnabled = true;
     window.addEventListener('deviceorientation', this.onDeviceOrientation, true);
-    this.vibrate(16);
+    if (!silent) {
+      this.vibrate(16);
+      this.onStatusMessage?.(t('msgTiltOn'));
+    }
     this.syncTiltUI();
-    this.onStatusMessage?.('🧭 TILT STEERING ON');
+    return true;
   }
 
   private onDeviceOrientation = (e: DeviceOrientationEvent): void => {
@@ -345,7 +403,7 @@ export class TouchControls {
       this.tiltSteerAxis = 0;
     } else {
       const sign = Math.sign(tiltDeg);
-      const norm = clamp((Math.abs(tiltDeg) - deadzone) / 22.5, 0, 1);
+      const norm = clamp(((Math.abs(tiltDeg) - deadzone) / 22.5) * this.steerSensitivity, 0, 1);
       this.tiltSteerAxis = sign * Math.pow(norm, 1.15);
     }
 
@@ -355,13 +413,7 @@ export class TouchControls {
     }
   };
 
-  /**
-   * True AAA Dynamic Floating Joystick Initialization:
-   * ALWAYS places the neutral center (0, 0) at the EXACT touchdown point (clientX, clientY)!
-   * Result: ZERO accidental steering jerk on landing, no matter where your left thumb lands!
-   */
   private beginJoystickAt(clientX: number, clientY: number): void {
-    // Clear active transform temporarily to read exact resting home center in viewport coordinates
     this.joystickBase.classList.remove('dragging');
     this.joystickBase.style.transform = 'translate3d(0px, 0px, 0px)';
     const baseRect = this.joystickBase.getBoundingClientRect();
@@ -370,7 +422,6 @@ export class TouchControls {
     this.joyHomeY = baseRect.top + baseRect.height * 0.5;
     this.joyMaxRadius = Math.max(baseRect.width * 0.38, 44);
 
-    // Exact touchdown point IS ALWAYS the neutral 0.00 center!
     this.joyOriginX = clientX;
     this.joyOriginY = clientY;
     this.touchSteerAxis = 0;
@@ -388,8 +439,6 @@ export class TouchControls {
     let dist = Math.hypot(dx, dy);
     const maxR = this.joyMaxRadius;
 
-    // Anti-slip dynamic follow ("跟手防脱"): if thumb drags far beyond rim (>1.35× radius),
-    // gently pull the origin along so quick counter-steer reversals remain instant & crisp!
     const followLimit = maxR * 1.35;
     if (dist > followLimit && dist > 0.001) {
       const pull = dist - followLimit;
@@ -409,7 +458,6 @@ export class TouchControls {
       dist = Math.hypot(dx, dy);
     }
 
-    // Tactile 360° circular puck clamp
     let visX = dx;
     let visY = dy;
     if (dist > maxR && dist > 0.001) {
@@ -418,8 +466,7 @@ export class TouchControls {
       visY = dy * scale;
     }
 
-    // Precision progressive analog steering curve from horizontal throw (-1..+1)
-    const normX = clamp(dx / maxR, -1, 1);
+    const normX = clamp((dx / maxR) * this.steerSensitivity, -1, 1);
     const absX = Math.abs(normX);
     const deadzone = 0.07;
 
@@ -427,8 +474,8 @@ export class TouchControls {
       this.touchSteerAxis = 0;
     } else {
       const sign = Math.sign(normX);
-      const t = clamp((absX - deadzone) / (0.90 - deadzone), 0, 1);
-      this.touchSteerAxis = sign * Math.pow(t, 1.18);
+      const tNorm = clamp((absX - deadzone) / (0.9 - deadzone), 0, 1);
+      this.touchSteerAxis = sign * Math.pow(tNorm, 1.18);
     }
 
     this.updateJoystickStickVisual(visX, visY, this.touchSteerAxis);
@@ -455,17 +502,16 @@ export class TouchControls {
   }
 
   private bindVirtualJoystick(): void {
-    // 1. Native multi-touch TouchEvents across entire lower-left half
     this.joystickZone.addEventListener(
       'touchstart',
       (e) => {
         e.preventDefault();
         this.onAnyInteract?.();
         if (this.steerTouchId === null && e.changedTouches.length > 0) {
-          const t = e.changedTouches[0];
-          this.steerTouchId = t.identifier;
+          const touch = e.changedTouches[0];
+          this.steerTouchId = touch.identifier;
           this.vibrate(8);
-          this.beginJoystickAt(t.clientX, t.clientY);
+          this.beginJoystickAt(touch.clientX, touch.clientY);
         }
       },
       { passive: false }
@@ -477,9 +523,9 @@ export class TouchControls {
         e.preventDefault();
         if (this.steerTouchId === null) return;
         for (let i = 0; i < e.changedTouches.length; i++) {
-          const t = e.changedTouches[i];
-          if (t.identifier === this.steerTouchId) {
-            this.updateJoystickMove(t.clientX, t.clientY);
+          const touch = e.changedTouches[i];
+          if (touch.identifier === this.steerTouchId) {
+            this.updateJoystickMove(touch.clientX, touch.clientY);
             break;
           }
         }
@@ -500,7 +546,6 @@ export class TouchControls {
     this.joystickZone.addEventListener('touchend', endTouchSteer, { passive: false });
     this.joystickZone.addEventListener('touchcancel', endTouchSteer, { passive: false });
 
-    // 2. Mouse / stylus fallback via PointerEvent (ignored for touch to prevent double-firing)
     this.joystickZone.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'touch') return;
       e.preventDefault();
@@ -532,7 +577,7 @@ export class TouchControls {
 
   private bindHoldButton(
     el: HTMLElement,
-    key: 'drift' | 'nitro' | 'brake' | 'gas',
+    key: keyof TouchControls['activeHold'],
     vibeMs: number
   ): void {
     const set = this.activeHold[key];
@@ -611,12 +656,27 @@ export class TouchControls {
     const nitro = this.activeHold.nitro.size > 0;
     const drift = this.activeHold.drift.size > 0;
 
-    const hasTouchSteer = this.steerTouchId !== null || this.steerMouseActive;
-    const steerAxis = hasTouchSteer
-      ? this.touchSteerAxis
-      : this.tiltEnabled
-        ? this.tiltSteerAxis
-        : 0;
+    let steerAxis = 0;
+    if (this.steerMode === 'buttons') {
+      const leftPressed = this.activeHold.steerLeft.size > 0;
+      const rightPressed = this.activeHold.steerRight.size > 0;
+      const target = (rightPressed ? 1 : 0) - (leftPressed ? 1 : 0);
+      const step = 0.24 * this.steerSensitivity;
+      if (target === 0) {
+        this.buttonSteerAxis *= 0.55;
+        if (Math.abs(this.buttonSteerAxis) < 0.04) this.buttonSteerAxis = 0;
+      } else {
+        this.buttonSteerAxis = clamp(this.buttonSteerAxis + target * step, -1, 1);
+      }
+      steerAxis = this.buttonSteerAxis;
+    } else {
+      const hasTouchSteer = this.steerTouchId !== null || this.steerMouseActive;
+      steerAxis = hasTouchSteer
+        ? this.touchSteerAxis
+        : this.tiltEnabled
+          ? this.tiltSteerAxis
+          : 0;
+    }
 
     const throttle = isCountdown
       ? manualGas || nitro
@@ -642,7 +702,7 @@ export class TouchControls {
     this.gasBtn.classList.toggle('hidden', !showGas);
     const gasLabel = this.gasBtn.querySelector('.tbtn-main');
     if (gasLabel) {
-      gasLabel.textContent = isCountdown ? 'REV' : 'GAS';
+      gasLabel.textContent = isCountdown ? t('touchRevMain') : t('touchGasMain');
     }
     this.gasBtn.classList.toggle('rev-pulse', isCountdown);
 
@@ -658,11 +718,11 @@ export class TouchControls {
     const nSub = this.nitroBtn.querySelector('.tbtn-sub');
     if (nSub) {
       nSub.textContent = locked
-        ? '漂移禁用'
+        ? t('touchNitroLocked')
         : isInfZone
-          ? '∞ MAX!'
+          ? t('touchNitroInf')
           : superReady
-            ? 'SUPER!'
+            ? t('touchNitroSuper')
             : `${Math.round(telemetry.nitro)}%`;
     }
 

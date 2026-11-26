@@ -15,6 +15,11 @@ export class SpeedLinesOverlay {
   private readonly streaks: SpeedStreak[] = [];
   private w = 1;
   private h = 1;
+  private densityScale = 1.0;
+
+  public setQuality(level: 'low' | 'medium' | 'high'): void {
+    this.densityScale = level === 'low' ? 0.35 : level === 'medium' ? 0.65 : 1.0;
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -79,7 +84,7 @@ export class SpeedLinesOverlay {
       ctx.fillRect(0, 0, this.w, this.h);
     }
 
-    const activeCount = Math.floor(12 + intensity * 28);
+    const activeCount = Math.floor((12 + intensity * 28) * this.densityScale);
     ctx.lineCap = 'round';
 
     for (let i = 0; i < Math.min(activeCount, this.streaks.length); i++) {

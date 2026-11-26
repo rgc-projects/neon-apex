@@ -1,3 +1,4 @@
+import { i18n, t } from '../i18n/i18n';
 import { CameraMode, RacerHUDTelemetry } from '../types';
 import { TrackSpline } from '../track/TrackSpline';
 import { clamp, formatTime, ordinalSuffix } from '../utils/math';
@@ -5,6 +6,10 @@ import { RacerPhysics } from '../vehicle/CarPhysics';
 
 export class HUD {
   private readonly root = document.getElementById('hud-overlay')!;
+  private readonly fpsBadge = document.getElementById('fps-badge')!;
+  private readonly rotateHintBanner = document.getElementById('rotate-hint-banner')!;
+  private readonly dismissRotateBtn = document.getElementById('btn-dismiss-rotate')!;
+
   private readonly rankEl = document.getElementById('hud-rank')!;
   private readonly rankSuffixEl = document.getElementById('hud-rank-suffix')!;
   private readonly lapEl = document.getElementById('hud-lap')!;
@@ -61,17 +66,54 @@ export class HUD {
   private trackAccent = '#00f2ff';
   private lastCalloutText = '';
   private lastCalloutAt = 0;
+  private currentSpline: TrackSpline | null = null;
+  private currentCamMode: CameraMode = 'CHASE';
+  private rotateHintDismissed = false;
+
+  constructor() {
+    this.dismissRotateBtn.addEventListener('click', () => {
+      this.rotateHintDismissed = true;
+      this.rotateHintBanner.classList.add('hidden');
+    });
+
+    i18n.subscribe(() => {
+      if (this.currentSpline) {
+        this.trackLabelEl.textContent = i18n.getTrackName(this.currentSpline.config);
+      }
+      this.setCameraLabel(this.currentCamMode);
+    });
+  }
 
   public setVisible(visible: boolean): void {
     this.root.classList.toggle('active', visible);
+    this.updateRotateHint(visible);
+  }
+
+  public updateRotateHint(hudVisible = this.root.classList.contains('active')): void {
+    if (!hudVisible || this.rotateHintDismissed || document.body.classList.contains('native-app')) {
+      this.rotateHintBanner.classList.add('hidden');
+      return;
+    }
+    const isTouch = document.body.classList.contains('touch-mode');
+    const isPortrait = window.innerHeight > window.innerWidth && window.innerWidth <= 600;
+    this.rotateHintBanner.classList.toggle('hidden', !(isTouch && isPortrait));
+  }
+
+  public updateFps(fps: number, frameMs: number, visible: boolean): void {
+    this.fpsBadge.classList.toggle('hidden', !visible);
+    if (!visible) return;
+    const rounded = Math.round(fps);
+    this.fpsBadge.textContent = `${rounded} FPS · ${frameMs.toFixed(1)}ms`;
+    this.fpsBadge.classList.toggle('low', rounded < 36);
+    this.fpsBadge.classList.toggle('mid', rounded >= 36 && rounded < 52);
   }
 
   public configureTrack(spline: TrackSpline): void {
+    this.currentSpline = spline;
     this.minimapOutline = spline.getMinimapOutline(6);
     this.trackAccent = spline.config.accentColorHex;
-    this.trackLabelEl.textContent = spline.config.nameZh;
+    this.trackLabelEl.textContent = i18n.getTrackName(spline.config);
 
-    // Pre-project auto-detected Hyper Straight Infinite-Nitro corridors for zero-overhead minimap rendering
     this.minimapHyperSegments = [];
     if (this.minimapOutline && spline.hyperZones.length > 0) {
       for (const z of spline.hyperZones) {
@@ -88,7 +130,8 @@ export class HUD {
   }
 
   public setCameraLabel(mode: CameraMode): void {
-    this.camBtn.textContent = mode === 'CHASE' ? 'CHASE' : 'HOOD';
+    this.currentCamMode = mode;
+    this.camBtn.textContent = mode === 'CHASE' ? t('hudCamChase') : t('hudCamHood');
   }
 
   public setMutedLabel(muted: boolean): void {
@@ -97,6 +140,7 @@ export class HUD {
 
   public setTouchLabel(enabled: boolean): void {
     this.touchBtn.classList.toggle('active-pill', enabled);
+    this.updateRotateHint();
   }
 
   public setHyperZonesVisible(visible: boolean): void {
@@ -112,7 +156,6 @@ export class HUD {
     if (this.countdownText.textContent !== text) {
       this.countdownText.textContent = text;
       this.countdownText.classList.toggle('go', isGo);
-      // Restart pop animation cleanly
       this.countdownText.style.animation = 'none';
       void this.countdownText.offsetWidth;
       this.countdownText.style.animation = '';
@@ -125,7 +168,6 @@ export class HUD {
 
   public pushCallout(text: string, variant: 'cyan' | 'gold' | 'magenta' | 'green' = 'cyan'): void {
     const now = performance.now();
-    // Deduplicate rapid repeated triggers (e.g. tapping NITRO repeatedly won't stack 3 banners!)
     if (text === this.lastCalloutText && now - this.lastCalloutAt < 1400) {
       return;
     }
@@ -140,7 +182,6 @@ export class HUD {
     el.textContent = displayText;
     this.calloutStack.appendChild(el);
 
-    // On mobile touch mode, show AT MOST 1 sleek compact pill at a time so the road view stays wide open!
     const maxVisible = isTouch ? 1 : 2;
     while (this.calloutStack.children.length > maxVisible) {
       this.calloutStack.removeChild(this.calloutStack.firstChild!);
@@ -152,14 +193,13 @@ export class HUD {
 
   public update(telemetry: RacerHUDTelemetry, racers: RacerPhysics[], spline: TrackSpline): void {
     this.rankEl.textContent = String(telemetry.rank);
-    this.rankSuffixEl.textContent = ordinalSuffix(telemetry.rank);
+    this.rankSuffixEl.textContent = i18n.isZh ? '' : ordinalSuffix(telemetry.rank);
     this.lapEl.innerHTML = `${telemetry.lap} <span>/ ${telemetry.totalLaps}</span>`;
     this.timeEl.textContent = formatTime(telemetry.raceTime);
     this.bestLapEl.textContent =
       telemetry.bestLapTime !== null ? formatTime(telemetry.bestLapTime) : '--:--.--';
     this.scoreEl.textContent = telemetry.styleScore.toLocaleString();
 
-    // Speedometer & RPM Arcs
     this.speedEl.textContent = String(telemetry.speedKmh);
     this.gearEl.textContent = String(telemetry.gear);
 
@@ -170,18 +210,18 @@ export class HUD {
     const rpmDash = 280 * (1 - clamp(telemetry.rpmNorm, 0, 1));
     this.rpmArc.setAttribute('stroke-dashoffset', rpmDash.toFixed(1));
 
-    // Hyper Straight Infinite-Nitro Zone / Straightaway Auto-Escalating Overdrive Pill
+    // Overdrive / Hyper Straight pill
     if (telemetry.inHyperZone && !telemetry.nitroLockedByDrift) {
       const rem = telemetry.hyperZoneRemaining;
       const remTxt = rem >= 1000 ? `${(rem / 1000).toFixed(1)} KM` : `${rem}M`;
       this.overdrivePill.classList.remove('hidden', 'stage2');
       this.overdrivePill.classList.add('hyper-zone');
-      this.overdrivePill.textContent = `⚡ ∞ 无限氮气直道 · ${remTxt}`;
+      this.overdrivePill.textContent = t('hudOverdriveInf', { rem: remTxt });
     } else if (telemetry.overdriveStage >= 1 && !telemetry.isDrifting) {
       this.overdrivePill.classList.remove('hidden', 'hyper-zone');
       this.overdrivePill.classList.toggle('stage2', telemetry.overdriveStage === 2);
       this.overdrivePill.textContent =
-        telemetry.overdriveStage === 2 ? '⚡⚡ HYPER OVERDRIVE II' : '⚡ DRS OVERDRIVE I';
+        telemetry.overdriveStage === 2 ? t('hudOverdrive2') : t('hudOverdrive1');
     } else {
       this.overdrivePill.classList.add('hidden');
       this.overdrivePill.classList.remove('stage2', 'hyper-zone');
@@ -197,39 +237,45 @@ export class HUD {
 
     this.nitroStatus.classList.remove('ready', 'super', 'locked', 'infinite');
     if (telemetry.nitroLockedByDrift) {
-      this.nitroStatus.textContent = '漂移禁用氮气';
+      this.nitroStatus.textContent = t('hudNitroLocked');
       this.nitroStatus.classList.add('locked');
     } else if (isInfZone && telemetry.isNitroActive) {
-      this.nitroStatus.textContent = '★ ∞ 无限氮气爆发!';
+      this.nitroStatus.textContent = t('hudNitroInfActive');
       this.nitroStatus.classList.add('infinite');
     } else if (isInfZone) {
-      this.nitroStatus.textContent = '∞ 无限 [SHIFT]';
+      this.nitroStatus.textContent = t('hudNitroInfReady');
       this.nitroStatus.classList.add('infinite');
     } else if (telemetry.isSuperNitro) {
-      this.nitroStatus.textContent = '★ SUPER NITRO!';
+      this.nitroStatus.textContent = t('hudNitroSuperActive');
       this.nitroStatus.classList.add('super');
     } else if (telemetry.isNitroActive) {
-      this.nitroStatus.textContent = 'BOOSTING!';
+      this.nitroStatus.textContent = t('hudNitroBoosting');
       this.nitroStatus.classList.add('ready');
     } else if (nPct >= 82) {
-      this.nitroStatus.textContent = 'SUPER READY [SHIFT]';
+      this.nitroStatus.textContent = t('hudNitroSuperReady');
       this.nitroStatus.classList.add('super');
     } else if (nPct >= 14) {
-      this.nitroStatus.textContent = 'READY [SHIFT]';
+      this.nitroStatus.textContent = t('hudNitroReady');
       this.nitroStatus.classList.add('ready');
     } else {
-      this.nitroStatus.textContent = 'DRIFT TO CHARGE';
+      this.nitroStatus.textContent = t('hudNitroCharge');
     }
 
-    // Live Drift Charge HUD (shows live slip angle + road banking angle!)
+    // Live Drift Charge HUD
     if (telemetry.isDrifting) {
       this.driftHud.classList.remove('hidden');
-      const bankTag = telemetry.bankAngleDeg >= 12 ? ` · BANK ${telemetry.bankAngleDeg}°` : '';
+      const bankTag =
+        telemetry.bankAngleDeg >= 12 ? t('hudBankTag', { deg: telemetry.bankAngleDeg }) : '';
       const angleTag = telemetry.driftAngleDeg >= 10 ? ` ${telemetry.driftAngleDeg}°` : '';
       this.driftMeters.textContent = `${telemetry.driftDistance}m${bankTag}`;
       this.driftFill.style.width = `${Math.round(telemetry.driftChargeNorm * 100)}%`;
 
-      const labels = ['DRIFTING', 'MINI BOOST', 'SUPER DRIFT!', '★ ULTRA DRIFT ★'];
+      const labels = [
+        t('hudDriftTier0'),
+        t('hudDriftTier1'),
+        t('hudDriftTier2'),
+        t('hudDriftTier3'),
+      ];
       const cols = ['#7dd3fc', '#00f2ff', '#ffb800', '#ff2aff'];
       this.driftLabel.textContent = `${labels[telemetry.driftTier]}${angleTag}`;
       this.driftLabel.style.color = cols[telemetry.driftTier];
@@ -239,7 +285,7 @@ export class HUD {
       this.driftHud.classList.add('hidden');
     }
 
-    // Upcoming Sharp Corner Telegraph Callout (like Forza / DiRT / GT)
+    // Upcoming Sharp Corner Callout
     const uc = telemetry.upcomingCorner;
     if (uc && !telemetry.isWrongWay && telemetry.speedKmh > 90) {
       this.cornerCalloutEl.classList.remove('hidden');
@@ -252,21 +298,21 @@ export class HUD {
         : uc.direction > 0
           ? '↱'
           : '↰';
-      const dirTxt = uc.direction > 0 ? '右弯' : '左弯';
-      const bankTxt = uc.bankDeg >= 18 ? ` · 倾角 ${uc.bankDeg}°` : '';
-      this.cornerTypeEl.textContent = uc.isHairpin ? `U型发卡${dirTxt}${bankTxt}` : `90° ${dirTxt}${bankTxt}`;
-      this.cornerDistEl.textContent = `${uc.distanceMeters}m · DRIFT`;
+      const dirTxt = uc.direction > 0 ? t('hudCornerRight') : t('hudCornerLeft');
+      const bankTxt = uc.bankDeg >= 18 ? t('hudBankTag', { deg: uc.bankDeg }) : '';
+      this.cornerTypeEl.textContent = uc.isHairpin
+        ? t('hudCornerHairpin', { dir: dirTxt, bank: bankTxt })
+        : t('hudCornerTurn', { dir: dirTxt, bank: bankTxt });
+      this.cornerDistEl.textContent = t('hudCornerDist', { m: uc.distanceMeters });
     } else {
       this.cornerCalloutEl.classList.add('hidden');
     }
 
-    // Alerts (on mobile, suppress slipstream pill when a transient callout pill is active so they never collide)
     this.wrongWayEl.classList.toggle('hidden', !telemetry.isWrongWay);
     const suppressSlip =
       document.body.classList.contains('touch-mode') && this.calloutStack.children.length > 0;
     this.slipstreamEl.classList.toggle('hidden', !telemetry.isSlipstreaming || suppressSlip);
 
-    // Live 2D Minimap
     this.drawMinimap(racers, spline);
   }
 
@@ -284,7 +330,6 @@ export class HUD {
     const pts = this.minimapOutline.points;
     if (pts.length < 3) return;
 
-    // Outer neon track glow
     ctx.save();
     ctx.beginPath();
     pts.forEach((p, idx) => {
@@ -304,7 +349,6 @@ export class HUD {
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Highlight auto-detected Hyper Straight Infinite-Nitro corridors in electric cyan-gold when enabled!
     if (this.showHyperZones && this.minimapHyperSegments.length > 0) {
       ctx.lineCap = 'round';
       for (const seg of this.minimapHyperSegments) {
@@ -325,14 +369,12 @@ export class HUD {
       }
     }
 
-    // Start/Finish marker dot
     const sp = pts[0];
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(pad + sp.x * drawW, pad + sp.y * drawH, 4.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Draw AI racers first, then Player arrow on top
     for (const r of racers) {
       if (r.isPlayer) continue;
       const m = spline.projectToMinimap(r.worldPos, this.minimapOutline);

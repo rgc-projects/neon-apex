@@ -24,14 +24,28 @@ import { AudioEngine } from '../audio/AudioEngine';
 import { HUD } from '../ui/HUD';
 import { MenuUI } from '../ui/MenuUI';
 import { ResultsUI } from '../ui/ResultsUI';
+import { SettingsUI } from '../ui/SettingsUI';
 import { TouchControls } from '../ui/TouchControls';
+import { i18n, t } from '../i18n/i18n';
+import { nativeBridge } from '../platform/NativeBridge';
+import {
+  drawDistanceToFar,
+  GraphicsSettings,
+  isMobileDevice,
+  settingsManager,
+} from '../settings/SettingsManager';
 import { clamp, damp } from '../utils/math';
 import { createProceduralEnvMap } from '../utils/textures';
 
 export class GameEngine {
   private readonly renderer: THREE.WebGLRenderer;
-  private readonly composer: EffectComposer;
-  private readonly bloomPass: UnrealBloomPass;
+  private composer: EffectComposer | null = null;
+  private renderTarget: THREE.WebGLRenderTarget | null = null;
+  private bloomPass: UnrealBloomPass | null = null;
+  private smaaPass: SMAAPass | null = null;
+  private useDirectRender = false;
+  private lastPipelineKey = '';
+
   private readonly scene = new THREE.Scene();
   private readonly cameraController: CameraController;
 
@@ -39,12 +53,20 @@ export class GameEngine {
   private readonly speedLines: SpeedLinesOverlay;
   private readonly hud = new HUD();
   private readonly menuUI: MenuUI;
+  private readonly settingsUI: SettingsUI;
   private readonly resultsUI: ResultsUI;
   private readonly touchControls: TouchControls;
   private readonly pauseOverlay = document.getElementById('pause-overlay')!;
+  private readonly pauseSettingsBtn = document.getElementById('btn-pause-settings')!;
   private readonly pauseDriftNitroBtn = document.getElementById('btn-pause-drift-nitro')!;
   private readonly pauseOverdriveBtn = document.getElementById('btn-pause-overdrive')!;
   private readonly pauseHyperNitroBtn = document.getElementById('btn-pause-hyper-nitro')!;
+
+  // FPS cap & telemetry monitor
+  private lastRenderAt = performance.now();
+  private fpsFrames = 0;
+  private fpsAccumMs = 0;
+  private fpsWindowStart = performance.now();
 
   private state: GameState = 'MENU';
   private selectedCarIndex = 0;
@@ -105,59 +127,24 @@ export class GameEngine {
   };
 
   constructor() {
+    nativeBridge.init();
+    i18n.applyDomTranslations();
+
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     const speedCanvas = document.getElementById('speedlines-canvas') as HTMLCanvasElement;
 
     const initW = Math.round(window.visualViewport?.width ?? window.innerWidth);
     const initH = Math.round(window.visualViewport?.height ?? window.innerHeight);
-    const isMobile =
-      window.matchMedia?.('(pointer: coarse)').matches ||
-      Math.min(initW, initH) <= 720;
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
       powerPreference: 'high-performance',
     });
-    const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.75 : 2.0);
-    this.renderer.setPixelRatio(dpr);
-    this.renderer.setSize(initW, initH);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
 
     this.cameraController = new CameraController(initW / Math.max(initH, 1));
-
-    // Hardware WebGL2 4x MSAA Multisampled HDR RenderTarget + Optical Bloom + OutputPass + SMAA!
-    // Fixes EffectComposer's default 0-sample FBO that previously disabled all hardware anti-aliasing!
-    const maxSamples = this.renderer.capabilities.maxSamples || 0;
-    const msaaSamples = this.renderer.capabilities.isWebGL2 ? Math.min(maxSamples, 4) : 0;
-    const renderTarget = new THREE.WebGLRenderTarget(
-      Math.max(1, Math.floor(initW * dpr)),
-      Math.max(1, Math.floor(initH * dpr)),
-      {
-        type: THREE.HalfFloatType,
-        samples: msaaSamples,
-      }
-    );
-
-    this.composer = new EffectComposer(this.renderer, renderTarget);
-    this.composer.setPixelRatio(dpr);
-    this.composer.setSize(initW, initH);
-    this.composer.addPass(new RenderPass(this.scene, this.cameraController.camera));
-
-    const bloomScale = isMobile ? 0.5 : 1.0;
-    this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(initW * bloomScale, initH * bloomScale),
-      0.26, // strength - authentic camera lens bloom on headlights, taillights & streetlamps
-      0.34, // radius
-      0.90  // threshold - preserves crisp daylight/dusk speculars without neon haze
-    );
-    this.composer.addPass(this.bloomPass);
-    this.composer.addPass(new OutputPass());
-
-    // Post-tonemap SMAA pass removes remaining specular/clearcoat & high-contrast line aliasing
-    const smaaPass = new SMAAPass(Math.floor(initW * dpr), Math.floor(initH * dpr));
-    this.composer.addPass(smaaPass);
 
     // Procedural Realistic Twilight + Streetlamp HDR Reflection Probe
     this.scene.environment = createProceduralEnvMap(this.renderer);
@@ -178,6 +165,10 @@ export class GameEngine {
 
     this.speedLines = new SpeedLinesOverlay(speedCanvas);
 
+    // Build initial dynamic graphics pipeline & apply saved settings
+    this.applyGraphicsSettings(settingsManager.settings.graphics, true);
+    this.applyAudioSettings();
+
     this.touchControls = new TouchControls({
       onAnyInteract: () => this.audio.unlock(),
       onToggleChange: (enabled) => {
@@ -193,6 +184,7 @@ export class GameEngine {
       },
     });
     this.cameraController.setMobileMode(this.touchControls.enabled);
+    this.cameraController.setMode(settingsManager.settings.controls.defaultCamera);
 
     // Restore saved preferences (all 3 default to false!)
     try {
@@ -204,6 +196,44 @@ export class GameEngine {
       this.enableStraightOverdrive = false;
       this.enableHyperNitro = false;
     }
+
+    // Unified Settings Hub (Graphics / Controls / Audio / Language)
+    this.settingsUI = new SettingsUI({
+      onAnyInteract: () => this.audio.unlock(),
+      onTouchEnabledChange: (enabled) => {
+        this.touchControls.setEnabled(enabled);
+      },
+      getTouchEnabled: () => this.touchControls.enabled,
+      onMuteToggle: (muted) => {
+        this.audio.setMuted(muted);
+        this.hud.setMutedLabel(muted);
+        this.menuUI.setMuted(muted);
+      },
+      getMuted: () => this.audio.muted,
+      onNotify: (msg) => this.hud.pushCallout(msg, 'cyan'),
+    });
+
+    // React live whenever any setting changes in SettingsUI or quick toggles
+    settingsManager.subscribe((s, section) => {
+      if (section === 'graphics' || section === 'all') {
+        this.applyGraphicsSettings(s.graphics, false);
+      }
+      if (section === 'controls' || section === 'all') {
+        this.touchControls.applySettings(s.controls, false);
+        this.cameraController.setMode(s.controls.defaultCamera);
+        this.hud.setCameraLabel(this.cameraController.mode);
+      }
+      if (section === 'audio' || section === 'all') {
+        this.applyAudioSettings();
+      }
+    });
+
+    // React live when language toggles
+    i18n.subscribe(() => {
+      this.syncPauseDriftNitroLabel();
+      this.syncPauseOverdriveLabel();
+      this.syncPauseHyperNitroLabel();
+    });
 
     // Wire UI
     this.menuUI = new MenuUI({
@@ -253,6 +283,14 @@ export class GameEngine {
         this.audio.unlock();
         return this.toggleHyperNitro();
       },
+      onOpenSettings: () => {
+        this.audio.unlock();
+        this.settingsUI.open('graphics');
+      },
+      onToggleLang: () => {
+        this.audio.unlock();
+        i18n.toggleLang();
+      },
     });
     this.menuUI.setTouchEnabled(this.touchControls.enabled);
     this.menuUI.setFullscreen(this.touchControls.isFullscreen());
@@ -296,11 +334,15 @@ export class GameEngine {
       this.audio.unlock();
       if (this.state === 'RACING' && this.playerRacer) {
         this.playerRacer.resetToTrack(this.spline);
-        this.hud.pushCallout('TRACK RESET', 'cyan');
+        this.hud.pushCallout(t('msgTrackReset'), 'cyan');
       }
     });
 
     document.getElementById('btn-resume')!.addEventListener('click', () => this.togglePause());
+    this.pauseSettingsBtn.addEventListener('click', () => {
+      this.audio.unlock();
+      this.settingsUI.open('graphics');
+    });
     this.pauseDriftNitroBtn.addEventListener('click', () => {
       this.audio.unlock();
       const enabled = this.toggleDriftNitro();
@@ -325,6 +367,15 @@ export class GameEngine {
       this.enterMenu();
     });
 
+    // Native Android Back button & background auto-pause hooks
+    nativeBridge.onBackButton(() => this.handleBackAction());
+    nativeBridge.onAppBackground(() => {
+      this.touchControls.resetAllInputs();
+      if (this.state === 'RACING') {
+        this.togglePause();
+      }
+    });
+
     this.bindInputs();
     this.bindMenuShowroomDrag(canvas);
     window.addEventListener('resize', this.onResize);
@@ -338,7 +389,142 @@ export class GameEngine {
     this.enterMenu();
 
     this.lastTime = performance.now();
+    this.lastRenderAt = this.lastTime;
+    this.fpsWindowStart = this.lastTime;
     this.loop(this.lastTime);
+  }
+
+  private handleBackAction(): boolean {
+    if (this.settingsUI.isOpen()) {
+      this.settingsUI.close();
+      return true;
+    }
+    if (this.state === 'MENU') {
+      return this.menuUI.closeOpenModal();
+    }
+    if (this.state === 'RACING' || this.state === 'PAUSED') {
+      this.togglePause();
+      return true;
+    }
+    if (this.state === 'RESULTS') {
+      this.enterMenu();
+      return true;
+    }
+    return false;
+  }
+
+  private computeEffectiveDpr(resScale: number): number {
+    const rawDpr = window.devicePixelRatio || 1;
+    if (resScale <= 0.78) return Math.min(rawDpr, 1.0) * 0.75;
+    if (resScale <= 0.9) return Math.min(rawDpr, 1.0) * 0.85;
+    if (resScale <= 1.05) return Math.min(rawDpr, 1.25);
+    if (resScale <= 1.3) return Math.min(rawDpr, 1.6);
+    return Math.min(rawDpr, 2.0);
+  }
+
+  private applyAudioSettings(): void {
+    const a = settingsManager.settings.audio;
+    this.audio.setVolumes(a.masterVolume, a.sfxVolume, a.musicVolume);
+  }
+
+  private applyGraphicsSettings(g: GraphicsSettings, forceRebuild: boolean): void {
+    const w = Math.max(1, Math.round(window.visualViewport?.width ?? window.innerWidth));
+    const h = Math.max(1, Math.round(window.visualViewport?.height ?? window.innerHeight));
+    const dpr = this.computeEffectiveDpr(g.resolutionScale);
+    const mobile = isMobileDevice();
+
+    this.renderer.setPixelRatio(dpr);
+    this.renderer.setSize(w, h);
+    this.cameraController.setAspect(w / Math.max(h, 1));
+    this.cameraController.setDrawDistance(drawDistanceToFar(g.drawDistance));
+    this.particles.setQuality(g.particles);
+    this.speedLines.setQuality(g.particles);
+    this.speedLines.resize(w, h);
+
+    if (!g.showFps) {
+      this.hud.updateFps(60, 16.6, false);
+    }
+
+    const useDirect = g.antiAliasing === 'off' && g.bloom === 'off';
+    const pipelineKey = `${useDirect ? 'direct' : 'comp'}:${g.antiAliasing}:${g.bloom}`;
+
+    if (forceRebuild || pipelineKey !== this.lastPipelineKey) {
+      this.lastPipelineKey = pipelineKey;
+      this.useDirectRender = useDirect;
+
+      if (this.composer) {
+        this.composer.dispose();
+        this.composer = null;
+      }
+      if (this.renderTarget) {
+        this.renderTarget.dispose();
+        this.renderTarget = null;
+      }
+      this.bloomPass = null;
+      this.smaaPass = null;
+
+      if (!useDirect) {
+        const maxSamples = this.renderer.capabilities.maxSamples || 0;
+        const targetSamples =
+          g.antiAliasing === 'msaa4_smaa' ? 4 : g.antiAliasing === 'msaa2' ? 2 : 0;
+        const msaaSamples = this.renderer.capabilities.isWebGL2
+          ? Math.min(maxSamples, targetSamples)
+          : 0;
+
+        this.renderTarget = new THREE.WebGLRenderTarget(
+          Math.max(1, Math.floor(w * dpr)),
+          Math.max(1, Math.floor(h * dpr)),
+          {
+            type: THREE.HalfFloatType,
+            samples: msaaSamples,
+          }
+        );
+
+        this.composer = new EffectComposer(this.renderer, this.renderTarget);
+        this.composer.setPixelRatio(dpr);
+        this.composer.setSize(w, h);
+        this.composer.addPass(new RenderPass(this.scene, this.cameraController.camera));
+
+        if (g.bloom !== 'off') {
+          const bloomScale = g.bloom === 'soft' ? 0.5 : mobile ? 0.65 : 1.0;
+          const strength = g.bloom === 'soft' ? 0.2 : 0.26;
+          const radius = g.bloom === 'soft' ? 0.28 : 0.34;
+          const threshold = g.bloom === 'soft' ? 0.92 : 0.9;
+          this.bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(Math.max(1, Math.floor(w * bloomScale)), Math.max(1, Math.floor(h * bloomScale))),
+            strength,
+            radius,
+            threshold
+          );
+          this.composer.addPass(this.bloomPass);
+        }
+
+        this.composer.addPass(new OutputPass());
+
+        if (g.antiAliasing === 'smaa' || g.antiAliasing === 'msaa4_smaa') {
+          this.smaaPass = new SMAAPass(Math.max(1, Math.floor(w * dpr)), Math.max(1, Math.floor(h * dpr)));
+          this.composer.addPass(this.smaaPass);
+        }
+      }
+    } else if (this.composer) {
+      this.composer.setPixelRatio(dpr);
+      this.composer.setSize(w, h);
+      if (this.bloomPass) {
+        const bloomScale = g.bloom === 'soft' ? 0.5 : mobile ? 0.65 : 1.0;
+        this.bloomPass.setSize(
+          Math.max(1, Math.floor(w * bloomScale)),
+          Math.max(1, Math.floor(h * bloomScale))
+        );
+      }
+    }
+  }
+
+  private renderScene(): void {
+    if (this.useDirectRender || !this.composer) {
+      this.renderer.render(this.scene, this.cameraController.camera);
+    } else {
+      this.composer.render();
+    }
   }
 
   private buildShowcasePedestal(): void {
@@ -539,6 +725,7 @@ export class GameEngine {
 
   private enterMenu(): void {
     this.state = 'MENU';
+    document.body.classList.remove('in-race');
     this.clearRacers();
     this.particles.clear();
     this.skidMarks.clear();
@@ -555,6 +742,7 @@ export class GameEngine {
   }
 
   private startRace(): void {
+    document.body.classList.add('in-race');
     this.clearRacers();
     this.particles.clear();
     this.skidMarks.clear();
@@ -633,8 +821,8 @@ export class GameEngine {
 
   private syncPauseDriftNitroLabel(): void {
     this.pauseDriftNitroBtn.textContent = this.allowDriftNitro
-      ? '🔥 漂移同步喷气：开（允许同喷）'
-      : '🔥 漂移同步喷气：关（漂移禁氮）';
+      ? t('pauseDriftNitroOn')
+      : t('pauseDriftNitroOff');
     this.pauseDriftNitroBtn.style.borderColor = this.allowDriftNitro ? '#00ff9d' : '';
   }
 
@@ -651,7 +839,7 @@ export class GameEngine {
     this.syncPauseDriftNitroLabel();
     if (this.state === 'RACING' || this.state === 'PAUSED') {
       this.hud.pushCallout(
-        this.allowDriftNitro ? '🔥 漂移同步喷气：已开启' : '🔒 漂移同步喷气：已关闭',
+        this.allowDriftNitro ? t('msgDriftNitroOn') : t('msgDriftNitroOff'),
         this.allowDriftNitro ? 'green' : 'cyan'
       );
     }
@@ -660,8 +848,8 @@ export class GameEngine {
 
   private syncPauseOverdriveLabel(): void {
     this.pauseOverdriveBtn.textContent = this.enableStraightOverdrive
-      ? '🚀 长道自动超频：开（自动超频）'
-      : '🚀 长道自动超频：关（原版极速）';
+      ? t('pauseOverdriveOn')
+      : t('pauseOverdriveOff');
     this.pauseOverdriveBtn.style.borderColor = this.enableStraightOverdrive ? '#2dd4bf' : '';
   }
 
@@ -682,7 +870,7 @@ export class GameEngine {
     this.syncPauseOverdriveLabel();
     if (this.state === 'RACING' || this.state === 'PAUSED') {
       this.hud.pushCallout(
-        this.enableStraightOverdrive ? '🚀 长道自动超频：已开启' : '🔒 长道自动超频：已关闭',
+        this.enableStraightOverdrive ? t('msgOverdriveOn') : t('msgOverdriveOff'),
         this.enableStraightOverdrive ? 'green' : 'cyan'
       );
     }
@@ -691,8 +879,8 @@ export class GameEngine {
 
   private syncPauseHyperNitroLabel(): void {
     this.pauseHyperNitroBtn.textContent = this.enableHyperNitro
-      ? '⚡ 长道直道满氮：开（长直道满氮）'
-      : '⚡ 长道直道满氮：关（常规氮气）';
+      ? t('pauseHyperNitroOn')
+      : t('pauseHyperNitroOff');
     this.pauseHyperNitroBtn.style.borderColor = this.enableHyperNitro ? '#fde047' : '';
   }
 
@@ -716,7 +904,7 @@ export class GameEngine {
     this.syncPauseHyperNitroLabel();
     if (this.state === 'RACING' || this.state === 'PAUSED') {
       this.hud.pushCallout(
-        this.enableHyperNitro ? '⚡ 超长直道无限氮气：已开启' : '🔒 超长直道无限氮气：已关闭',
+        this.enableHyperNitro ? t('msgHyperNitroOn') : t('msgHyperNitroOff'),
         this.enableHyperNitro ? 'gold' : 'cyan'
       );
     }
@@ -754,15 +942,23 @@ export class GameEngine {
       if (e.code === 'KeyC' && (this.state === 'RACING' || this.state === 'COUNTDOWN')) {
         const m = this.cameraController.toggleMode();
         this.hud.setCameraLabel(m);
-        this.hud.pushCallout(m === 'HOOD' ? 'HOOD CAMERA' : 'CHASE CAMERA', 'cyan');
+        this.hud.pushCallout(m === 'HOOD' ? t('msgCamHood') : t('msgCamChase'), 'cyan');
       } else if (e.code === 'KeyR' && this.state === 'RACING' && this.playerRacer) {
         this.playerRacer.resetToTrack(this.spline);
-        this.hud.pushCallout('TRACK RESET', 'cyan');
+        this.hud.pushCallout(t('msgTrackReset'), 'cyan');
       } else if (e.code === 'KeyM') {
         const muted = this.audio.toggleMute();
         this.hud.setMutedLabel(muted);
         this.menuUI.setMuted(muted);
-      } else if (e.code === 'Escape' || e.code === 'KeyP') {
+      } else if (e.code === 'Escape') {
+        if (this.settingsUI.isOpen()) {
+          this.settingsUI.close();
+        } else if (this.state === 'MENU') {
+          this.menuUI.closeOpenModal();
+        } else if (this.state === 'RACING' || this.state === 'PAUSED') {
+          this.togglePause();
+        }
+      } else if (e.code === 'KeyP') {
         if (this.state === 'RACING' || this.state === 'PAUSED') {
           this.togglePause();
         }
@@ -823,28 +1019,29 @@ export class GameEngine {
   }
 
   private onResize = (): void => {
-    const w = Math.round(window.visualViewport?.width ?? window.innerWidth);
-    const h = Math.round(window.visualViewport?.height ?? window.innerHeight);
-    const isMobile =
-      window.matchMedia?.('(pointer: coarse)').matches || Math.min(w, h) <= 720;
-    const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.75 : 2.0);
-    this.renderer.setPixelRatio(dpr);
-    this.renderer.setSize(w, h);
-    this.composer.setPixelRatio(dpr);
-    this.composer.setSize(w, h);
-    const bloomScale = isMobile ? 0.5 : 1.0;
-    this.bloomPass.setSize(w * bloomScale, h * bloomScale);
-    this.cameraController.setAspect(w / Math.max(h, 1));
-    this.speedLines.resize(w, h);
+    this.applyGraphicsSettings(settingsManager.settings.graphics, false);
+    this.hud.updateRotateHint();
   };
 
   private loop = (now: number): void => {
     this.animFrameId = requestAnimationFrame(this.loop);
+
+    const g = settingsManager.settings.graphics;
+    if (g.fpsCap > 0) {
+      const minInterval = 1000 / g.fpsCap - 1.5;
+      if (now - this.lastRenderAt < minInterval) {
+        return;
+      }
+    }
+    this.lastRenderAt = now;
+
+    const frameStart = performance.now();
     const rawDt = Math.min((now - this.lastTime) / 1000, 0.05);
     this.lastTime = now;
 
     if (this.state === 'PAUSED') {
-      this.composer.render();
+      this.renderScene();
+      this.recordFpsTick(now, performance.now() - frameStart, g.showFps);
       return;
     }
 
@@ -869,8 +1066,24 @@ export class GameEngine {
     }
 
     this.sceneryBuild?.update(simDt, this.elapsed, this.cameraController.camera.position);
-    this.composer.render();
+    this.renderScene();
+    this.recordFpsTick(now, performance.now() - frameStart, g.showFps);
   };
+
+  private recordFpsTick(now: number, workMs: number, showFps: boolean): void {
+    if (!showFps) return;
+    this.fpsFrames += 1;
+    this.fpsAccumMs += workMs;
+    const span = now - this.fpsWindowStart;
+    if (span >= 400) {
+      const fps = (this.fpsFrames * 1000) / Math.max(span, 1);
+      const avgFrameMs = span / Math.max(this.fpsFrames, 1);
+      this.hud.updateFps(fps, avgFrameMs, true);
+      this.fpsFrames = 0;
+      this.fpsAccumMs = 0;
+      this.fpsWindowStart = now;
+    }
+  }
 
   private updateMenuState(dt: number): void {
     if (this.showcaseCar) {
@@ -908,7 +1121,7 @@ export class GameEngine {
       this.audio.playCountdownBeep(stage === 4);
     }
 
-    const label = stage === 1 ? '3' : stage === 2 ? '2' : stage === 3 ? '1' : 'GO!';
+    const label = stage === 1 ? '3' : stage === 2 ? '2' : stage === 3 ? '1' : t('countdownGo');
     this.hud.showCountdown(label, stage === 4, this.startRevRpm, stage < 4);
 
     if (this.playerRacer) {
@@ -951,7 +1164,7 @@ export class GameEngine {
         this.playerRacer.applyPerfectStart();
         this.audio.playPerfectStart();
         this.cameraController.addShake(0.45);
-        this.hud.pushCallout('⚡ PERFECT START! +300', 'green');
+        this.hud.pushCallout(t('msgPerfectStart'), 'green');
         this.particles.emitImpactBurst(this.playerRacer.worldPos, 0x00ff9d, 28);
       }
       setTimeout(() => {
@@ -966,7 +1179,7 @@ export class GameEngine {
 
     const playerEvents: PhysicsEvents = {
       onDriftBoost: (tier, distMeters, points) => {
-        const names = ['', 'DRIFT BOOST!', 'SUPER DRIFT!', '★ ULTRA DRIFT ★'];
+        const names = ['', t('msgDriftBoost1'), t('msgDriftBoost2'), t('msgDriftBoost3')];
         const colors: ('cyan' | 'gold' | 'magenta')[] = ['cyan', 'cyan', 'gold', 'magenta'];
         this.hud.pushCallout(`${names[tier]} ${Math.round(distMeters)}m +${points}`, colors[tier]);
         this.audio.playDriftBoost(tier);
@@ -974,7 +1187,7 @@ export class GameEngine {
         this.touchControls.vibrate(tier >= 2 ? [20, 15, 30] : 22);
       },
       onBoostPad: () => {
-        this.hud.pushCallout('⚡ BOOST PAD +120', 'cyan');
+        this.hud.pushCallout(t('msgBoostPad'), 'cyan');
         this.audio.playBoostPad();
         this.cameraController.addShake(0.32);
         this.touchControls.vibrate(20);
@@ -984,7 +1197,7 @@ export class GameEngine {
         this.cameraController.addShake(0.25);
       },
       onLanding: (airTime, points) => {
-        this.hud.pushCallout(`AIR TIME ${airTime.toFixed(1)}s! +${points}`, 'gold');
+        this.hud.pushCallout(t('msgAirTime', { s: airTime.toFixed(1), pts: points }), 'gold');
         this.audio.playLanding();
         this.cameraController.addShake(clamp(airTime * 0.35, 0.25, 0.65));
         this.touchControls.vibrate(25);
@@ -1004,7 +1217,7 @@ export class GameEngine {
         this.cameraController.addShake(isSuper ? 0.52 : 0.26);
         this.touchControls.vibrate(isSuper ? [28, 18, 46] : 24);
         if (isSuper) {
-          this.hud.pushCallout('🔥 SUPER NITRO OVERDRIVE!', 'magenta');
+          this.hud.pushCallout(t('msgSuperNitro'), 'magenta');
         }
       },
       onOverdriveStage: (stage) => {
@@ -1012,7 +1225,7 @@ export class GameEngine {
         this.cameraController.addShake(stage === 2 ? 0.36 : 0.16);
         this.touchControls.vibrate(stage === 2 ? [18, 14, 30] : 16);
         this.hud.pushCallout(
-          stage === 2 ? '⚡⚡ HYPER OVERDRIVE II!' : '⚡ DRS OVERDRIVE I',
+          stage === 2 ? t('msgOverdrive2') : t('msgOverdrive1'),
           stage === 2 ? 'gold' : 'green'
         );
       },
@@ -1022,13 +1235,13 @@ export class GameEngine {
         this.audio.playBoostPad();
         this.cameraController.addShake(0.24);
         this.touchControls.vibrate([16, 12, 26]);
-        this.hud.pushCallout(`⚡ HYPER STRAIGHT · ∞ 无限氮气 (${lenLabel})`, 'gold');
+        this.hud.pushCallout(t('msgHyperEnter', { len: lenLabel }), 'gold');
       },
       onLapComplete: (newLap) => {
         const isFinal = newLap === player.totalLaps;
         this.audio.playLapChime(isFinal);
         this.hud.pushCallout(
-          isFinal ? '★ FINAL LAP! ★' : `LAP ${newLap} / ${player.totalLaps}`,
+          isFinal ? t('msgFinalLap') : t('msgLapProgress', { lap: newLap, total: player.totalLaps }),
           isFinal ? 'magenta' : 'cyan'
         );
       },
@@ -1179,7 +1392,7 @@ export class GameEngine {
     const p = this.playerRacer!;
     this.audio.playFinishFanfare(p.rank === 1);
     this.hud.pushCallout(
-      p.rank === 1 ? '🏆 FINISH! 1ST PLACE!' : `🏁 FINISH! #${p.rank}`,
+      p.rank === 1 ? t('msgFinishWin') : t('msgFinishRank', { rank: p.rank }),
       p.rank === 1 ? 'gold' : 'cyan'
     );
     this.particles.emitImpactBurst(p.worldPos.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xffb800, 45);
@@ -1238,6 +1451,8 @@ export class GameEngine {
     this.destructibles?.dispose();
     this.particles.dispose();
     this.skidMarks.dispose();
+    this.composer?.dispose();
+    this.renderTarget?.dispose();
     this.audio.dispose();
     this.renderer.dispose();
   }

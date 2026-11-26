@@ -269,6 +269,11 @@ export class ParticleSystem {
   private readonly trailRight: NitroRibbonTrail;
   private readonly _vel = new THREE.Vector3();
   private readonly _col = new THREE.Color();
+  private qualityScale = 1.0;
+
+  public setQuality(level: 'low' | 'medium' | 'high'): void {
+    this.qualityScale = level === 'low' ? 0.35 : level === 'medium' ? 0.7 : 1.0;
+  }
 
   constructor() {
     this.glowTex = createParticleGlowTexture();
@@ -291,7 +296,11 @@ export class ParticleSystem {
     const hex = tier === 3 ? 0x93c5fd : tier === 2 ? 0xffe49e : tier === 1 ? 0xffa940 : 0xff8c2b;
     this._col.setHex(hex).multiplyScalar(1.35);
 
-    for (let i = 0; i < count; i++) {
+    const scaledCount = Math.max(
+      this.qualityScale >= 0.65 ? 1 : Math.random() < this.qualityScale ? 1 : 0,
+      Math.round(count * this.qualityScale)
+    );
+    for (let i = 0; i < scaledCount; i++) {
       this._vel
         .copy(carForward)
         .multiplyScalar(-(7 + Math.random() * 11))
@@ -303,6 +312,7 @@ export class ParticleSystem {
   }
 
   public emitTireSmoke(pos: THREE.Vector3, carForward: THREE.Vector3, carUp: THREE.Vector3, tintHex = 0xd6dde8): void {
+    if (this.qualityScale < 0.99 && Math.random() > this.qualityScale) return;
     this._col.setHex(tintHex);
     this._vel
       .copy(carForward)
@@ -315,7 +325,11 @@ export class ParticleSystem {
 
   public emitImpactBurst(pos: THREE.Vector3, hexColor: number, count = 22): void {
     this._col.setHex(hexColor).multiplyScalar(1.7);
-    for (let i = 0; i < count; i++) {
+    const scaledCount = Math.max(
+      this.qualityScale >= 0.65 ? 1 : Math.random() < this.qualityScale ? 1 : 0,
+      Math.round(count * this.qualityScale)
+    );
+    for (let i = 0; i < scaledCount; i++) {
       this._vel.set(
         (Math.random() - 0.5) * 24,
         4 + Math.random() * 14,

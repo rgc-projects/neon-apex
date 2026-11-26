@@ -3,6 +3,17 @@ node_modules/
 
 # Build output
 dist/
+releases/
+
+# Android Gradle local artifacts (keep android/ source tracked per Capacitor best practices)
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/res/xml/config.xml
 
 # Cloudflare Wrangler local state
 .wrangler/

@@ -34,6 +34,20 @@ export class CameraController {
     this.camera.updateProjectionMatrix();
   }
 
+  public setDrawDistance(farMeters: number): void {
+    if (Math.abs(this.camera.far - farMeters) > 10) {
+      this.camera.far = farMeters;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  public setMode(mode: CameraMode): void {
+    if (this.mode !== mode) {
+      this.mode = mode;
+      this.initialized = false;
+    }
+  }
+
   public setMobileMode(mobile: boolean): void {
     this.mobileMode = mobile;
   }

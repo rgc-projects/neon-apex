@@ -19,14 +19,15 @@ class SupercarAssetManager {
     }
 
     this.templatePromise = new Promise((resolve, reject) => {
+      const base = import.meta.env.BASE_URL || './';
       const dracoLoader = new DRACOLoader();
-      dracoLoader.setDecoderPath('/draco/');
+      dracoLoader.setDecoderPath(`${base}draco/`);
 
       const gltfLoader = new GLTFLoader();
       gltfLoader.setDRACOLoader(dracoLoader);
 
       gltfLoader.load(
-        '/models/supercar.glb',
+        `${base}models/supercar.glb`,
         (gltf) => {
           const root = gltf.scene;
           root.updateMatrixWorld(true);

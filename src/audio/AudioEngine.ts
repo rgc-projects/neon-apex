@@ -31,9 +31,29 @@ export class AudioEngine {
   private bgmStep = 0;
 
   public muted = false;
+  private masterVol = 0.75;
+  private sfxVol = 0.85;
+  private musicVol = 0.48;
   private initialized = false;
   private engineActive = false;
   private racingIntensity = 0;
+
+  public setVolumes(master: number, sfx: number, music: number): void {
+    this.masterVol = clamp(master, 0, 1);
+    this.sfxVol = clamp(sfx, 0, 1);
+    this.musicVol = clamp(music, 0, 1);
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    if (this.masterGain) {
+      this.masterGain.gain.setTargetAtTime(this.muted ? 0 : this.masterVol * 0.96, now, 0.04);
+    }
+    if (this.sfxGain) {
+      this.sfxGain.gain.setTargetAtTime(this.sfxVol, now, 0.04);
+    }
+    if (this.musicGain) {
+      this.musicGain.gain.setTargetAtTime(this.musicVol * 0.72, now, 0.04);
+    }
+  }
 
   public unlock(): void {
     if (this.initialized) {
@@ -57,11 +77,11 @@ export class AudioEngine {
     comp.connect(ctx.destination);
 
     this.masterGain = ctx.createGain();
-    this.masterGain.gain.value = this.muted ? 0 : 0.72;
+    this.masterGain.gain.value = this.muted ? 0 : this.masterVol * 0.96;
     this.masterGain.connect(comp);
 
     this.sfxGain = ctx.createGain();
-    this.sfxGain.gain.value = 0.85;
+    this.sfxGain.gain.value = this.sfxVol;
     this.sfxGain.connect(this.masterGain);
 
     this.musicFilter = ctx.createBiquadFilter();
@@ -70,7 +90,7 @@ export class AudioEngine {
     this.musicFilter.Q.value = 1.2;
 
     this.musicGain = ctx.createGain();
-    this.musicGain.gain.value = 0.34;
+    this.musicGain.gain.value = this.musicVol * 0.72;
     this.musicFilter.connect(this.musicGain);
     this.musicGain.connect(this.masterGain);
 
@@ -175,7 +195,7 @@ export class AudioEngine {
   public setMuted(muted: boolean): void {
     this.muted = muted;
     if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setTargetAtTime(muted ? 0 : 0.72, this.ctx.currentTime, 0.04);
+      this.masterGain.gain.setTargetAtTime(muted ? 0 : this.masterVol * 0.96, this.ctx.currentTime, 0.04);
     }
   }
 

@@ -1,5 +1,6 @@
 import { CAR_SPECS } from '../config/cars';
 import { TRACK_CONFIGS } from '../config/tracks';
+import { i18n, t } from '../i18n/i18n';
 import { TrackConfig } from '../types';
 import { TrackSpline } from '../track/TrackSpline';
 
@@ -14,6 +15,8 @@ export interface MenuCallbacks {
   onToggleDriftNitro: () => boolean;
   onToggleOverdrive: () => boolean;
   onToggleHyperNitro: () => boolean;
+  onOpenSettings: () => void;
+  onToggleLang: () => void;
 }
 
 type TrackCategory = 'all' | 'classic' | 'drift' | 'mega' | 'fav';
@@ -42,6 +45,8 @@ export class MenuUI {
   private readonly showcaseCarName = document.getElementById('showcase-car-name')!;
   private readonly showcaseTrackName = document.getElementById('showcase-track-name')!;
   private readonly launchSubEl = document.getElementById('launch-sub')!;
+  private readonly langBtn = document.getElementById('btn-menu-lang')!;
+  private readonly settingsBtn = document.getElementById('btn-menu-settings')!;
   private readonly fullscreenBtn = document.getElementById('btn-menu-fullscreen')!;
   private readonly audioBtn = document.getElementById('btn-menu-audio')!;
   private readonly touchBtn = document.getElementById('btn-menu-touch')!;
@@ -95,10 +100,16 @@ export class MenuUI {
   private readonly favorites = new Set<string>();
   private readonly trackMetas: TrackMeta[] = [];
 
+  private currentMuted = false;
+  private currentTouch = false;
+  private currentFullscreen = false;
+  private currentDriftNitro = false;
+  private currentOverdrive = false;
+  private currentHyperNitro = false;
+
   constructor(private readonly callbacks: MenuCallbacks) {
     this.loadFavorites();
 
-    // Precompute crisp SVG silhouettes, exact lengths, elevation spans & auto-categories from real 3D splines
     TRACK_CONFIGS.forEach((cfg, index) => {
       const spline = new TrackSpline(cfg);
       const lengthMeters = Math.round(spline.totalLength);
@@ -135,10 +146,7 @@ export class MenuUI {
 
     this.trackTotalCountEl.textContent = String(this.trackMetas.length);
 
-    this.renderCars();
-    this.renderTrackHub();
-    this.syncLapButtons();
-    this.updateSelectionReadout();
+    this.renderAllLocalized();
 
     // Lap selection
     this.lapButtons.forEach((btn) => {
@@ -175,17 +183,9 @@ export class MenuUI {
       this.renderCatalogGrid();
     });
 
-    // Global Escape closes Circuit Catalog or Controls modal when open on menu
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Escape' && this.root.classList.contains('active')) {
-        if (!this.catalogModal.classList.contains('hidden')) {
-          this.closeCatalog();
-        } else if (!this.controlsModal.classList.contains('hidden')) {
-          this.controlsModal.classList.add('hidden');
-        }
-      }
-    });
-
+    // Header actions & race switches
+    this.langBtn.addEventListener('click', () => this.callbacks.onToggleLang());
+    this.settingsBtn.addEventListener('click', () => this.callbacks.onOpenSettings());
     this.startBtn.addEventListener('click', () => this.callbacks.onStartRace());
     this.fullscreenBtn.addEventListener('click', () => this.callbacks.onToggleFullscreen());
     this.audioBtn.addEventListener('click', () => {
@@ -227,6 +227,40 @@ export class MenuUI {
     };
     this.tabCarsBtn.addEventListener('click', () => setMobileTab('cars'));
     this.tabTracksBtn.addEventListener('click', () => setMobileTab('tracks'));
+
+    // React seamlessly whenever language toggles!
+    i18n.subscribe(() => {
+      this.renderAllLocalized();
+    });
+  }
+
+  public closeOpenModal(): boolean {
+    if (!this.catalogModal.classList.contains('hidden')) {
+      this.closeCatalog();
+      return true;
+    }
+    if (!this.controlsModal.classList.contains('hidden')) {
+      this.controlsModal.classList.add('hidden');
+      return true;
+    }
+    return false;
+  }
+
+  private renderAllLocalized(): void {
+    this.renderCars();
+    this.renderTrackHub();
+    this.syncLapButtons();
+    this.updateSelectionReadout();
+    this.setMuted(this.currentMuted);
+    this.setTouchEnabled(this.currentTouch);
+    this.setFullscreen(this.currentFullscreen);
+    this.setDriftNitroEnabled(this.currentDriftNitro);
+    this.setOverdriveEnabled(this.currentOverdrive);
+    this.setHyperNitroEnabled(this.currentHyperNitro);
+    if (!this.catalogModal.classList.contains('hidden')) {
+      this.renderCatalogTabs();
+      this.renderCatalogGrid();
+    }
   }
 
   private loadFavorites(): void {
@@ -240,7 +274,7 @@ export class MenuUI {
         }
       }
     } catch {
-      // Ignore malformed/blocked storage
+      // Ignore storage errors
     }
   }
 
@@ -248,7 +282,7 @@ export class MenuUI {
     try {
       localStorage.setItem(FAV_STORAGE_KEY, JSON.stringify(Array.from(this.favorites)));
     } catch {
-      // Ignore blocked storage
+      // Ignore storage errors
     }
   }
 
@@ -322,50 +356,57 @@ export class MenuUI {
   }
 
   public setMuted(muted: boolean): void {
+    this.currentMuted = muted;
     const icon = this.audioBtn.querySelector('.icon')!;
     const label = this.audioBtn.querySelector('.label')!;
     icon.textContent = muted ? '🔇' : '🔊';
-    label.textContent = muted ? 'AUDIO OFF' : 'AUDIO ON';
+    label.textContent = muted ? t('btnAudioOff') : t('btnAudioOn');
   }
 
   public setTouchEnabled(enabled: boolean): void {
+    this.currentTouch = enabled;
     const label = this.touchBtn.querySelector('.label')!;
-    label.textContent = enabled ? '触屏: 开' : '触屏: 关';
+    label.textContent = enabled ? t('btnTouchOn') : t('btnTouchOff');
     this.touchBtn.style.borderColor = enabled ? '#00ff9d' : '';
   }
 
   public setFullscreen(active: boolean): void {
+    this.currentFullscreen = active;
     const icon = this.fullscreenBtn.querySelector('.icon')!;
     const label = this.fullscreenBtn.querySelector('.label')!;
     icon.innerHTML = active
       ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>'
       : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
-    label.textContent = active ? '退出全屏' : '全屏';
+    label.textContent = active ? t('btnExitFullscreen') : t('btnFullscreen');
     this.fullscreenBtn.style.borderColor = active ? '#00f2ff' : '';
   }
 
   public setDriftNitroEnabled(enabled: boolean): void {
+    this.currentDriftNitro = enabled;
     this.driftNitroBtn.classList.toggle('active', enabled);
     this.driftNitroBtn.setAttribute('aria-checked', String(enabled));
-    this.driftNitroStateEl.textContent = enabled ? '开' : '关';
+    this.driftNitroStateEl.textContent = enabled ? t('stateOn') : t('stateOff');
   }
 
   public setOverdriveEnabled(enabled: boolean): void {
+    this.currentOverdrive = enabled;
     this.overdriveBtn.classList.toggle('active', enabled);
     this.overdriveBtn.setAttribute('aria-checked', String(enabled));
-    this.overdriveStateEl.textContent = enabled ? '开' : '关';
+    this.overdriveStateEl.textContent = enabled ? t('stateOn') : t('stateOff');
   }
 
   public setHyperNitroEnabled(enabled: boolean): void {
+    this.currentHyperNitro = enabled;
     this.hyperNitroBtn.classList.toggle('active', enabled);
     this.hyperNitroBtn.setAttribute('aria-checked', String(enabled));
-    this.hyperNitroStateEl.textContent = enabled ? '开' : '关';
+    this.hyperNitroStateEl.textContent = enabled ? t('stateOn') : t('stateOff');
   }
 
   private renderCars(): void {
     this.carListEl.innerHTML = '';
     CAR_SPECS.forEach((car, idx) => {
       const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = `select-card ${idx === this.selectedCar ? 'selected' : ''}`;
       const paintHex = `#${car.primaryColor.toString(16).padStart(6, '0')}`;
       btn.innerHTML = `
@@ -374,9 +415,9 @@ export class MenuUI {
             <span class="color-swatch" style="background:${paintHex};color:${paintHex}"></span>
             <span class="card-name">${car.name}</span>
           </div>
-          <span class="card-badge">${car.archetypeZh}</span>
+          <span class="card-badge">${i18n.getCarArchetype(car)}</span>
         </div>
-        <div class="card-sub">${car.subtitle} · ${car.archetype}</div>
+        <div class="card-sub">${i18n.getCarSubtitle(car)}</div>
       `;
       btn.addEventListener('click', () => {
         this.selectedCar = idx;
@@ -389,11 +430,11 @@ export class MenuUI {
 
     const c = CAR_SPECS[this.selectedCar];
     this.carSpecsEl.innerHTML = `
-      <p class="spec-desc">${c.description}</p>
-      ${this.statBarHtml('TOP SPEED', c.stats.speed)}
-      ${this.statBarHtml('ACCEL', c.stats.accel)}
-      ${this.statBarHtml('DRIFT', c.stats.drift)}
-      ${this.statBarHtml('NITRO', c.stats.nitro)}
+      <p class="spec-desc">${i18n.getCarDesc(c)}</p>
+      ${this.statBarHtml(t('statSpeed'), c.stats.speed)}
+      ${this.statBarHtml(t('statAccel'), c.stats.accel)}
+      ${this.statBarHtml(t('statDrift'), c.stats.drift)}
+      ${this.statBarHtml(t('statNitro'), c.stats.nitro)}
     `;
   }
 
@@ -419,10 +460,10 @@ export class MenuUI {
     const isFav = this.favorites.has(tr.id);
     const diffClass = this.diffClassFor(tr.difficulty);
 
-    this.heroNameEl.textContent = tr.nameZh;
-    this.heroBadgeEl.textContent = tr.difficulty;
+    this.heroNameEl.textContent = i18n.getTrackName(tr);
+    this.heroBadgeEl.textContent = i18n.getDifficultyLabel(tr.difficulty);
     this.heroBadgeEl.className = `card-badge ${diffClass}`;
-    this.heroSubEl.textContent = tr.name;
+    this.heroSubEl.textContent = i18n.getTrackSub(tr);
     this.heroFavBtn.textContent = isFav ? '★' : '☆';
     this.heroFavBtn.classList.toggle('active', isFav);
 
@@ -430,37 +471,40 @@ export class MenuUI {
     this.heroSvgEl.style.filter = `drop-shadow(0 0 8px ${tr.accentColorHex}88)`;
 
     const lenLabel = this.formatLen(meta.lengthMeters);
-    const lapWord = this.selectedLaps === 1 ? '1 LAP' : `${this.selectedLaps} LAPS`;
+    const lapWord = i18n.formatLapPill(this.selectedLaps);
     const hyperChip =
-      meta.hyperZoneCount > 0 ? `<span class="hero-chip hyper">⚡ ${meta.hyperZoneCount} 长直道</span>` : '';
-    const elevChip = meta.elevSpan >= 35 ? `<span class="hero-chip">⛰ ${meta.elevSpan}m 落差</span>` : '';
+      meta.hyperZoneCount > 0
+        ? `<span class="hero-chip hyper">⚡ ${t('hyperShort', { n: meta.hyperZoneCount })}</span>`
+        : '';
+    const elevChip =
+      meta.elevSpan >= 35 ? `<span class="hero-chip">⛰ ${t('elevShort', { m: meta.elevSpan })}</span>` : '';
 
     this.heroQuickChipsEl.innerHTML = `
       <span class="hero-chip accent">${lenLabel}</span>
-      <span class="hero-chip">倾角 ${tr.maxBankDeg}°</span>
+      <span class="hero-chip">${t('bankShort', { deg: tr.maxBankDeg })}</span>
       ${elevChip}
       ${hyperChip}
     `;
 
     this.trackInfoEl.innerHTML = `
-      <div class="track-desc-clamp">${tr.description}</div>
+      <div class="track-desc-clamp">${i18n.getTrackDesc(tr)}</div>
       <div class="track-meta-pills">
-        <span class="meta-pill">单圈 ${lenLabel}</span>
+        <span class="meta-pill">${t('singleLapLen', { len: lenLabel })}</span>
         <span class="meta-pill">${lapWord}</span>
-        <span class="meta-pill">${tr.boostPads.length} 加速带</span>
-        <span class="meta-pill">${tr.jumpRamps.length} 飞跃跳台</span>
-        <span class="meta-pill">最大倾角 ${tr.maxBankDeg}°</span>
+        <span class="meta-pill">${t('boostPadsCount', { n: tr.boostPads.length })}</span>
+        <span class="meta-pill">${t('jumpRampsCount', { n: tr.jumpRamps.length })}</span>
+        <span class="meta-pill">${t('maxBankLabel', { deg: tr.maxBankDeg })}</span>
       </div>
     `;
   }
 
   private renderSidebarCategoryTabs(): void {
     const defs: { id: TrackCategory; label: string }[] = [
-      { id: 'all', label: '全部' },
-      { id: 'classic', label: '经典' },
-      { id: 'drift', label: '漂移' },
-      { id: 'mega', label: '超长' },
-      { id: 'fav', label: '★收藏' },
+      { id: 'all', label: t('catAll') },
+      { id: 'classic', label: t('catClassic') },
+      { id: 'drift', label: t('catDrift') },
+      { id: 'mega', label: t('catMega') },
+      { id: 'fav', label: t('catFav') },
     ];
     this.sidebarCatTabsEl.innerHTML = '';
     for (const d of defs) {
@@ -488,8 +532,8 @@ export class MenuUI {
       const empty = document.createElement('div');
       empty.className = 'track-list-empty';
       empty.innerHTML = `
-        <span>${this.sidebarCategory === 'fav' ? '还没有收藏赛道，点 ☆ 即可收藏' : '该分类暂无赛道'}</span>
-        <button type="button" class="empty-reset-btn">查看全部</button>
+        <span>${this.sidebarCategory === 'fav' ? t('listEmptyFav') : t('listEmptyOther')}</span>
+        <button type="button" class="empty-reset-btn">${t('btnViewAll')}</button>
       `;
       empty.querySelector('button')!.addEventListener('click', () => {
         this.sidebarCategory = 'all';
@@ -503,33 +547,33 @@ export class MenuUI {
     let selectedBtn: HTMLButtonElement | null = null;
 
     for (const meta of filtered) {
-      const t = meta.config;
+      const tCfg = meta.config;
       const isSelected = meta.index === this.selectedTrack;
-      const isFav = this.favorites.has(t.id);
-      const diffClass = this.diffClassFor(t.difficulty);
+      const isFav = this.favorites.has(tCfg.id);
+      const diffClass = this.diffClassFor(tCfg.difficulty);
 
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `select-card track-card compact-row ${isSelected ? 'selected' : ''}`;
-      btn.dataset.trackId = t.id;
+      btn.dataset.trackId = tCfg.id;
       btn.innerHTML = `
         <div class="track-row-inner">
           <svg class="track-svg compact-svg" viewBox="0 0 100 80">
-            <path d="${meta.svgPath}" fill="none" stroke="${t.accentColorHex}" stroke-width="4.5" stroke-linejoin="round" />
+            <path d="${meta.svgPath}" fill="none" stroke="${tCfg.accentColorHex}" stroke-width="4.5" stroke-linejoin="round" />
           </svg>
           <div class="track-row-text">
             <div class="track-row-top">
-              <span class="card-name">${t.nameZh}</span>
-              <span class="card-badge ${diffClass}">${t.difficulty}</span>
+              <span class="card-name">${i18n.getTrackName(tCfg)}</span>
+              <span class="card-badge ${diffClass}">${i18n.getDifficultyLabel(tCfg.difficulty)}</span>
             </div>
             <div class="track-row-meta">
               <span>${this.formatLen(meta.lengthMeters)}</span>
               <span>·</span>
-              <span>倾角 ${t.maxBankDeg}°</span>
-              ${meta.hyperZoneCount > 0 ? '<span>· ⚡长直道</span>' : ''}
+              <span>${t('bankShort', { deg: tCfg.maxBankDeg })}</span>
+              ${meta.hyperZoneCount > 0 ? `<span>· ${t('hyperRowTag')}</span>` : ''}
             </div>
           </div>
-          <span class="row-fav-star ${isFav ? 'active' : ''}" role="button" tabindex="-1" title="收藏/取消收藏">${isFav ? '★' : '☆'}</span>
+          <span class="row-fav-star ${isFav ? 'active' : ''}" role="button" tabindex="-1" title="${t('btnFavTrack')}">${isFav ? '★' : '☆'}</span>
         </div>
       `;
 
@@ -537,7 +581,7 @@ export class MenuUI {
         const target = e.target as HTMLElement;
         if (target.closest('.row-fav-star')) {
           e.stopPropagation();
-          this.toggleFavorite(t.id);
+          this.toggleFavorite(tCfg.id);
           return;
         }
         this.selectTrackByIndex(meta.index, false);
@@ -554,11 +598,11 @@ export class MenuUI {
 
   private renderCatalogTabs(): void {
     const defs: { id: TrackCategory; label: string }[] = [
-      { id: 'all', label: '🌐 全部赛道' },
-      { id: 'classic', label: '🏙️ 经典短程' },
-      { id: 'drift', label: '🔥 漂移圣地' },
-      { id: 'mega', label: '🏔️ 超长史诗' },
-      { id: 'fav', label: '★ 我的收藏' },
+      { id: 'all', label: t('catAllFull') },
+      { id: 'classic', label: t('catClassicFull') },
+      { id: 'drift', label: t('catDriftFull') },
+      { id: 'mega', label: t('catMegaFull') },
+      { id: 'fav', label: t('catFavFull') },
     ];
     this.catalogCatTabsEl.innerHTML = '';
     for (const d of defs) {
@@ -584,7 +628,7 @@ export class MenuUI {
       if (!this.matchesCategory(m, this.catalogCategory)) return false;
       if (!q) return true;
       const c = m.config;
-      const hay = `${c.nameZh} ${c.name} ${c.description} ${c.difficulty} ${this.formatLen(m.lengthMeters)} ${c.maxBankDeg}`.toLowerCase();
+      const hay = `${c.nameZh} ${c.name} ${c.description} ${i18n.getTrackName(c)} ${i18n.getTrackDesc(c)} ${c.difficulty} ${i18n.getDifficultyLabel(c.difficulty)} ${this.formatLen(m.lengthMeters)} ${c.maxBankDeg}`.toLowerCase();
       return hay.includes(q);
     });
 
@@ -603,9 +647,9 @@ export class MenuUI {
       const empty = document.createElement('div');
       empty.className = 'catalog-empty';
       empty.innerHTML = `
-        <div class="catalog-empty-title">未找到匹配的赛道</div>
-        <div class="catalog-empty-sub">${this.catalogCategory === 'fav' ? '点击任意赛道卡片右上角的 ☆ 即可加入收藏' : '尝试更换搜索关键词或切换分类标签'}</div>
-        <button type="button" class="cyber-btn">重置筛选条件</button>
+        <div class="catalog-empty-title">${t('catalogEmptyTitle')}</div>
+        <div class="catalog-empty-sub">${this.catalogCategory === 'fav' ? t('catalogEmptyFavSub') : t('catalogEmptySearchSub')}</div>
+        <button type="button" class="cyber-btn">${t('catalogResetBtn')}</button>
       `;
       empty.querySelector('button')!.addEventListener('click', () => {
         this.catalogCategory = 'all';
@@ -621,42 +665,42 @@ export class MenuUI {
     }
 
     for (const meta of list) {
-      const t = meta.config;
+      const tr = meta.config;
       const isSelected = meta.index === this.selectedTrack;
-      const isFav = this.favorites.has(t.id);
-      const diffClass = this.diffClassFor(t.difficulty);
+      const isFav = this.favorites.has(tr.id);
+      const diffClass = this.diffClassFor(tr.difficulty);
 
       const card = document.createElement('div');
       card.className = `catalog-card ${isSelected ? 'selected' : ''}`;
-      card.dataset.trackId = t.id;
+      card.dataset.trackId = tr.id;
       card.tabIndex = 0;
       card.setAttribute('role', 'button');
-      card.style.setProperty('--track-accent', t.accentColorHex);
+      card.style.setProperty('--track-accent', tr.accentColorHex);
       card.innerHTML = `
         <div class="catalog-card-blueprint">
           <div class="catalog-bp-bar">
             <div class="catalog-card-top-badges">
-              <span class="card-badge ${diffClass}">${t.difficulty}</span>
-              ${isSelected ? '<span class="catalog-selected-tag">已选中</span>' : ''}
+              <span class="card-badge ${diffClass}">${i18n.getDifficultyLabel(tr.difficulty)}</span>
+              ${isSelected ? `<span class="catalog-selected-tag">${t('catalogSelected')}</span>` : ''}
             </div>
-            <button type="button" class="catalog-fav-btn ${isFav ? 'active' : ''}" aria-label="收藏赛道" title="收藏/取消收藏">${isFav ? '★' : '☆'}</button>
+            <button type="button" class="catalog-fav-btn ${isFav ? 'active' : ''}" aria-label="${t('btnFavTrack')}" title="${t('btnFavTrack')}">${isFav ? '★' : '☆'}</button>
           </div>
           <div class="catalog-bp-stage">
             <svg class="catalog-card-svg" viewBox="0 0 100 80">
-              <path d="${meta.svgPath}" fill="none" stroke="${t.accentColorHex}" stroke-width="3.8" stroke-linejoin="round" stroke-linecap="round" />
+              <path d="${meta.svgPath}" fill="none" stroke="${tr.accentColorHex}" stroke-width="3.8" stroke-linejoin="round" stroke-linecap="round" />
             </svg>
           </div>
         </div>
         <div class="catalog-card-body">
-          <div class="catalog-card-title">${t.nameZh}</div>
-          <div class="catalog-card-sub">${t.name}</div>
-          <div class="catalog-card-desc">${t.description}</div>
+          <div class="catalog-card-title">${i18n.getTrackName(tr)}</div>
+          <div class="catalog-card-sub">${i18n.getTrackSub(tr)}</div>
+          <div class="catalog-card-desc">${i18n.getTrackDesc(tr)}</div>
           <div class="catalog-card-chips">
             <span class="meta-pill">📏 ${this.formatLen(meta.lengthMeters)}</span>
-            <span class="meta-pill">📐 ${t.maxBankDeg}°</span>
+            <span class="meta-pill">📐 ${tr.maxBankDeg}°</span>
             ${meta.elevSpan >= 35 ? `<span class="meta-pill">⛰ ${meta.elevSpan}m</span>` : ''}
-            ${t.jumpRamps.length > 0 ? `<span class="meta-pill">🛫 ${t.jumpRamps.length} 跳台</span>` : ''}
-            ${meta.hyperZoneCount > 0 ? `<span class="meta-pill hyper">⚡ ${meta.hyperZoneCount} 长直道</span>` : ''}
+            ${tr.jumpRamps.length > 0 ? `<span class="meta-pill">🛫 ${t('catalogJumpChip', { n: tr.jumpRamps.length })}</span>` : ''}
+            ${meta.hyperZoneCount > 0 ? `<span class="meta-pill hyper">⚡ ${t('catalogHyperChip', { n: meta.hyperZoneCount })}</span>` : ''}
           </div>
         </div>
       `;
@@ -664,11 +708,10 @@ export class MenuUI {
       const favBtn = card.querySelector<HTMLButtonElement>('.catalog-fav-btn')!;
       favBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.toggleFavorite(t.id);
+        this.toggleFavorite(tr.id);
       });
 
       const activate = () => {
-        // Keep sidebar category synced so user can see their chosen track immediately
         if (!this.matchesCategory(meta, this.sidebarCategory)) {
           this.sidebarCategory = 'all';
         }
@@ -691,6 +734,7 @@ export class MenuUI {
   private syncLapButtons(): void {
     this.lapButtons.forEach((btn) => {
       const laps = Number(btn.dataset.laps);
+      btn.textContent = i18n.formatLapShort(laps);
       btn.classList.toggle('active', laps === this.selectedLaps);
     });
   }
@@ -701,20 +745,21 @@ export class MenuUI {
     const track = meta.config;
     const rawLen = meta.lengthMeters;
     const totalKm = ((rawLen * this.selectedLaps) / 1000).toFixed(1);
-    const lapWord = this.selectedLaps === 1 ? '1 LAP' : `${this.selectedLaps} LAPS`;
-    this.showcaseCarName.textContent = `${car.name} ${car.subtitle}`;
-    this.showcaseTrackName.textContent = `${track.nameZh} // ${track.name}`;
-    this.launchSubEl.textContent =
-      track.id === 'isle-of-man'
-        ? `${lapWord} · 总长 ${totalKm}KM · ISLE OF MAN TT`
-        : track.id === 'super-akina'
-          ? `${lapWord} · 总长 ${totalKm}KM · SUPER AKINA TOUGE`
-          : track.id === 'aurora-fjord'
-            ? `${lapWord} · 总长 ${totalKm}KM · AURORA FJORD`
-            : track.id === 'nujiang-72'
-              ? `${lapWord} · 总长 ${totalKm}KM · NUJIANG 72 BENDS`
-              : rawLen >= 10000
-                ? `${lapWord} · 总长 ${totalKm}KM · GRAND ISLAND`
-                : `${lapWord} · 6 RACERS · DRIFT TO BOOST`;
+    const trackTitle = i18n.getTrackName(track);
+
+    this.showcaseCarName.textContent = `${car.name} · ${i18n.getCarArchetype(car)}`;
+    this.showcaseTrackName.textContent = trackTitle;
+
+    if (rawLen >= 7000) {
+      this.launchSubEl.textContent = t('launchSubMega', {
+        laps: this.selectedLaps,
+        km: totalKm,
+        tag: trackTitle,
+      });
+    } else {
+      this.launchSubEl.textContent = t('launchSubStandard', {
+        laps: this.selectedLaps,
+      });
+    }
   }
 }

@@ -7,8 +7,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#040714" />
-  <link rel="manifest" href="/manifest.json" />
-  <title>NEON APEX // 3D 未来街机赛车</title>
+  <link rel="manifest" href="./manifest.json" />
+  <title>NEON APEX · 3D 未来街机赛车</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
@@ -16,29 +16,40 @@
     <canvas id="game-canvas"></canvas>
     <canvas id="speedlines-canvas"></canvas>
 
+    <!-- Live FPS / Frame-Time Telemetry Badge -->
+    <div id="fps-badge" class="fps-badge hidden mono">60 FPS · 16.6ms</div>
+
     <!-- Main Menu Overlay -->
     <div id="menu-overlay" class="overlay active">
       <header class="menu-header">
         <div class="brand-lockup">
-          <div class="brand-tag">CYBER ARCADE GP // 2099</div>
+          <div class="brand-tag" data-i18n="brandTag">未来街机大奖赛 · 2099</div>
           <h1 class="brand-title">NEON<span>APEX</span></h1>
         </div>
         <div class="header-actions">
-          <button id="btn-menu-fullscreen" class="cyber-icon-btn" title="进入/退出全屏模式">
+          <button id="btn-menu-lang" class="cyber-icon-btn lang-toggle-btn" type="button" data-i18n-title="btnLangTitle" title="切换语言 / Switch to English">
+            <span class="icon">🌐</span>
+            <span class="label" data-i18n="btnLang">EN</span>
+          </button>
+          <button id="btn-menu-settings" class="cyber-icon-btn settings-trigger-btn" type="button" data-i18n-title="btnSettingsTitle" title="画质、操控、音频与语言设置">
+            <span class="icon">⚙</span>
+            <span class="label" data-i18n="btnSettings">设置</span>
+          </button>
+          <button id="btn-menu-fullscreen" class="cyber-icon-btn" type="button" data-i18n-title="btnFullscreenTitle" title="进入 / 退出全屏模式">
             <span class="icon">⛶</span>
-            <span class="label">全屏</span>
+            <span class="label" data-i18n="btnFullscreen">全屏</span>
           </button>
-          <button id="btn-menu-touch" class="cyber-icon-btn" title="开启/关闭手机触屏按键">
+          <button id="btn-menu-touch" class="cyber-icon-btn" type="button" data-i18n-title="btnTouchTitle" title="开启 / 关闭触屏按键">
             <span class="icon">📱</span>
-            <span class="label">触屏: 自动</span>
+            <span class="label" data-i18n="btnTouchOff">触屏: 关</span>
           </button>
-          <button id="btn-menu-audio" class="cyber-icon-btn" title="切换音乐/音效 (M)">
+          <button id="btn-menu-audio" class="cyber-icon-btn" type="button" data-i18n-title="btnAudioTitle" title="切换静音 (M)">
             <span class="icon">🔊</span>
-            <span class="label">AUDIO ON</span>
+            <span class="label" data-i18n="btnAudioOn">声音: 开</span>
           </button>
-          <button id="btn-menu-controls" class="cyber-icon-btn" title="操作指南">
+          <button id="btn-menu-controls" class="cyber-icon-btn" type="button" data-i18n-title="btnControlsTitle" title="驾驶技巧与操作指南">
             <span class="icon">⌨</span>
-            <span class="label">操作说明</span>
+            <span class="label" data-i18n="btnControls">指南</span>
           </button>
         </div>
       </header>
@@ -46,15 +57,15 @@
       <div class="menu-body">
         <!-- Mobile Portrait Compact Tab Switcher -->
         <div id="mobile-menu-tabs" class="mobile-menu-tabs">
-          <button id="tab-cars" class="mob-tab active" type="button">🏎 选择超跑</button>
-          <button id="tab-tracks" class="mob-tab" type="button">🏁 选择赛道</button>
+          <button id="tab-cars" class="mob-tab active" type="button" data-i18n="mobTabCars">🏎 选择超跑</button>
+          <button id="tab-tracks" class="mob-tab" type="button" data-i18n="mobTabTracks">🏁 选择赛道</button>
         </div>
 
         <!-- Left Panel: Car Selection -->
         <section id="menu-panel-cars" class="glass-panel panel-left mob-tab-active">
           <div class="panel-heading">
             <span class="accent-bar"></span>
-            <h2>SELECT MACHINE / 选择超跑</h2>
+            <h2 data-i18n="panelCarsTitle">选择超跑</h2>
           </div>
           <div id="car-cards" class="car-list"></div>
           <div id="car-specs" class="specs-box"></div>
@@ -64,9 +75,9 @@
         <section class="menu-center-bottom">
           <div class="showcase-badge">
             <span class="pulse-dot"></span>
-            <span id="showcase-car-name">APEX-V12 INTERCEPTOR</span>
+            <span id="showcase-car-name">APEX-V12</span>
             <span class="sep">|</span>
-            <span id="showcase-track-name">NEO TOKYO OVERDRIVE</span>
+            <span id="showcase-track-name">东京湾岸高速</span>
           </div>
           <div class="menu-race-opts">
             <button
@@ -75,11 +86,11 @@
               type="button"
               role="switch"
               aria-checked="false"
-              title="默认关闭：漂移时禁止同时使用氮气；开启后可漂移与氮气同时触发"
+              data-i18n-title="optDriftNitroTitle"
             >
-              <span class="dnt-label">🔥 漂移同喷</span>
+              <span class="dnt-label" data-i18n="optDriftNitro">🔥 漂移同喷</span>
               <span class="dnt-track"><span class="dnt-thumb"></span></span>
-              <span id="drift-nitro-state" class="dnt-state">关</span>
+              <span id="drift-nitro-state" class="dnt-state" data-i18n="stateOff">关</span>
             </button>
             <button
               id="btn-menu-overdrive"
@@ -87,11 +98,11 @@
               type="button"
               role="switch"
               aria-checked="false"
-              title="仅超长直道综合赛道（极境环岛 / 曼岛 TT / 超级秋名山）生效：默认关闭（原版极速）；开启后直道持续满油自动触发二阶超频提速与零掉速惯性接力"
+              data-i18n-title="optOverdriveTitle"
             >
-              <span class="dnt-label">🚀 长道超频</span>
+              <span class="dnt-label" data-i18n="optOverdrive">🚀 长道超频</span>
               <span class="dnt-track"><span class="dnt-thumb"></span></span>
-              <span id="overdrive-state" class="dnt-state">关</span>
+              <span id="overdrive-state" class="dnt-state" data-i18n="stateOff">关</span>
             </button>
             <button
               id="btn-menu-hyper-nitro"
@@ -99,23 +110,23 @@
               type="button"
               role="switch"
               aria-checked="false"
-              title="仅超长直道综合赛道（极境环岛 / 曼岛 TT / 超级秋名山）笔直大直道生效：默认关闭（常规氮气）；开启后进入超长直道自动锁定无限氮气"
+              data-i18n-title="optHyperNitroTitle"
             >
-              <span class="dnt-label">⚡ 长道满氮</span>
+              <span class="dnt-label" data-i18n="optHyperNitro">⚡ 长道满氮</span>
               <span class="dnt-track"><span class="dnt-thumb"></span></span>
-              <span id="hyper-nitro-state" class="dnt-state">关</span>
+              <span id="hyper-nitro-state" class="dnt-state" data-i18n="stateOff">关</span>
             </button>
-            <div id="lap-selector" class="lap-selector" role="group" aria-label="选择圈数">
-              <span class="lap-sel-label">🏁 圈数</span>
+            <div id="lap-selector" class="lap-selector" role="group" data-i18n-aria="lapsLabel" aria-label="圈数">
+              <span class="lap-sel-label" data-i18n="lapsLabel">🏁 圈数</span>
               <button type="button" class="lap-opt-btn" data-laps="1">1 圈</button>
               <button type="button" class="lap-opt-btn" data-laps="2">2 圈</button>
               <button type="button" class="lap-opt-btn" data-laps="3">3 圈</button>
             </div>
           </div>
-          <button id="btn-start-race" class="launch-btn">
+          <button id="btn-start-race" class="launch-btn" type="button">
             <span class="launch-bg"></span>
-            <span class="launch-text">START RACE // 立即开赛</span>
-            <span id="launch-sub" class="launch-sub">3 LAPS · 6 RACERS · DRIFT TO BOOST</span>
+            <span class="launch-text" data-i18n="startRace">立即开赛</span>
+            <span id="launch-sub" class="launch-sub">3 圈 · 6 台赛车 · 漂移集气加速</span>
           </button>
         </section>
 
@@ -123,9 +134,9 @@
         <section id="menu-panel-tracks" class="glass-panel panel-right">
           <div class="panel-heading">
             <span class="accent-bar magenta"></span>
-            <h2>SELECT CIRCUIT / 选择赛道</h2>
-            <button id="btn-open-catalog" class="catalog-trigger-btn" type="button" title="展开全屏赛道图库（支持搜索、分类、排序与收藏）">
-              <span>🌐 图库</span>
+            <h2 data-i18n="panelTracksTitle">选择赛道</h2>
+            <button id="btn-open-catalog" class="catalog-trigger-btn" type="button" data-i18n-title="btnCatalogTitle">
+              <span>🌐 <span data-i18n="btnCatalog">图库</span></span>
               <span id="track-total-count" class="catalog-count">10</span>
             </button>
           </div>
@@ -133,27 +144,27 @@
           <!-- Active Circuit Hero Preview with Quick Prev/Next & Favorite -->
           <div id="track-hero-card" class="track-hero-card">
             <div class="track-hero-top">
-              <button id="btn-prev-track" class="hero-step-btn" type="button" aria-label="上一条赛道" title="上一条赛道">◀</button>
+              <button id="btn-prev-track" class="hero-step-btn" type="button" data-i18n-aria="btnPrevTrack" data-i18n-title="btnPrevTrack">◀</button>
               <div class="track-hero-title">
                 <div class="track-hero-name-row">
                   <span id="hero-track-name" class="hero-track-name">东京湾岸高速</span>
-                  <span id="hero-track-badge" class="card-badge">MEDIUM</span>
+                  <span id="hero-track-badge" class="card-badge">中等</span>
                 </div>
                 <div id="hero-track-sub" class="hero-track-sub">TOKYO BAYSHORE EXPWY</div>
               </div>
-              <button id="btn-hero-fav" class="fav-star-btn" type="button" aria-label="收藏赛道" title="收藏/取消收藏此赛道">☆</button>
-              <button id="btn-next-track" class="hero-step-btn" type="button" aria-label="下一条赛道" title="下一条赛道">▶</button>
+              <button id="btn-hero-fav" class="fav-star-btn" type="button" data-i18n-aria="btnFavTrack" data-i18n-title="btnFavTrack">☆</button>
+              <button id="btn-next-track" class="hero-step-btn" type="button" data-i18n-aria="btnNextTrack" data-i18n-title="btnNextTrack">▶</button>
             </div>
-            <div class="track-hero-blueprint" id="hero-blueprint-box" title="点击展开全屏赛道图库">
+            <div class="track-hero-blueprint" id="hero-blueprint-box" data-i18n-title="blueprintBoxTitle">
               <svg id="hero-track-svg" class="hero-track-svg" viewBox="0 0 100 80"></svg>
               <div id="hero-quick-chips" class="hero-quick-chips"></div>
             </div>
           </div>
 
           <!-- Compact Category Filter Chips -->
-          <div id="sidebar-cat-tabs" class="cat-filter-row" role="tablist" aria-label="赛道分类"></div>
+          <div id="sidebar-cat-tabs" class="cat-filter-row" role="tablist"></div>
 
-          <!-- Bounded Internal Scrollable Quick-Pick List (never stretches the sidebar!) -->
+          <!-- Bounded Internal Scrollable Quick-Pick List -->
           <div id="track-cards" class="track-list track-list-bounded"></div>
 
           <!-- Always-Visible Pinned Active Track Details -->
@@ -163,27 +174,27 @@
 
       <footer class="menu-footer">
         <div class="quick-keys">
-          <span><kbd>W/A/S/D</kbd> 或 <kbd>↑↓←→</kbd> 驾驶</span>
-          <span><kbd>SPACE</kbd> 或 <kbd>轻点S</kbd> 漂移</span>
-          <span><kbd>SHIFT</kbd> / <kbd>E</kbd> 氮气喷射</span>
-          <span><kbd>C</kbd> 视角</span>
-          <span><kbd>R</kbd> 复位</span>
-          <span class="credit-note">3D Car: Ferrari 458 (vicent091036, CC BY 4.0) + GT3 Carbon Aero</span>
+          <span data-i18n-html="keyDrive"><kbd>W/A/S/D</kbd> 或 <kbd>↑↓←→</kbd> 驾驶</span>
+          <span data-i18n-html="keyDrift"><kbd>SPACE</kbd> 或 <kbd>点刹S</kbd> 漂移</span>
+          <span data-i18n-html="keyNitro"><kbd>SHIFT</kbd> / <kbd>E</kbd> 氮气喷射</span>
+          <span data-i18n-html="keyCam"><kbd>C</kbd> 视角</span>
+          <span data-i18n-html="keyReset"><kbd>R</kbd> 复位</span>
+          <span class="credit-note" data-i18n="creditNote">3D 车型：Ferrari 458 (vicent091036, CC BY 4.0) + GT3 碳纤套件</span>
         </div>
       </footer>
     </div>
 
-    <!-- Full-Catalog Scalable Circuit Browser Modal (Forza / GT7 / ACC Style) -->
-    <div id="circuit-catalog-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="全球赛道图库">
+    <!-- Full-Catalog Scalable Circuit Browser Modal -->
+    <div id="circuit-catalog-modal" class="modal hidden" role="dialog" aria-modal="true" data-i18n-aria="catalogTitle">
       <div class="modal-card glass-panel catalog-modal-card">
         <div class="catalog-header">
           <div class="catalog-title-row">
             <div class="panel-heading">
               <span class="accent-bar magenta"></span>
-              <h2>CIRCUIT CATALOG // 全球赛道图库</h2>
+              <h2 data-i18n="catalogTitle">全球赛道图库</h2>
               <span id="catalog-match-badge" class="catalog-match-badge">10 / 10</span>
             </div>
-            <button id="btn-close-catalog" class="close-btn" type="button" aria-label="关闭赛道图库">✕</button>
+            <button id="btn-close-catalog" class="close-btn" type="button" aria-label="Close">✕</button>
           </div>
           <div class="catalog-toolbar">
             <div class="catalog-search-wrap">
@@ -192,45 +203,70 @@
                 id="catalog-search-input"
                 class="catalog-search-input"
                 type="search"
+                data-i18n-placeholder="catalogSearchPlaceholder"
                 placeholder="搜索赛道名、特点（如 秋名山 / 漂移 / 60km）..."
                 autocomplete="off"
               />
             </div>
-            <select id="catalog-sort-select" class="catalog-sort-select" aria-label="赛道排序">
-              <option value="default">排序：默认推荐</option>
-              <option value="len-asc">里程：短 → 长</option>
-              <option value="len-desc">里程：长 → 短</option>
-              <option value="bank-desc">倾角：高 → 低</option>
+            <select id="catalog-sort-select" class="catalog-sort-select">
+              <option value="default" data-i18n="sortDefault">排序：默认推荐</option>
+              <option value="len-asc" data-i18n="sortLenAsc">里程：短 → 长</option>
+              <option value="len-desc" data-i18n="sortLenDesc">里程：长 → 短</option>
+              <option value="bank-desc" data-i18n="sortBankDesc">倾角：高 → 低</option>
             </select>
           </div>
         </div>
 
-        <div id="catalog-cat-tabs" class="catalog-cat-tabs" role="tablist" aria-label="图库分类筛选"></div>
+        <div id="catalog-cat-tabs" class="catalog-cat-tabs" role="tablist"></div>
 
         <div id="catalog-grid" class="catalog-grid"></div>
       </div>
     </div>
 
-    <!-- Controls Modal -->
-    <div id="controls-modal" class="modal hidden">
+    <!-- Unified Game Settings Modal (Graphics / Controls / Audio / Language) -->
+    <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" data-i18n-aria="settingsTitle">
+      <div class="modal-card glass-panel settings-modal-card">
+        <div class="settings-header">
+          <div class="panel-heading">
+            <span class="accent-bar"></span>
+            <h2 data-i18n="settingsTitle">游戏设置</h2>
+          </div>
+          <button id="btn-close-settings" class="close-btn" type="button" aria-label="Close">✕</button>
+        </div>
+
+        <div id="settings-tabs" class="settings-tabs" role="tablist">
+          <button type="button" class="settings-tab-btn active" role="tab" data-tab="graphics" data-i18n="tabGraphics">🎨 画质</button>
+          <button type="button" class="settings-tab-btn" role="tab" data-tab="controls" data-i18n="tabControls">🎮 操控</button>
+          <button type="button" class="settings-tab-btn" role="tab" data-tab="audio" data-i18n="tabAudio">🔊 音频</button>
+          <button type="button" class="settings-tab-btn" role="tab" data-tab="language" data-i18n="tabLanguage">🌐 语言</button>
+        </div>
+
+        <div id="settings-body" class="settings-body"></div>
+
+        <div class="settings-footer">
+          <button id="btn-settings-reset" type="button" class="cyber-btn ghost" data-i18n="btnResetSettings">恢复默认设置</button>
+          <button id="btn-settings-done" type="button" class="cyber-btn primary" data-i18n="btnSettingsDone">完成</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls Guide Modal -->
+    <div id="controls-modal" class="modal hidden" role="dialog" aria-modal="true" data-i18n-aria="controlsTitle">
       <div class="modal-card glass-panel">
         <div class="panel-heading">
           <span class="accent-bar"></span>
-          <h2>PILOT BRIEFING // 驾驶技巧与操控</h2>
-          <button id="btn-close-controls" class="close-btn">✕</button>
+          <h2 data-i18n="controlsTitle">驾驶技巧与操控指南</h2>
+          <button id="btn-close-controls" class="close-btn" type="button">✕</button>
         </div>
         <div class="controls-grid">
-          <div class="ctrl-item"><kbd>W / ↑</kbd><div><strong>油门加速</strong><p>倒计时结束瞬间在绿区踩油门触发「完美起步」</p></div></div>
-          <div class="ctrl-item"><kbd>S / ↓</kbd><div><strong>点刹起漂 / 刹车</strong><p>高速打方向时轻点 S 即可像极品飞车一样丝滑甩尾入弯！</p></div></div>
-          <div class="ctrl-item"><kbd>A / D / ← / →</kbd><div><strong>内切收线 / 反打修正</strong><p>漂移中往弯心打方向收紧走线，反打外侧可稳住大角度横滑</p></div></div>
-          <div class="ctrl-item"><kbd>SPACE</kbd><div><strong>手刹漂移 (按住)</strong><p>结合弯道 150m/100m/50m 路牌提早起漂，松开即享小喷加速！</p></div></div>
-          <div class="ctrl-item"><kbd>SHIFT / E / N</kbd><div><strong>主动氮气喷射（独立按键）</strong><p>默认漂移中禁止同喷；可在主菜单或暂停页开启「漂移同步喷气」</p></div></div>
-          <div class="ctrl-item"><kbd>C / R / M / ESC</kbd><div><strong>辅助功能</strong><p>C 切换追尾/引擎盖视角 · R 复位 · M 静音 · ESC 暂停</p></div></div>
+          <div class="ctrl-item"><kbd>W / ↑</kbd><div><strong data-i18n="ctrlGasTitle">油门加速</strong><p data-i18n="ctrlGasDesc">倒计时结束瞬间在绿区踩油门触发「完美起步」</p></div></div>
+          <div class="ctrl-item"><kbd>S / ↓</kbd><div><strong data-i18n="ctrlBrakeTitle">点刹起漂 / 刹车</strong><p data-i18n="ctrlBrakeDesc">高速打方向时轻点 S 即可像极品飞车一样丝滑甩尾入弯！</p></div></div>
+          <div class="ctrl-item"><kbd>A / D / ← / →</kbd><div><strong data-i18n="ctrlSteerTitle">内切收线 / 反打修正</strong><p data-i18n="ctrlSteerDesc">漂移中往弯心打方向收紧走线，反打外侧可稳住大角度横滑</p></div></div>
+          <div class="ctrl-item"><kbd>SPACE</kbd><div><strong data-i18n="ctrlDriftTitle">手刹漂移（按住）</strong><p data-i18n="ctrlDriftDesc">结合弯道 150m/100m/50m 路牌提早起漂，松开即享小喷加速！</p></div></div>
+          <div class="ctrl-item"><kbd>SHIFT / E / N</kbd><div><strong data-i18n="ctrlNitroTitle">主动氮气喷射</strong><p data-i18n="ctrlNitroDesc">默认漂移中禁止同喷；可在主菜单或暂停页开启「漂移同喷」</p></div></div>
+          <div class="ctrl-item"><kbd>C / R / M / ESC</kbd><div><strong data-i18n="ctrlAuxTitle">辅助快捷功能</strong><p data-i18n="ctrlAuxDesc">C 切换追尾/引擎盖视角 · R 复位 · M 静音 · ESC 暂停</p></div></div>
         </div>
-        <div class="pro-tips">
-          <strong>进阶玩法：</strong> 留意屏幕顶部 <span>弯道预警提示</span> 与赛道边 <span>150m/100m/50m</span> 刹车牌，在弯前果断起漂并借倾斜坡度控时长 · 紧跟对手车尾触发 <span>尾流加速</span> · 冲上跳台获取 <span>滞空特技加分</span>！<br />
-          <strong>📱 手机触屏操作：</strong> 左半屏任意位置落指即刻生成 <span>动态浮动摇杆</span>（永远以落指点为绝对中心、零误偏），右手采用 <span>拇指扇形布局</span>（自然落位漂移、上滑氮气、内侧点刹）；点击顶部 <span>⛶ 全屏</span> 可隐藏手机浏览器导航栏畅玩。
-        </div>
+        <div class="pro-tips" data-i18n-html="proTipsHtml"></div>
       </div>
     </div>
 
@@ -239,49 +275,55 @@
       <!-- Top Bar -->
       <div class="hud-top">
         <div class="hud-rank-box glass-hud">
-          <div class="hud-label">POS</div>
+          <div class="hud-label" data-i18n="hudPos">排名</div>
           <div class="rank-value"><span id="hud-rank">1</span><sup id="hud-rank-suffix">st</sup><span class="rank-total">/ 6</span></div>
         </div>
 
         <div class="hud-center-telemetry glass-hud">
           <div class="tel-block">
-            <div class="hud-label">LAP</div>
+            <div class="hud-label" data-i18n="hudLap">圈数</div>
             <div id="hud-lap" class="tel-value">1 <span>/ 3</span></div>
           </div>
           <div class="tel-divider"></div>
           <div class="tel-block">
-            <div class="hud-label">TIME</div>
+            <div class="hud-label" data-i18n="hudTime">用时</div>
             <div id="hud-time" class="tel-value mono">00:00.00</div>
           </div>
           <div class="tel-divider hide-compact"></div>
           <div class="tel-block hide-compact">
-            <div class="hud-label">BEST LAP</div>
+            <div class="hud-label" data-i18n="hudBestLap">最快圈</div>
             <div id="hud-best-lap" class="tel-value mono dim">--:--.--</div>
           </div>
           <div class="tel-divider"></div>
           <div class="tel-block">
-            <div class="hud-label">STYLE</div>
+            <div class="hud-label" data-i18n="hudStyle">特技分</div>
             <div id="hud-score" class="tel-value accent">0</div>
           </div>
         </div>
 
         <div class="hud-right-tools">
-          <button id="btn-hud-touch" class="hud-mini-btn" title="切换触屏按键">📱</button>
-          <button id="btn-hud-autogas" class="hud-mini-btn touch-only" title="切换自动油门">AUTO</button>
-          <button id="btn-hud-tilt" class="hud-mini-btn touch-only" title="切换重力感应转向">TILT</button>
-          <button id="btn-hud-reset" class="hud-mini-btn touch-only" title="赛道复位 (R)">↺</button>
-          <button id="btn-hud-cam" class="hud-mini-btn" title="切换视角 (C)">CHASE</button>
-          <button id="btn-hud-fullscreen" class="hud-mini-btn touch-only" title="全屏模式">⛶</button>
-          <button id="btn-hud-audio" class="hud-mini-btn" title="切换静音 (M)">🔊</button>
-          <button id="btn-hud-pause" class="hud-mini-btn" title="暂停 (ESC)">❚❚</button>
+          <button id="btn-hud-touch" class="hud-mini-btn" type="button" data-i18n-title="btnTouchTitle">📱</button>
+          <button id="btn-hud-autogas" class="hud-mini-btn touch-only" type="button" data-i18n="hudAutoGas">自动油门</button>
+          <button id="btn-hud-tilt" class="hud-mini-btn touch-only" type="button" data-i18n="hudTiltOff">重力</button>
+          <button id="btn-hud-reset" class="hud-mini-btn touch-only" type="button" title="Reset (R)">↺</button>
+          <button id="btn-hud-cam" class="hud-mini-btn" type="button" data-i18n="hudCamChase">追尾</button>
+          <button id="btn-hud-fullscreen" class="hud-mini-btn touch-only" type="button" data-i18n-title="btnFullscreenTitle">⛶</button>
+          <button id="btn-hud-audio" class="hud-mini-btn" type="button" data-i18n-title="btnAudioTitle">🔊</button>
+          <button id="btn-hud-pause" class="hud-mini-btn" type="button" title="Pause (ESC)">❚❚</button>
         </div>
+      </div>
+
+      <!-- Subtle Dismissible Mobile Web Portrait Landscape Hint -->
+      <div id="rotate-hint-banner" class="rotate-hint-banner hidden">
+        <span data-i18n="hudRotateHint">📱 横屏游玩视野更宽广，体验更佳</span>
+        <button id="btn-dismiss-rotate" class="rotate-dismiss-btn" type="button" data-i18n="hudRotateDismiss">知道了</button>
       </div>
 
       <!-- Center Notifications / Countdown / Callouts -->
       <div id="countdown-banner" class="countdown-banner hidden">
         <div id="countdown-text" class="countdown-text">3</div>
         <div id="start-rpm-meter" class="start-rpm-meter">
-          <div class="start-rpm-label">HOLD <kbd>W</kbd> OR <kbd>REV</kbd> IN GREEN ZONE FOR PERFECT START</div>
+          <div class="start-rpm-label" data-i18n-html="hudStartRpmHint">按住 <kbd>W</kbd> 或 <kbd>油门</kbd> 在绿区触发「完美起步」</div>
           <div class="start-rpm-track">
             <div class="start-rpm-sweet"></div>
             <div id="start-rpm-fill" class="start-rpm-fill"></div>
@@ -289,21 +331,21 @@
         </div>
       </div>
 
-      <div id="wrong-way-alert" class="wrong-way hidden">⚠ WRONG WAY // 逆行警告 (按 R 复位)</div>
+      <div id="wrong-way-alert" class="wrong-way hidden" data-i18n="hudWrongWay">⚠ 逆行警告（按 R 复位）</div>
       <div id="corner-callout" class="corner-callout hidden">
         <span id="corner-arrow" class="corner-arrow">↱</span>
         <div class="corner-meta">
-          <span id="corner-type" class="corner-type">90° RIGHT</span>
+          <span id="corner-type" class="corner-type">90° 右弯</span>
           <span id="corner-dist" class="corner-dist mono">120m</span>
         </div>
       </div>
-      <div id="slipstream-indicator" class="slipstream-badge hidden">⚡ SLIPSTREAM BOOST</div>
+      <div id="slipstream-indicator" class="slipstream-badge hidden" data-i18n="hudSlipstream">⚡ 尾流加速</div>
       <div id="callout-stack" class="callout-stack"></div>
 
-      <!-- Drift Live Meter (Center-bottom above nitro) -->
+      <!-- Drift Live Meter -->
       <div id="drift-hud" class="drift-hud hidden">
         <div class="drift-title">
-          <span id="drift-tier-label">DRIFT</span>
+          <span id="drift-tier-label">漂移中</span>
           <span id="drift-meters" class="mono">0m</span>
         </div>
         <div class="drift-bar-bg">
@@ -314,31 +356,31 @@
       <!-- Bottom Left: Live Minimap -->
       <div class="hud-bottom-left glass-hud">
         <div class="minimap-header">
-          <span id="hud-track-label">NEO TOKYO</span>
-          <span class="minimap-live">● LIVE</span>
+          <span id="hud-track-label">东京湾岸高速</span>
+          <span class="minimap-live" data-i18n="hudLive">● 实时</span>
         </div>
         <canvas id="minimap-canvas" width="210" height="170"></canvas>
       </div>
 
       <!-- Bottom Center: Keybind Strip -->
       <div class="hud-keybinds">
-        <span><kbd>SPACE</kbd> / <kbd>点刹S</kbd> 漂移</span>
-        <span><kbd>SHIFT</kbd> / <kbd>E</kbd> 氮气喷射</span>
-        <span><kbd>C</kbd> 视角</span>
-        <span><kbd>R</kbd> 复位</span>
+        <span data-i18n-html="hudKeyDrift"><kbd>SPACE</kbd> / <kbd>点刹S</kbd> 漂移</span>
+        <span data-i18n-html="hudKeyNitro"><kbd>SHIFT</kbd> / <kbd>E</kbd> 氮气喷射</span>
+        <span data-i18n-html="hudKeyCam"><kbd>C</kbd> 视角</span>
+        <span data-i18n-html="hudKeyReset"><kbd>R</kbd> 复位</span>
       </div>
 
       <!-- Bottom Right: Speedometer + Nitro Gauge + Overdrive Pill -->
       <div class="hud-bottom-right">
-        <div id="overdrive-pill" class="overdrive-pill hidden">⚡ OVERDRIVE I · DRS</div>
+        <div id="overdrive-pill" class="overdrive-pill hidden">⚡ DRS 超频 I</div>
         <div class="nitro-container glass-hud">
           <div class="nitro-header">
-            <span class="hud-label">NITRO SYSTEM</span>
-            <span id="nitro-status" class="nitro-status">CHARGING</span>
+            <span class="hud-label" data-i18n="hudNitroSystem">氮气系统</span>
+            <span id="nitro-status" class="nitro-status">漂移集气中</span>
           </div>
           <div class="nitro-bar-track">
             <div id="nitro-bar-fill" class="nitro-bar-fill"></div>
-            <div class="nitro-super-marker" title="Super Nitro Threshold (85%)"></div>
+            <div class="nitro-super-marker"></div>
           </div>
         </div>
 
@@ -356,25 +398,23 @@
                 <stop offset="100%" stop-color="#ff1e56" />
               </linearGradient>
             </defs>
-            <!-- Background Speed Arc -->
             <path d="M 24 114 A 86 86 0 1 1 196 114" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="11" stroke-linecap="round" />
-            <!-- Active Speed Arc -->
             <path id="speedo-arc" d="M 24 114 A 86 86 0 1 1 196 114" fill="none" stroke="url(#speedGrad)" stroke-width="11" stroke-linecap="round" stroke-dasharray="355" stroke-dashoffset="355" />
-            <!-- Inner RPM Arc -->
             <path d="M 42 114 A 68 68 0 1 1 178 114" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4" stroke-linecap="round" />
             <path id="rpm-arc" d="M 42 114 A 68 68 0 1 1 178 114" fill="none" stroke="url(#rpmGrad)" stroke-width="4" stroke-linecap="round" stroke-dasharray="280" stroke-dashoffset="280" />
           </svg>
           <div class="speedo-readout">
             <div id="hud-speed" class="speed-num">0</div>
             <div class="speed-unit">KM/H</div>
-            <div class="gear-pill">GEAR <span id="hud-gear">1</span></div>
+            <div class="gear-pill"><span data-i18n="hudGear">档位</span> <span id="hud-gear">1</span></div>
           </div>
         </div>
       </div>
+
       <!-- Mobile / Touchscreen Arcade Controls -->
       <div id="touch-controls" class="touch-controls hidden">
-        <!-- Left Thumb: Floating Virtual Analog Steering Joystick -->
-        <div id="touch-joystick-zone" class="touch-joystick-zone" aria-label="虚拟方向摇杆">
+        <!-- Left Thumb Option A: Floating Virtual Analog Steering Joystick -->
+        <div id="touch-joystick-zone" class="touch-joystick-zone" aria-label="Steering Joystick">
           <div id="touch-joystick-base" class="joystick-base">
             <div class="joystick-ring"></div>
             <div class="joystick-crosshair"></div>
@@ -386,23 +426,35 @@
           </div>
         </div>
 
+        <!-- Left Thumb Option B: Classic Left / Right Digital Steering Buttons -->
+        <div id="touch-steer-buttons" class="touch-steer-buttons hidden">
+          <button id="touch-steer-left" class="touch-btn steer-pad-btn" type="button">
+            <span class="steer-arrow">◀</span>
+            <span class="tbtn-sub" data-i18n="touchLeftLabel">左转</span>
+          </button>
+          <button id="touch-steer-right" class="touch-btn steer-pad-btn" type="button">
+            <span class="steer-arrow">▶</span>
+            <span class="tbtn-sub" data-i18n="touchRightLabel">右转</span>
+          </button>
+        </div>
+
         <!-- Right Thumb: Ergonomic Thumb-Arc Action Pad -->
         <div class="touch-action-arc">
           <button id="touch-drift" class="touch-btn arc-btn drift-btn" type="button">
-            <span class="tbtn-main">DRIFT</span>
-            <span class="tbtn-sub">按住漂移</span>
+            <span class="tbtn-main" data-i18n="touchDriftMain">漂移</span>
+            <span class="tbtn-sub" data-i18n="touchDriftSub">按住甩尾</span>
           </button>
           <button id="touch-nitro" class="touch-btn arc-btn nitro-btn" type="button">
-            <span class="tbtn-main">NITRO</span>
+            <span class="tbtn-main" data-i18n="touchNitroMain">氮气</span>
             <span class="tbtn-sub">40%</span>
           </button>
           <button id="touch-brake" class="touch-btn arc-btn brake-btn" type="button">
-            <span class="tbtn-main">BRAKE</span>
-            <span class="tbtn-sub">点刹</span>
+            <span class="tbtn-main" data-i18n="touchBrakeMain">刹车</span>
+            <span class="tbtn-sub" data-i18n="touchBrakeSub">点刹</span>
           </button>
           <button id="touch-gas" class="touch-btn arc-btn gas-btn hidden" type="button">
-            <span class="tbtn-main">REV</span>
-            <span class="tbtn-sub">油门</span>
+            <span class="tbtn-main" data-i18n="touchRevMain">轰油</span>
+            <span class="tbtn-sub" data-i18n="touchGasSub">加速</span>
           </button>
         </div>
       </div>
@@ -411,14 +463,15 @@
     <!-- Pause Overlay -->
     <div id="pause-overlay" class="modal hidden">
       <div class="modal-card glass-panel pause-card">
-        <h2 class="pause-title">RACE PAUSED</h2>
+        <h2 class="pause-title" data-i18n="pauseTitle">比赛已暂停</h2>
         <div class="pause-actions">
-          <button id="btn-resume" class="cyber-btn primary">RESUME // 继续比赛</button>
-          <button id="btn-pause-drift-nitro" class="cyber-btn">🔥 漂移同步喷气：关（漂移禁氮）</button>
-          <button id="btn-pause-overdrive" class="cyber-btn">🚀 长道自动超频：关（原版极速）</button>
-          <button id="btn-pause-hyper-nitro" class="cyber-btn">⚡ 长道直道满氮：关（常规氮气）</button>
-          <button id="btn-pause-restart" class="cyber-btn">RESTART // 重新开赛</button>
-          <button id="btn-pause-menu" class="cyber-btn ghost">MAIN MENU // 返回主菜单</button>
+          <button id="btn-resume" class="cyber-btn primary" type="button" data-i18n="pauseResume">继续比赛</button>
+          <button id="btn-pause-settings" class="cyber-btn" type="button" data-i18n="pauseSettings">⚙ 画质 / 操控 / 语言设置</button>
+          <button id="btn-pause-drift-nitro" class="cyber-btn" type="button">🔥 漂移同步喷气：关</button>
+          <button id="btn-pause-overdrive" class="cyber-btn" type="button">🚀 长道自动超频：关</button>
+          <button id="btn-pause-hyper-nitro" class="cyber-btn" type="button">⚡ 长道直道满氮：关</button>
+          <button id="btn-pause-restart" class="cyber-btn" type="button" data-i18n="pauseRestart">重新开赛</button>
+          <button id="btn-pause-menu" class="cyber-btn ghost" type="button" data-i18n="pauseMenu">返回主菜单</button>
         </div>
       </div>
     </div>
@@ -428,8 +481,8 @@
       <div class="results-card glass-panel">
         <div class="results-header">
           <div>
-            <div class="brand-tag">TELEMETRY REPORT // 完赛结算</div>
-            <h2 id="results-headline" class="results-headline">1ST PLACE VICTORY!</h2>
+            <div class="brand-tag" data-i18n="resultsTag">赛事数据报告</div>
+            <h2 id="results-headline" class="results-headline">冠军冲线！</h2>
           </div>
           <div id="results-rank-badge" class="results-rank-badge">#1</div>
         </div>
@@ -437,40 +490,40 @@
         <div class="results-body">
           <div class="results-stats-grid">
             <div class="stat-tile">
-              <span class="stat-label">TOTAL TIME / 总耗时</span>
+              <span class="stat-label" data-i18n="resTotalTime">总耗时</span>
               <strong id="res-total-time" class="mono">02:14.55</strong>
             </div>
             <div class="stat-tile">
-              <span class="stat-label">BEST LAP / 最快单圈</span>
+              <span class="stat-label" data-i18n="resBestLap">最快单圈</span>
               <strong id="res-best-lap" class="mono">00:43.12</strong>
             </div>
             <div class="stat-tile">
-              <span class="stat-label">TOP SPEED / 最高时速</span>
+              <span class="stat-label" data-i18n="resTopSpeed">最高时速</span>
               <strong id="res-top-speed" class="accent">412 KM/H</strong>
             </div>
             <div class="stat-tile">
-              <span class="stat-label">LONGEST DRIFT / 最长漂移</span>
+              <span class="stat-label" data-i18n="resLongestDrift">最长漂移</span>
               <strong id="res-longest-drift" class="magenta">184 m</strong>
             </div>
             <div class="stat-tile">
-              <span class="stat-label">AIR TIME / 累计滞空</span>
+              <span class="stat-label" data-i18n="resAirTime">累计滞空</span>
               <strong id="res-air-time">3.8 s</strong>
             </div>
             <div class="stat-tile">
-              <span class="stat-label">STYLE SCORE / 特技评分</span>
+              <span class="stat-label" data-i18n="resStyleScore">特技评分</span>
               <strong id="res-style-score" class="gold">4,850</strong>
             </div>
           </div>
 
           <div class="standings-section">
-            <div class="standings-title">FINAL CLASSIFICATION / 赛手排名</div>
+            <div class="standings-title" data-i18n="resStandingsTitle">最终排名</div>
             <div id="results-standings" class="standings-list"></div>
           </div>
         </div>
 
         <div class="results-actions">
-          <button id="btn-race-again" class="cyber-btn primary">RACE AGAIN // 再来一局</button>
-          <button id="btn-back-menu" class="cyber-btn">GARAGE & TRACKS // 选车与赛道</button>
+          <button id="btn-race-again" class="cyber-btn primary" type="button" data-i18n="btnRaceAgain">再来一局</button>
+          <button id="btn-back-menu" class="cyber-btn" type="button" data-i18n="btnBackMenu">返回车库</button>
         </div>
       </div>
     </div>

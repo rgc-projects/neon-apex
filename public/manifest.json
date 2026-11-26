@@ -1,8 +1,8 @@
 {
-  "name": "NEON APEX // 3D 未来街机赛车",
+  "name": "NEON APEX · 3D Arcade Racing",
   "short_name": "NEON APEX",
-  "description": "3D Photorealistic Arcade Racing Game with Drift-to-Boost & Mobile Virtual Joystick",
-  "start_url": "/",
+  "description": "3D Arcade Racing Game with Drift-to-Boost, Multi-Language UI, Graphics Presets & Mobile Controls",
+  "start_url": "./",
   "display": "fullscreen",
   "orientation": "any",
   "background_color": "#040714",

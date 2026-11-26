@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NEON APEX</string>
+    <string name="title_activity_main">NEON APEX</string>
+    <string name="package_name">top.gcrdev.neonapex</string>
+    <string name="custom_url_scheme">top.gcrdev.neonapex</string>
+</resources>

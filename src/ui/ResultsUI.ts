@@ -1,3 +1,4 @@
+import { i18n, t } from '../i18n/i18n';
 import { RaceResults } from '../types';
 import { formatTime, ordinalSuffix } from '../utils/math';
 
@@ -15,10 +16,17 @@ export class ResultsUI {
 
   private readonly raceAgainBtn = document.getElementById('btn-race-again')!;
   private readonly backMenuBtn = document.getElementById('btn-back-menu')!;
+  private lastResults: RaceResults | null = null;
 
   constructor(callbacks: { onRaceAgain: () => void; onBackToMenu: () => void }) {
     this.raceAgainBtn.addEventListener('click', callbacks.onRaceAgain);
     this.backMenuBtn.addEventListener('click', callbacks.onBackToMenu);
+
+    i18n.subscribe(() => {
+      if (this.lastResults && this.root.classList.contains('active')) {
+        this.render(this.lastResults);
+      }
+    });
   }
 
   public setVisible(visible: boolean): void {
@@ -26,13 +34,22 @@ export class ResultsUI {
   }
 
   public show(res: RaceResults): void {
-    const rankStr = `${res.rank}${ordinalSuffix(res.rank).toUpperCase()}`;
+    this.lastResults = res;
+    this.render(res);
+    this.setVisible(true);
+  }
+
+  private render(res: RaceResults): void {
+    const rankStr = i18n.isZh
+      ? String(res.rank)
+      : `${res.rank}${ordinalSuffix(res.rank).toUpperCase()}`;
+
     this.headlineEl.textContent =
       res.rank === 1
-        ? '1ST PLACE VICTORY! // 冠军冲线'
+        ? t('resultsWin')
         : res.rank <= 3
-          ? `${rankStr} PLACE PODIUM! // 登上领奖台`
-          : `FINISHED ${rankStr} // 完赛报告`;
+          ? t('resultsPodium', { rank: rankStr })
+          : t('resultsFinished', { rank: rankStr });
 
     this.badgeEl.textContent = `#${res.rank}`;
     this.totalTimeEl.textContent = formatTime(res.totalTime);
@@ -46,17 +63,16 @@ export class ResultsUI {
     for (const s of res.standings) {
       const row = document.createElement('div');
       row.className = `standing-row ${s.isPlayer ? 'player' : ''}`;
-      const timeLabel = s.finishTime !== null ? formatTime(s.finishTime) : 'RACING...';
+      const timeLabel = s.finishTime !== null ? formatTime(s.finishTime) : t('resRacing');
+      const displayName = s.isPlayer ? `${t('resPlayerName')}${t('resYou')}` : s.name;
       row.innerHTML = `
         <span class="mono" style="color:${s.rank === 1 ? '#ffb800' : '#00f2ff'}">#${s.rank}</span>
         <span class="color-swatch" style="background:${s.colorHex};color:${s.colorHex}"></span>
-        <span>${s.name}${s.isPlayer ? ' (YOU)' : ''}</span>
+        <span>${displayName}</span>
         <span class="dim" style="font-size:11px">${s.carName}</span>
         <span class="mono" style="text-align:right">${timeLabel}</span>
       `;
       this.standingsEl.appendChild(row);
     }
-
-    this.setVisible(true);
   }
 }

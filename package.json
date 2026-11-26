@@ -10,12 +10,21 @@
     "preview": "vite preview --port 4173",
     "cf:dev": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
-    "deploy:dry": "npm run build && wrangler deploy --dry-run"
+    "deploy:dry": "npm run build && wrangler deploy --dry-run",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.11",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/core": "^7.6.11",
+    "@capacitor/haptics": "^7.0.5",
+    "@capacitor/screen-orientation": "^7.0.4",
+    "@capacitor/status-bar": "^7.0.6",
     "three": "^0.170.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.11",
     "@types/three": "^0.170.0",
     "typescript": "^5.6.3",
     "vite": "^6.0.3",
