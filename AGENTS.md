@@ -140,9 +140,9 @@ npm run android:sync         # npm run build && npx cap sync android
 ```powershell
 @'
 set -e
-cd /mnt/c/Users/15116/.gemini/antigravity/scratch/neon-apex
+cd /mnt/e/AI/google/neon-apex
 GH_BIN=$(command -v gh)
-git -c safe.directory=/mnt/c/Users/15116/.gemini/antigravity/scratch/neon-apex \
+git -c safe.directory=/mnt/e/AI/google/neon-apex \
     -c credential.helper= \
     -c "credential.helper=!$GH_BIN auth git-credential" \
     push origin main
@@ -153,7 +153,7 @@ git -c safe.directory=/mnt/c/Users/15116/.gemini/antigravity/scratch/neon-apex \
 - Local Windows PC currently has JDK 8 only; **APK compilation runs via GitHub Actions** (`.github/workflows/build-android.yml`, Ubuntu + Node 22 + JDK 21 + Android SDK 35 + Gradle 8.11.1).
 - Pushing to `main` (or running `workflow_dispatch`) builds `NEON-APEX-v2.0.0-android.apk` in ~1.5–2 min and uploads artifact `neon-apex-android-apk`. Download locally via WSL:
   ```bash
-  gh run download <RUN_ID> -R rgc-projects/neon-apex -n neon-apex-android-apk -D /mnt/c/Users/15116/.gemini/antigravity/scratch/neon-apex/releases
+  gh run download <RUN_ID> -R rgc-projects/neon-apex -n neon-apex-android-apk -D /mnt/e/AI/google/neon-apex/releases
   ```
 - Local Android testing uses official Google **`android` CLI** (`%USERPROFILE%\AppData\AndroidCLI\android.exe`) + `adb` (`%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe`) + AVD `medium_phone` (Android 16, `2400×1080`). **Never touch the user's personal NetEase MuMu VMs (`127.0.0.1:16512`, etc.).**
 

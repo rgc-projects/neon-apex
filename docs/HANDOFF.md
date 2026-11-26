@@ -2,7 +2,7 @@
 
 > **交接日期**：2026-11-26  
 > **当前生产版本**：`v2.0.1`（Android `versionCode = 3` / `versionName = "2.0.1"`）  
-> **当前最新提交**：`1fd7002`（分支 `main`，已推送至 `origin/main`）
+> **主分支**：`main`（已同步至 `origin/main`，当前 APK 代码基线 `1fd7002`）
 
 ---
 
@@ -10,7 +10,7 @@
 
 | 维度 | 详细信息 |
 | :--- | :--- |
-| **项目仓库** | `https://github.com/rgc-projects/neon-apex`（本地：`C:\Users\15116\.gemini\antigravity\scratch\neon-apex`） |
+| **项目仓库** | `https://github.com/rgc-projects/neon-apex`（本地：`E:\AI\google\neon-apex`） |
 | **线上 Web 域名** | `https://neon-apex.gcrdev.top`（Cloudflare Workers Static Assets，`wrangler.jsonc` → `./dist`） |
 | **Android 包名** | `top.gcrdev.neonapex`（Capacitor 7，`minSdk = 23`，`compileSdk / targetSdk = 35`） |
 | **本地最新安装包** | `releases/NEON-APEX-v2.0.0-android.apk`（`5.0 MB`，gitignored，由 CI Run `#45813287500` 下载并已实机验收） |
@@ -72,7 +72,7 @@
 2. 推送至 `main` 后，在 GitHub Actions 等待 `Build Android APK` 绿灯，或在 WSL 执行：
    ```bash
    gh run list -R rgc-projects/neon-apex --workflow "Build Android APK" --limit 3
-   gh run download <RUN_ID> -R rgc-projects/neon-apex -n neon-apex-android-apk -D /mnt/c/Users/15116/.gemini/antigravity/scratch/neon-apex/releases
+   gh run download <RUN_ID> -R rgc-projects/neon-apex -n neon-apex-android-apk -D /mnt/e/AI/google/neon-apex/releases
    ```
 
 ---

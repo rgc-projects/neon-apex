@@ -19,7 +19,7 @@
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-Set-Location 'C:\Users\15116\.gemini\antigravity\scratch\neon-apex'
+Set-Location 'E:\AI\google\neon-apex'
 
 # 1. 类型检查 + 生产构建 + Cloudflare Workers 打包预检
 npm run deploy:dry
@@ -84,7 +84,7 @@ npx cap sync android
 ### 1. APK 包体与签名完整性检查
 ```powershell
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zip = [System.IO.Compression.ZipFile]::OpenRead('C:\Users\15116\.gemini\antigravity\scratch\neon-apex\releases\NEON-APEX-v2.0.0-android.apk')
+$zip = [System.IO.Compression.ZipFile]::OpenRead('E:\AI\google\neon-apex\releases\NEON-APEX-v2.0.0-android.apk')
 $entries = $zip.Entries | Select-Object -ExpandProperty FullName
 @(
   'AndroidManifest.xml',
@@ -104,7 +104,7 @@ $zip.Dispose()
 ```powershell
 $android = "$env:USERPROFILE\AppData\AndroidCLI\android.exe"
 $adb     = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
-$apk     = "C:\Users\15116\.gemini\antigravity\scratch\neon-apex\releases\NEON-APEX-v2.0.0-android.apk"
+$apk     = "E:\AI\google\neon-apex\releases\NEON-APEX-v2.0.0-android.apk"
 $serial  = "emulator-5554"
 
 # 1. 启动虚拟手机（若尚未运行）
