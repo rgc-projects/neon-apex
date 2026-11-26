@@ -62,6 +62,17 @@ export class HUD {
     maxZ: number;
   } | null = null;
   private minimapHyperSegments: { x: number; y: number }[][] = [];
+  private minimapBgCanvas: HTMLCanvasElement | null = null;
+  private minimapBgDirty = true;
+  private lastMinimapDrawAt = 0;
+  private lastRankText = '';
+  private lastLapText = '';
+  private lastTimeText = '';
+  private lastBestLapText = '';
+  private lastScoreText = '';
+  private lastSpeedText = '';
+  private lastGearText = '';
+  private lastNitroStatusText = '';
   private showHyperZones = false;
   private trackAccent = '#00f2ff';
   private lastCalloutText = '';
@@ -127,6 +138,7 @@ export class HUD {
         this.minimapHyperSegments.push(segPts);
       }
     }
+    this.minimapBgDirty = true;
   }
 
   public setCameraLabel(mode: CameraMode): void {
@@ -144,7 +156,10 @@ export class HUD {
   }
 
   public setHyperZonesVisible(visible: boolean): void {
-    this.showHyperZones = visible;
+    if (this.showHyperZones !== visible) {
+      this.showHyperZones = visible;
+      this.minimapBgDirty = true;
+    }
   }
 
   public showCountdown(text: string | null, isGo = false, startRpmNorm = 0, showRpm = false): void {
@@ -192,16 +207,48 @@ export class HUD {
   }
 
   public update(telemetry: RacerHUDTelemetry, racers: RacerPhysics[], spline: TrackSpline): void {
-    this.rankEl.textContent = String(telemetry.rank);
-    this.rankSuffixEl.textContent = i18n.isZh ? '' : ordinalSuffix(telemetry.rank);
-    this.lapEl.innerHTML = `${telemetry.lap} <span>/ ${telemetry.totalLaps}</span>`;
-    this.timeEl.textContent = formatTime(telemetry.raceTime);
-    this.bestLapEl.textContent =
-      telemetry.bestLapTime !== null ? formatTime(telemetry.bestLapTime) : '--:--.--';
-    this.scoreEl.textContent = telemetry.styleScore.toLocaleString();
+    const rankTxt = String(telemetry.rank);
+    if (rankTxt !== this.lastRankText) {
+      this.lastRankText = rankTxt;
+      this.rankEl.textContent = rankTxt;
+      this.rankSuffixEl.textContent = i18n.isZh ? '' : ordinalSuffix(telemetry.rank);
+    }
 
-    this.speedEl.textContent = String(telemetry.speedKmh);
-    this.gearEl.textContent = String(telemetry.gear);
+    const lapKey = `${telemetry.lap}/${telemetry.totalLaps}`;
+    if (lapKey !== this.lastLapText) {
+      this.lastLapText = lapKey;
+      this.lapEl.innerHTML = `${telemetry.lap} <span>/ ${telemetry.totalLaps}</span>`;
+    }
+
+    const timeTxt = formatTime(telemetry.raceTime);
+    if (timeTxt !== this.lastTimeText) {
+      this.lastTimeText = timeTxt;
+      this.timeEl.textContent = timeTxt;
+    }
+
+    const bestTxt = telemetry.bestLapTime !== null ? formatTime(telemetry.bestLapTime) : '--:--.--';
+    if (bestTxt !== this.lastBestLapText) {
+      this.lastBestLapText = bestTxt;
+      this.bestLapEl.textContent = bestTxt;
+    }
+
+    const scoreTxt = telemetry.styleScore.toLocaleString();
+    if (scoreTxt !== this.lastScoreText) {
+      this.lastScoreText = scoreTxt;
+      this.scoreEl.textContent = scoreTxt;
+    }
+
+    const spdTxt = String(telemetry.speedKmh);
+    if (spdTxt !== this.lastSpeedText) {
+      this.lastSpeedText = spdTxt;
+      this.speedEl.textContent = spdTxt;
+    }
+
+    const gearTxt = String(telemetry.gear);
+    if (gearTxt !== this.lastGearText) {
+      this.lastGearText = gearTxt;
+      this.gearEl.textContent = gearTxt;
+    }
 
     const speedRatio = clamp(telemetry.speedKmh / 540, 0, 1);
     const speedDash = 355 * (1 - speedRatio);
@@ -316,8 +363,77 @@ export class HUD {
     this.drawMinimap(racers, spline);
   }
 
+  private rebuildMinimapBackground(w: number, h: number): void {
+    if (!this.minimapOutline) return;
+    if (!this.minimapBgCanvas) {
+      this.minimapBgCanvas = document.createElement('canvas');
+    }
+    this.minimapBgCanvas.width = w;
+    this.minimapBgCanvas.height = h;
+    const bgCtx = this.minimapBgCanvas.getContext('2d')!;
+    bgCtx.clearRect(0, 0, w, h);
+
+    const pad = 16;
+    const drawW = w - pad * 2;
+    const drawH = h - pad * 2;
+    const pts = this.minimapOutline.points;
+    if (pts.length < 3) return;
+
+    bgCtx.save();
+    bgCtx.beginPath();
+    pts.forEach((p, idx) => {
+      const px = pad + p.x * drawW;
+      const py = pad + p.y * drawH;
+      if (idx === 0) bgCtx.moveTo(px, py);
+      else bgCtx.lineTo(px, py);
+    });
+    bgCtx.closePath();
+
+    bgCtx.strokeStyle = 'rgba(0, 242, 255, 0.25)';
+    bgCtx.lineWidth = 10;
+    bgCtx.lineJoin = 'round';
+    bgCtx.stroke();
+
+    bgCtx.strokeStyle = this.trackAccent;
+    bgCtx.lineWidth = 4;
+    bgCtx.stroke();
+
+    if (this.showHyperZones && this.minimapHyperSegments.length > 0) {
+      bgCtx.lineCap = 'round';
+      for (const seg of this.minimapHyperSegments) {
+        if (seg.length < 2) continue;
+        bgCtx.beginPath();
+        seg.forEach((p, idx) => {
+          const px = pad + p.x * drawW;
+          const py = pad + p.y * drawH;
+          if (idx === 0) bgCtx.moveTo(px, py);
+          else bgCtx.lineTo(px, py);
+        });
+        bgCtx.strokeStyle = 'rgba(0, 242, 255, 0.55)';
+        bgCtx.lineWidth = 7;
+        bgCtx.stroke();
+        bgCtx.strokeStyle = '#fde047';
+        bgCtx.lineWidth = 2.6;
+        bgCtx.stroke();
+      }
+    }
+
+    const sp = pts[0];
+    bgCtx.fillStyle = '#ffffff';
+    bgCtx.beginPath();
+    bgCtx.arc(pad + sp.x * drawW, pad + sp.y * drawH, 4.5, 0, Math.PI * 2);
+    bgCtx.fill();
+    bgCtx.restore();
+
+    this.minimapBgDirty = false;
+  }
+
   private drawMinimap(racers: RacerPhysics[], spline: TrackSpline): void {
     if (!this.minimapOutline) return;
+    const now = performance.now();
+    if (!this.minimapBgDirty && now - this.lastMinimapDrawAt < 48) return;
+    this.lastMinimapDrawAt = now;
+
     const ctx = this.minimapCtx;
     const w = this.minimapCanvas.width;
     const h = this.minimapCanvas.height;
@@ -325,56 +441,16 @@ export class HUD {
     const drawW = w - pad * 2;
     const drawH = h - pad * 2;
 
-    ctx.clearRect(0, 0, w, h);
-
-    const pts = this.minimapOutline.points;
-    if (pts.length < 3) return;
-
-    ctx.save();
-    ctx.beginPath();
-    pts.forEach((p, idx) => {
-      const px = pad + p.x * drawW;
-      const py = pad + p.y * drawH;
-      if (idx === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
-    ctx.closePath();
-
-    ctx.strokeStyle = 'rgba(0, 242, 255, 0.25)';
-    ctx.lineWidth = 10;
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-
-    ctx.strokeStyle = this.trackAccent;
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    if (this.showHyperZones && this.minimapHyperSegments.length > 0) {
-      ctx.lineCap = 'round';
-      for (const seg of this.minimapHyperSegments) {
-        if (seg.length < 2) continue;
-        ctx.beginPath();
-        seg.forEach((p, idx) => {
-          const px = pad + p.x * drawW;
-          const py = pad + p.y * drawH;
-          if (idx === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        });
-        ctx.strokeStyle = 'rgba(0, 242, 255, 0.55)';
-        ctx.lineWidth = 7;
-        ctx.stroke();
-        ctx.strokeStyle = '#fde047';
-        ctx.lineWidth = 2.6;
-        ctx.stroke();
-      }
+    if (this.minimapBgDirty || !this.minimapBgCanvas) {
+      this.rebuildMinimapBackground(w, h);
     }
 
-    const sp = pts[0];
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(pad + sp.x * drawW, pad + sp.y * drawH, 4.5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.clearRect(0, 0, w, h);
+    if (this.minimapBgCanvas) {
+      ctx.drawImage(this.minimapBgCanvas, 0, 0);
+    }
 
+    ctx.save();
     for (const r of racers) {
       if (r.isPlayer) continue;
       const m = spline.projectToMinimap(r.worldPos, this.minimapOutline);
@@ -398,8 +474,11 @@ export class HUD {
 
       ctx.translate(x, y);
       ctx.rotate(heading);
-      ctx.shadowColor = '#00f2ff';
-      ctx.shadowBlur = 10;
+      ctx.fillStyle = 'rgba(0, 242, 255, 0.34)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 9.5, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.moveTo(8, 0);

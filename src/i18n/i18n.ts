@@ -161,7 +161,7 @@ const ZH = {
   distMedium: '中（均衡）',
   distFar: '远（全视距）',
   optShowFps: '显示实时 FPS / 帧耗时',
-  optShowFpsDesc: '在画面左上角显示实时帧率与每帧渲染耗时',
+  optShowFpsDesc: '在画面边缘显示实时帧率与每帧渲染耗时',
 
   optSteerMode: '手机转向方式',
   steerJoystick: '浮动摇杆',
@@ -490,7 +490,7 @@ const EN: Record<I18nKey, string> = {
   distMedium: 'MEDIUM',
   distFar: 'FAR',
   optShowFps: 'Live FPS / Frame Time',
-  optShowFpsDesc: 'Show live FPS and ms/frame badge in top-left corner',
+  optShowFpsDesc: 'Show live FPS and ms/frame performance badge',
 
   optSteerMode: 'Mobile Steering Mode',
   steerJoystick: 'JOYSTICK',

@@ -3861,11 +3861,29 @@ body.in-race:not(.touch-mode) .fps-badge {
   cursor: pointer;
 }
 
-/* Native Android / iOS Capacitor App Cleanups */
+/* Native Android / iOS Capacitor App Cleanups & Mobile In-Race GPU Performance */
 body.native-app #btn-menu-fullscreen,
 body.native-app #btn-hud-fullscreen,
 body.native-app .rotate-hint-banner {
   display: none !important;
+}
+
+/* Eliminate expensive per-frame WebView backdrop-filter re-blur during active mobile racing! */
+body.touch-mode .glass-hud,
+body.touch-mode .touch-btn,
+body.touch-mode .hud-mini-btn,
+body.touch-mode .drift-hud,
+body.touch-mode .corner-callout,
+body.native-app .glass-hud,
+body.native-app .touch-btn,
+body.native-app .hud-mini-btn {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.touch-mode .glass-hud,
+body.native-app .glass-hud {
+  background: rgba(6, 11, 26, 0.78);
 }
 
 /* ==================== UNIFIED GAME SETTINGS MODAL ==================== */
@@ -4309,7 +4327,13 @@ body.native-app .rotate-hint-banner {
 
   .panel-left .stat-row {
     font-size: 9.5px;
-    grid-template-columns: 44px 1fr 22px;
+    grid-template-columns: 58px 1fr 22px;
+    white-space: nowrap;
+  }
+
+  .panel-heading h2 {
+    font-size: 11.5px;
+    letter-spacing: 0.8px;
   }
 
   .header-actions {
@@ -4380,6 +4404,13 @@ body.native-app .rotate-hint-banner {
     width: 72px;
     height: 72px;
     border-radius: 18px;
+  }
+}
+
+/* Wide Modern 20:9 / 21:9 Android Landscape Phones (e.g. 2400x1080 -> ~914x411 CSS) */
+@media (max-height: 540px) and (min-width: 820px) {
+  .menu-body {
+    grid-template-columns: 248px 1fr 252px;
   }
 }
 

@@ -15,11 +15,9 @@ export class SpeedLinesOverlay {
   private readonly streaks: SpeedStreak[] = [];
   private w = 1;
   private h = 1;
+  private quality: 'low' | 'medium' | 'high' = 'high';
   private densityScale = 1.0;
-
-  public setQuality(level: 'low' | 'medium' | 'high'): void {
-    this.densityScale = level === 'low' ? 0.35 : level === 'medium' ? 0.65 : 1.0;
-  }
+  private wasClear = true;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -37,13 +35,27 @@ export class SpeedLinesOverlay {
     this.resize(window.innerWidth, window.innerHeight);
   }
 
+  public setQuality(level: 'low' | 'medium' | 'high'): void {
+    this.quality = level;
+    this.densityScale = level === 'low' ? 0 : level === 'medium' ? 0.55 : 1.0;
+    this.canvas.style.display = level === 'low' ? 'none' : 'block';
+    if (level === 'low') {
+      this.ctx.clearRect(0, 0, this.w, this.h);
+      this.wasClear = true;
+    } else {
+      this.resize(this.w, this.h);
+    }
+  }
+
   public resize(width: number, height: number): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    this.w = width;
-    this.h = height;
-    this.canvas.width = Math.floor(width * dpr);
-    this.canvas.height = Math.floor(height * dpr);
+    const maxDpr = this.quality === 'high' ? 1.5 : 0.75;
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+    this.w = Math.max(1, width);
+    this.h = Math.max(1, height);
+    this.canvas.width = Math.max(1, Math.floor(this.w * dpr));
+    this.canvas.height = Math.max(1, Math.floor(this.h * dpr));
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.wasClear = true;
   }
 
   public update(
@@ -54,9 +66,17 @@ export class SpeedLinesOverlay {
     isSlipstream: boolean,
     visible: boolean
   ): void {
+    // Skip all full-screen 2D canvas GPU compositing on Low quality!
+    if (this.quality === 'low') return;
+
     const ctx = this.ctx;
-    ctx.clearRect(0, 0, this.w, this.h);
-    if (!visible) return;
+    if (!visible) {
+      if (!this.wasClear) {
+        ctx.clearRect(0, 0, this.w, this.h);
+        this.wasClear = true;
+      }
+      return;
+    }
 
     const baseIntensity = clamp((speedKmh - 215) / 185, 0, 1);
     const intensity = clamp(
@@ -64,14 +84,23 @@ export class SpeedLinesOverlay {
       0,
       1.25
     );
-    if (intensity <= 0.02) return;
+    if (intensity <= 0.02) {
+      if (!this.wasClear) {
+        ctx.clearRect(0, 0, this.w, this.h);
+        this.wasClear = true;
+      }
+      return;
+    }
+
+    ctx.clearRect(0, 0, this.w, this.h);
+    this.wasClear = false;
 
     const cx = this.w * 0.5;
     const cy = this.h * 0.5;
     const maxR = Math.hypot(cx, cy);
 
-    // Subtle colored peripheral speed vignette when boosting
-    if (isNitro || isSlipstream) {
+    // Subtle colored peripheral speed vignette on High quality (skip heavy full-screen radial gradient on Medium/mobile)
+    if (this.quality === 'high' && (isNitro || isSlipstream)) {
       const vig = ctx.createRadialGradient(cx, cy, maxR * 0.42, cx, cy, maxR * 1.02);
       vig.addColorStop(0, 'rgba(0,0,0,0)');
       const edgeCol = isSuperNitro
@@ -95,22 +124,18 @@ export class SpeedLinesOverlay {
         s.angle = Math.random() * Math.PI * 2;
       }
 
-      // Keep center 54% of viewport crisp & unobstructed; frame only peripheral edges!
-      const r0 = Math.max(0.54, s.dist - s.len * (0.55 + intensity * 0.45)) * maxR;
-      const r1 = s.dist * maxR;
-      if (r1 <= r0 + 2) continue;
+      const r0 = s.dist * maxR;
+      const r1 = (s.dist + s.len * (0.65 + intensity * 0.6)) * maxR;
       const cos = Math.cos(s.angle);
       const sin = Math.sin(s.angle);
 
-      const alpha = clamp(intensity * 0.36 * (1 - Math.abs(s.dist - 0.85) * 0.6), 0.03, 0.42);
-      if (isSuperNitro && i % 2 === 0) {
-        ctx.strokeStyle = `rgba(147, 197, 253, ${alpha})`;
-      } else if (isNitro && i % 2 === 0) {
-        ctx.strokeStyle = `rgba(251, 191, 36, ${alpha * 0.88})`;
-      } else {
-        ctx.strokeStyle = `rgba(226, 232, 240, ${alpha * 0.72})`;
-      }
-      ctx.lineWidth = s.width * (0.55 + intensity * 0.38);
+      const alpha = clamp((s.dist - 0.45) * 0.72 * intensity, 0, 0.75);
+      ctx.strokeStyle = isSuperNitro
+        ? `rgba(255, 80, 220, ${alpha.toFixed(2)})`
+        : isNitro
+          ? `rgba(0, 242, 255, ${alpha.toFixed(2)})`
+          : `rgba(205, 245, 255, ${(alpha * 0.72).toFixed(2)})`;
+      ctx.lineWidth = s.width * (0.8 + intensity * 0.55);
 
       ctx.beginPath();
       ctx.moveTo(cx + cos * r0, cy + sin * r0);
