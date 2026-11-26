@@ -43,7 +43,7 @@ export const ISLE_OF_MAN_TRACK: TrackConfig = {
   railLeftColor: 0xdc2626,
   railRightColor: 0xfacc15,
   accentColorHex: '#ef4444',
-  asphaltTint: '#1a1e24',
+  asphaltTint: '#242932',
   points: scalePts([
     // === MS 0-1: Douglas TT Grandstand (Glencrutchery Road) -> St Ninian's -> Bray Hill -> Ago's Leap ===
     { x: 0, y: 34, z: 0, inwardBankDeg: 0 },

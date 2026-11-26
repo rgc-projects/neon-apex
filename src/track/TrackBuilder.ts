@@ -216,7 +216,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     roughnessMap: roadPBR.roughnessMap,
     roughness: 1.0,
     metalness: 0.02,
-    envMapIntensity: 0.42,
+    envMapIntensity: 0.45,
   });
   group.add(new THREE.Mesh(roadGeo, roadMat));
   disposables.push(roadGeo, roadMat);
@@ -244,7 +244,7 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   deckGeo.setAttribute('normal', new THREE.Float32BufferAttribute(deckNormals, 3));
   deckGeo.setIndex(deckIndices);
   const deckMat = new THREE.MeshStandardMaterial({
-    color: 0x262c36,
+    color: 0x2c3340,
     roughness: 0.78,
     metalness: 0.18,
     side: THREE.DoubleSide,

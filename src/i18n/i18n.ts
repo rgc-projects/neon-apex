@@ -160,6 +160,8 @@ const ZH = {
   distNear: '近（省电）',
   distMedium: '中（均衡）',
   distFar: '远（全视距）',
+  optBrightness: '画面亮度',
+  optBrightnessDesc: '实时校准场景曝光，适配不同手机屏幕与环境光线',
   optShowFps: '显示实时 FPS / 帧耗时',
   optShowFpsDesc: '在画面边缘显示实时帧率与每帧渲染耗时',
 
@@ -489,6 +491,8 @@ const EN: Record<I18nKey, string> = {
   distNear: 'NEAR',
   distMedium: 'MEDIUM',
   distFar: 'FAR',
+  optBrightness: 'Scene Brightness',
+  optBrightnessDesc: 'Live exposure calibration for OLED/LCD displays and ambient light',
   optShowFps: 'Live FPS / Frame Time',
   optShowFpsDesc: 'Show live FPS and ms/frame performance badge',
 

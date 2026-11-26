@@ -38,7 +38,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     railLeftColor: 0x38bdf8,
     railRightColor: 0xf59e0b,
     accentColorHex: '#38bdf8',
-    asphaltTint: '#1b1f27',
+    asphaltTint: '#232833',
     points: scalePoints(
       [
         // Main Start/Finish Expressway Straight
@@ -118,7 +118,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     railLeftColor: 0x38bdf8,
     railRightColor: 0xfbbf24,
     accentColorHex: '#38bdf8',
-    asphaltTint: '#1c222d',
+    asphaltTint: '#252c38',
     points: scalePoints(
       [
         // Main Twin-Pylon Suspension Bridge Launch Straight
@@ -196,7 +196,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     railLeftColor: 0xf59e0b,
     railRightColor: 0x38bdf8,
     accentColorHex: '#f59e0b',
-    asphaltTint: '#1a1e26',
+    asphaltTint: '#222732',
     points: scalePoints(
       [
         // Start Bay Downhill Concrete Tunnel
@@ -274,7 +274,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     railLeftColor: 0xf59e0b,
     railRightColor: 0xe2e8f0,
     accentColorHex: '#f59e0b',
-    asphaltTint: '#1a1d24',
+    asphaltTint: '#222630',
     points: scalePoints(
       [
         // Mountain Summit Start Straight (55m elevation!)
@@ -355,7 +355,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     railLeftColor: 0x10b981,
     railRightColor: 0xf59e0b,
     accentColorHex: '#10b981',
-    asphaltTint: '#1c212b',
+    asphaltTint: '#242a36',
     points: scalePoints(
       [
         // Start/Finish Harbor Boulevard Straight
@@ -435,7 +435,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     railLeftColor: 0x22d3ee,
     railRightColor: 0xfbbf24,
     accentColorHex: '#38f9d7',
-    asphaltTint: '#1b2029',
+    asphaltTint: '#242a36',
     points: scalePoints(
       [
         // === SECTOR 1: West Harbor Metropolis (Start/Finish Waterfront Straight -> Urban 90° Chicane) ===

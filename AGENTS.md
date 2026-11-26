@@ -114,7 +114,12 @@ neon-apex/
    Hyper Straight & Overdrive apply strictly to mega circuits (`island`, `manx`, `akina`).
 2. **Track Geometry & Drift Standards**: Every new or modified circuit MUST follow `docs/TRACK_AND_DRIFT_DESIGN.md` (`minSep3D >= 100m`, zero bridge/terrain clipping, smooth centripetal spline, automated clearance & 4-mode drift validation).
 
-### E. CSS & Modal Layout Pitfalls (Already Solved — Preserve!)
+### E. Lighting, Tone Mapping & PBR Readability Invariants
+1. **Keep `THREE.ACESFilmicToneMapping` & Restrained Charcoal Asphalt**: Do NOT switch uncalibrated scenes to `AgXToneMapping` or push `asphaltTint` into pale grey (`#353b47+`), which desaturates cyber-arcade night tones and makes roads look like flat concrete. Keep track `asphaltTint` in the dark charcoal range (`#212835`–`#282c36`) with per-theme `baseExposure` (`1.19–1.27`).
+2. **Prevent Grazing-Angle Specular Glare**: Keep `dirRimLight` at steep elevation (`y >= 155`, restrained intensity `0.68–0.82`) and keep `createProceduralEnvMap()` restrained (`scene.environmentIntensity = 1.0`) so grazing Fresnel reflections never blow out Tokyo Bay water or the leftmost lane into pale white bands.
+3. **Preset-Independent Scene Brightness**: `graphics.brightness` (`0.8–1.4`, default `1.0`) MUST stay decoupled from `qualityPreset` (like `showFps`), scaling `renderer.toneMappingExposure = this.baseExposure * brightness` in O(1) without rebuilding `EffectComposer`. In `SettingsUI.ts`, guard range-slider `input` handlers with `suppressRender` so dragging on mobile touchscreens never destroys the active `<input>` element.
+
+### F. CSS & Modal Layout Pitfalls (Already Solved — Preserve!)
 1. **Modal Specificity**: Scope catalog and settings modal dimensions with ID-prefixed selectors (`#circuit-catalog-modal .modal-card.catalog-modal-card`, `#settings-modal .modal-card.settings-modal-card`) so later `.modal-card` rules never cap their width.
 2. **Chromium Short-Landscape WebGL Compositor Bug**: Inside `@media (max-height: 540px)`, modals (`#circuit-catalog-modal`, `#settings-modal`) MUST use opaque `#090f24` backgrounds with `backdrop-filter: none`, `isolation: isolate`, and `transform: translateZ(0)` so WebGL never paints over them.
 3. **No CSS Nesting**: Keep all `@media` blocks top-level (never nest `@media` inside `@media`) for full compatibility down to Android WebView API 23.

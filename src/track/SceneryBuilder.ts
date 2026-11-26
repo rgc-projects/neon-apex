@@ -119,13 +119,13 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
         cfg.theme === 'nujiang' ? 0.92 : cfg.theme === 'manx' ? 0.72 : isOcean ? 0.82 : 0.45,
         cfg.theme === 'nujiang' ? 0.92 : cfg.theme === 'manx' ? 0.72 : isOcean ? 0.82 : 0.45
       ),
-      roughness: cfg.theme === 'fjord' ? 0.21 : cfg.theme === 'nujiang' ? 0.24 : cfg.theme === 'manx' ? 0.28 : isOcean ? 0.23 : 0.36,
-      metalness: cfg.theme === 'fjord' ? 0.58 : cfg.theme === 'nujiang' ? 0.42 : cfg.theme === 'manx' ? 0.48 : isOcean ? 0.54 : 0.35,
-      envMapIntensity: cfg.theme === 'fjord' ? 1.25 : cfg.theme === 'nujiang' ? 1.05 : cfg.theme === 'manx' ? 1.0 : isOcean ? 1.15 : 0.65,
+      roughness: cfg.theme === 'fjord' ? 0.24 : cfg.theme === 'nujiang' ? 0.26 : cfg.theme === 'manx' ? 0.30 : isOcean ? 0.28 : 0.46,
+      metalness: cfg.theme === 'fjord' ? 0.55 : cfg.theme === 'nujiang' ? 0.40 : cfg.theme === 'manx' ? 0.46 : isOcean ? 0.50 : 0.28,
+      envMapIntensity: cfg.theme === 'fjord' ? 1.15 : cfg.theme === 'nujiang' ? 1.0 : cfg.theme === 'manx' ? 0.95 : isOcean ? 0.98 : 0.48,
     });
   } else {
     groundMat = new THREE.MeshStandardMaterial({
-      color: cfg.theme === 'mountain' || cfg.theme === 'akina' ? 0x0a1116 : 0x0b0f17,
+      color: cfg.theme === 'mountain' || cfg.theme === 'akina' ? 0x0f171e : 0x0f1520,
       roughness: 0.92,
       metalness: 0.05,
     });
@@ -760,9 +760,9 @@ function buildRealisticMountainPass(
   const foliageGeo2 = new THREE.ConeGeometry(2.6, 7.0, 12);
   const foliageGeo3 = new THREE.ConeGeometry(1.7, 5.5, 12);
 
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2b1e16, roughness: 0.95, envMapIntensity: 0.2 });
-  const pineMatDark = new THREE.MeshStandardMaterial({ color: 0x0b2219, roughness: 0.92, envMapIntensity: 0.22 });
-  const pineMatMid = new THREE.MeshStandardMaterial({ color: 0x113024, roughness: 0.9, envMapIntensity: 0.22 });
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x34251b, roughness: 0.94, envMapIntensity: 0.22 });
+  const pineMatDark = new THREE.MeshStandardMaterial({ color: 0x122f23, roughness: 0.91, envMapIntensity: 0.24 });
+  const pineMatMid = new THREE.MeshStandardMaterial({ color: 0x193e2e, roughness: 0.89, envMapIntensity: 0.24 });
   disposables.push(trunkGeo, foliageGeo1, foliageGeo2, foliageGeo3, trunkMat, pineMatDark, pineMatMid);
 
   const trees: { x: number; y: number; z: number; s: number }[] = [];
@@ -1250,9 +1250,9 @@ function buildGrandIslandWorld(
   const fol2Geo = new THREE.ConeGeometry(2.6, 7.0, 10);
   const fol3Geo = new THREE.ConeGeometry(1.7, 5.5, 10);
 
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2b1e16, roughness: 0.95, envMapIntensity: 0.2 });
-  const pineDark = new THREE.MeshStandardMaterial({ color: 0x0b241a, roughness: 0.92, envMapIntensity: 0.22 });
-  const pineMid = new THREE.MeshStandardMaterial({ color: 0x123526, roughness: 0.9, envMapIntensity: 0.22 });
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x34251b, roughness: 0.94, envMapIntensity: 0.22 });
+  const pineDark = new THREE.MeshStandardMaterial({ color: 0x123225, roughness: 0.91, envMapIntensity: 0.24 });
+  const pineMid = new THREE.MeshStandardMaterial({ color: 0x1a4231, roughness: 0.89, envMapIntensity: 0.24 });
   disposables.push(trunkGeo, fol1Geo, fol2Geo, fol3Geo, trunkMat, pineDark, pineMid);
 
   const trees: { x: number; y: number; z: number; s: number }[] = [];
@@ -3094,10 +3094,10 @@ function buildSuperAkinaWorld(
   const pine3Geo = new THREE.ConeGeometry(1.9, 6.0, 10);
   const mapleCrownGeo = new THREE.DodecahedronGeometry(3.6, 1);
 
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x261a13, roughness: 0.95, envMapIntensity: 0.18 });
-  const pineDarkMat = new THREE.MeshStandardMaterial({ color: 0x0b2219, roughness: 0.92, envMapIntensity: 0.22 });
-  const pineMidMat = new THREE.MeshStandardMaterial({ color: 0x113024, roughness: 0.9, envMapIntensity: 0.22 });
-  const mapleRedMat = new THREE.MeshStandardMaterial({ color: 0x6b1d19, roughness: 0.88, envMapIntensity: 0.2 });
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x302118, roughness: 0.94, envMapIntensity: 0.2 });
+  const pineDarkMat = new THREE.MeshStandardMaterial({ color: 0x122f23, roughness: 0.91, envMapIntensity: 0.24 });
+  const pineMidMat = new THREE.MeshStandardMaterial({ color: 0x193e2e, roughness: 0.89, envMapIntensity: 0.24 });
+  const mapleRedMat = new THREE.MeshStandardMaterial({ color: 0x7c2520, roughness: 0.87, envMapIntensity: 0.22 });
   disposables.push(
     trunkGeo,
     pine1Geo,

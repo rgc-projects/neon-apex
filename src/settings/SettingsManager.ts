@@ -16,6 +16,7 @@ export interface GraphicsSettings {
   bloom: BloomMode;
   particles: ParticleQuality;
   drawDistance: DrawDistanceMode;
+  brightness: number; // 0.8..1.4 (1.0 = calibrated default exposure)
   showFps: boolean;
 }
 
@@ -86,7 +87,8 @@ export function detectRecommendedPreset(): Exclude<QualityPreset, 'custom'> {
 
 export function buildPresetGraphics(
   preset: Exclude<QualityPreset, 'custom'>,
-  showFps = false
+  showFps = false,
+  brightness = 1.0
 ): GraphicsSettings {
   const mobile = isMobileDevice();
   switch (preset) {
@@ -99,6 +101,7 @@ export function buildPresetGraphics(
         bloom: 'off',
         particles: 'low',
         drawDistance: 'near',
+        brightness,
         showFps,
       };
     case 'medium':
@@ -110,6 +113,7 @@ export function buildPresetGraphics(
         bloom: 'soft',
         particles: 'medium',
         drawDistance: 'medium',
+        brightness,
         showFps,
       };
     case 'high':
@@ -121,6 +125,7 @@ export function buildPresetGraphics(
         bloom: 'soft',
         particles: 'high',
         drawDistance: 'far',
+        brightness,
         showFps,
       };
     case 'ultra':
@@ -133,6 +138,7 @@ export function buildPresetGraphics(
         bloom: 'cinematic',
         particles: 'high',
         drawDistance: 'far',
+        brightness,
         showFps,
       };
   }
@@ -186,8 +192,13 @@ export class SettingsManager {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return def;
       const parsed = JSON.parse(raw) as Partial<GameSettings>;
+      const mergedGraphics = { ...def.graphics, ...(parsed.graphics ?? {}) };
+      const rawBrightness = Number(mergedGraphics.brightness);
+      mergedGraphics.brightness = Number.isFinite(rawBrightness)
+        ? Math.min(1.4, Math.max(0.8, rawBrightness))
+        : 1.0;
       return {
-        graphics: { ...def.graphics, ...(parsed.graphics ?? {}) },
+        graphics: mergedGraphics,
         controls: { ...def.controls, ...(parsed.controls ?? {}) },
         audio: { ...def.audio, ...(parsed.audio ?? {}) },
       };
@@ -218,7 +229,8 @@ export class SettingsManager {
 
   public applyQualityPreset(preset: Exclude<QualityPreset, 'custom'>): void {
     const keepFps = this.data.graphics.showFps;
-    this.data.graphics = buildPresetGraphics(preset, keepFps);
+    const keepBrightness = this.data.graphics.brightness;
+    this.data.graphics = buildPresetGraphics(preset, keepFps, keepBrightness);
     this.emit('graphics');
   }
 
@@ -229,8 +241,9 @@ export class SettingsManager {
   }
 
   public updateGraphics(patch: Partial<GraphicsSettings>): void {
+    const keys = Object.keys(patch);
     const isMetaOnly =
-      Object.keys(patch).length === 1 && Object.prototype.hasOwnProperty.call(patch, 'showFps');
+      keys.length > 0 && keys.every((k) => k === 'showFps' || k === 'brightness');
     this.data.graphics = {
       ...this.data.graphics,
       ...patch,

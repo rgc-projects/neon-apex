@@ -333,7 +333,7 @@ export const SUPER_AKINA_TRACK: TrackConfig = {
   railLeftColor: 0xf59e0b,
   railRightColor: 0xe2e8f0,
   accentColorHex: '#f59e0b',
-  asphaltTint: '#1a1d24',
+  asphaltTint: '#222630',
   points: [
     // =========================================================================
     // SECTOR 1: LAKE HARUNA SUMMIT ROLLERCOASTER SUPER-STRAIGHT #1 (~2.0 km!)

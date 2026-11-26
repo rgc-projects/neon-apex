@@ -126,7 +126,7 @@ export const AURORA_FJORD_TRACK: TrackConfig = {
   railLeftColor: 0x00f2ff,
   railRightColor: 0xff3b7a,
   accentColorHex: '#ff3b7a',
-  asphaltTint: '#181e28',
+  asphaltTint: '#212835',
   points: [
     // === START/FINISH: Straight North Launch along West side of Crown Finger #1 ===
     { x: -640, y: 44, z: -600, inwardBankDeg: 0 },

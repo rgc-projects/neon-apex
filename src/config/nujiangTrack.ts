@@ -71,7 +71,7 @@ export const NUJIANG_72_TRACK: TrackConfig = {
   railLeftColor: 0xf59e0b,
   railRightColor: 0xe2e8f0,
   accentColorHex: '#f97316',
-  asphaltTint: '#202229',
+  asphaltTint: '#282c36',
   points: [
     // === SECTOR 0: Yela Mountain Pass Summit Start/Finish (业拉山垭口观景台, Y=172m) ===
     { x: 0, y: 172, z: 0, inwardBankDeg: 0 },

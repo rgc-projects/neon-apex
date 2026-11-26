@@ -87,26 +87,26 @@ export class CarModel {
       roughness: 0.15,
       clearcoat: 1.0,
       clearcoatRoughness: 0.04,
-      envMapIntensity: 1.95,
+      envMapIntensity: 1.85,
     });
 
     // Dry-Weave Satin Motorsport Carbon Fiber
     this.carbonMat = new THREE.MeshStandardMaterial({
-      color: 0x161921,
+      color: 0x181b24,
       metalness: 0.42,
       roughness: 0.44,
-      envMapIntensity: 1.15,
+      envMapIntensity: 1.1,
     });
 
     // Tinted Laminated Automotive Cockpit Glass
     this.glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0x09111c,
+      color: 0x0a1320,
       metalness: 0.15,
       roughness: 0.05,
       clearcoat: 1.0,
       transparent: true,
       opacity: 0.82,
-      envMapIntensity: 2.25,
+      envMapIntensity: 2.1,
     });
 
     // Painted Performance Brake Calipers & Brushed Anodized Trim
@@ -188,22 +188,22 @@ export class CarModel {
     this.chassis.add(rearBounce);
     this.disposables.push(bounceGeo);
 
-    // Player tapered xenon headlight beams on damp tarmac
+    // Player tapered xenon headlight beams on damp tarmac (feathered realistic pools, never a hard white strip)
     if (isPlayer) {
-      const beamGeo = new THREE.PlaneGeometry(3.5, 20);
+      const beamGeo = new THREE.PlaneGeometry(2.4, 18);
       beamGeo.rotateX(-Math.PI / 2);
       const beamMat = new THREE.MeshBasicMaterial({
         map: sharedBeamTex,
         color: 0xeef5ff,
         transparent: true,
-        opacity: 0.36,
+        opacity: 0.16,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
       const beamL = new THREE.Mesh(beamGeo, beamMat);
-      beamL.position.set(-0.76, 0.09, -12.1);
+      beamL.position.set(-0.82, 0.09, -11.2);
       const beamR = new THREE.Mesh(beamGeo, beamMat);
-      beamR.position.set(0.76, 0.09, -12.1);
+      beamR.position.set(0.82, 0.09, -11.2);
       this.chassis.add(beamL, beamR);
       this.disposables.push(beamGeo, beamMat);
     }
@@ -274,7 +274,7 @@ export class CarModel {
             color: name.includes('rim') ? 0xcfd6df : 0x7c8796,
             metalness: 0.92,
             roughness: name.includes('rim') ? 0.2 : 0.28,
-            envMapIntensity: 1.8,
+            envMapIntensity: 1.7,
           });
           obj.material = alloyMat;
           this.disposables.push(alloyMat);

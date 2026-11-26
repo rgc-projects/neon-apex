@@ -32,6 +32,7 @@ export class SettingsUI {
   );
   private readonly bodyEl = document.getElementById('settings-body')!;
   private activeTab: SettingsTab = 'graphics';
+  private suppressRender = false;
 
   constructor(private readonly callbacks: SettingsUICallbacks) {
     this.closeBtn.addEventListener('click', () => this.close());
@@ -64,7 +65,7 @@ export class SettingsUI {
     });
 
     settingsManager.subscribe(() => {
-      if (this.isOpen()) {
+      if (this.isOpen() && !this.suppressRender) {
         this.renderActiveTab();
       }
     });
@@ -266,6 +267,17 @@ export class SettingsUI {
           )}
         </div>
 
+        <div class="set-row set-slider-row">
+          <div class="set-slider-head">
+            <div class="set-row-info">
+              <span class="set-row-title">${t('optBrightness')}</span>
+              <span class="set-row-desc">${t('optBrightnessDesc')}</span>
+            </div>
+            <span class="set-slider-val mono" id="val-brightness">${Math.round((g.brightness ?? 1) * 100)}%</span>
+          </div>
+          <input id="sl-brightness" class="set-range" type="range" min="80" max="140" step="5" value="${Math.round((g.brightness ?? 1) * 100)}" />
+        </div>
+
         <div class="set-row set-row-inline">
           <div class="set-row-info">
             <span class="set-row-title">${t('optShowFps')}</span>
@@ -295,6 +307,16 @@ export class SettingsUI {
     this.bindSeg('bloom', (v) => settingsManager.updateGraphics({ bloom: v as BloomMode }));
     this.bindSeg('particles', (v) => settingsManager.updateGraphics({ particles: v as ParticleQuality }));
     this.bindSeg('draw', (v) => settingsManager.updateGraphics({ drawDistance: v as DrawDistanceMode }));
+
+    const slBrightness = this.bodyEl.querySelector<HTMLInputElement>('#sl-brightness');
+    slBrightness?.addEventListener('input', () => {
+      const val = Number(slBrightness.value);
+      const lbl = this.bodyEl.querySelector('#val-brightness');
+      if (lbl) lbl.textContent = `${val}%`;
+      this.suppressRender = true;
+      settingsManager.updateGraphics({ brightness: val / 100 });
+      this.suppressRender = false;
+    });
 
     this.bodyEl.querySelector('#sw-show-fps')?.addEventListener('click', () => {
       this.callbacks.onAnyInteract?.();

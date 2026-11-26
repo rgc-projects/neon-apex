@@ -30,8 +30,8 @@ export function createRoadPBRTextures(asphaltTint: string): RoadPBRTextures {
   aCtx.fillStyle = asphaltTint;
   aCtx.fillRect(0, 0, S, S);
 
-  // Base roughness: ~0.84 (214/255) authentic matte-satin asphalt, gently polished to ~0.62 (158/255) along tire lanes
-  rCtx.fillStyle = 'rgb(214,214,214)';
+  // Base roughness: ~0.82 (210/255) authentic matte-satin asphalt, gently polished to ~0.61 (156/255) along tire lanes
+  rCtx.fillStyle = 'rgb(210,210,210)';
   rCtx.fillRect(0, 0, S, S);
 
   // Subtle longitudinal traffic-polished tire paths (continuous & seamless — zero blotchy oval spots!)
@@ -40,15 +40,15 @@ export function createRoadPBRTextures(asphaltTint: string): RoadPBRTextures {
     const cx = rc * S;
     const gA = aCtx.createLinearGradient(cx - 72, 0, cx + 72, 0);
     gA.addColorStop(0, 'rgba(0,0,0,0)');
-    gA.addColorStop(0.5, 'rgba(8,10,14,0.28)');
+    gA.addColorStop(0.5, 'rgba(8,10,14,0.24)');
     gA.addColorStop(1, 'rgba(0,0,0,0)');
     aCtx.fillStyle = gA;
     aCtx.fillRect(cx - 72, 0, 144, S);
 
     const gR = rCtx.createLinearGradient(cx - 78, 0, cx + 78, 0);
-    gR.addColorStop(0, 'rgba(158,158,158,0)');
-    gR.addColorStop(0.5, 'rgba(158,158,158,0.85)');
-    gR.addColorStop(1, 'rgba(158,158,158,0)');
+    gR.addColorStop(0, 'rgba(156,156,156,0)');
+    gR.addColorStop(0.5, 'rgba(156,156,156,0.85)');
+    gR.addColorStop(1, 'rgba(156,156,156,0)');
     rCtx.fillStyle = gR;
     rCtx.fillRect(cx - 78, 0, 156, S);
   }
@@ -94,22 +94,22 @@ export function createRoadPBRTextures(asphaltTint: string): RoadPBRTextures {
   }
 
   // Realistic shoulder rumble margins
-  aCtx.fillStyle = 'rgba(14,17,22,0.65)';
+  aCtx.fillStyle = 'rgba(18,22,30,0.46)';
   aCtx.fillRect(0, 0, 38, S);
   aCtx.fillRect(S - 38, 0, 38, S);
 
   // Crisp weathered white solid edge shoulder lines
-  aCtx.fillStyle = 'rgba(226,232,240,0.88)';
+  aCtx.fillStyle = 'rgba(236,242,250,0.92)';
   aCtx.fillRect(42, 0, 12, S);
   aCtx.fillRect(S - 54, 0, 12, S);
 
   // Authentic center double-yellow / warm-amber highway divider lines
-  aCtx.fillStyle = 'rgba(234,179,8,0.82)';
+  aCtx.fillStyle = 'rgba(244,192,28,0.88)';
   aCtx.fillRect(S * 0.5 - 12, 0, 8, S);
   aCtx.fillRect(S * 0.5 + 4, 0, 8, S);
 
   // Dashed white lane dividers on left & right carriageways
-  aCtx.fillStyle = 'rgba(226,232,240,0.72)';
+  aCtx.fillStyle = 'rgba(234,240,248,0.80)';
   for (let y = 36; y < S; y += 256) {
     aCtx.fillRect(S * 0.275, y, 8, 124);
     aCtx.fillRect(S * 0.725 - 8, y, 8, 124);
@@ -139,20 +139,20 @@ export function createRoadPBRTextures(asphaltTint: string): RoadPBRTextures {
 /** Realistic weathered architectural concrete for Jersey barriers, viaduct piers & tunnel walls */
 export function createConcreteTexture(): THREE.CanvasTexture {
   const [canvas, ctx] = makeCanvas(512, 512);
-  ctx.fillStyle = '#474f5c';
+  ctx.fillStyle = '#505968';
   ctx.fillRect(0, 0, 512, 512);
 
   // Subtle weathered concrete mottling
   for (let i = 0; i < 6000; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
-    const v = 50 + Math.floor(Math.random() * 55);
+    const v = 58 + Math.floor(Math.random() * 58);
     ctx.fillStyle = `rgba(${v},${v + 4},${v + 10},0.16)`;
     ctx.fillRect(x, y, 3 + Math.random() * 6, 3 + Math.random() * 6);
   }
 
   // Vertical cast concrete panel seams & tie-rod dots
-  ctx.strokeStyle = 'rgba(18,22,28,0.55)';
+  ctx.strokeStyle = 'rgba(20,24,30,0.52)';
   ctx.lineWidth = 3;
   for (let x = 0; x < 512; x += 128) {
     ctx.beginPath();
@@ -160,7 +160,7 @@ export function createConcreteTexture(): THREE.CanvasTexture {
     ctx.lineTo(x, 512);
     ctx.stroke();
   }
-  ctx.fillStyle = 'rgba(20,24,30,0.45)';
+  ctx.fillStyle = 'rgba(22,26,32,0.42)';
   for (let x = 64; x < 512; x += 128) {
     for (let y = 64; y < 512; y += 128) {
       ctx.beginPath();
@@ -171,9 +171,9 @@ export function createConcreteTexture(): THREE.CanvasTexture {
 
   // Bottom road-grime darkening
   const grime = ctx.createLinearGradient(0, 0, 0, 512);
-  grime.addColorStop(0, 'rgba(0,0,0,0.08)');
+  grime.addColorStop(0, 'rgba(0,0,0,0.07)');
   grime.addColorStop(0.75, 'rgba(0,0,0,0)');
-  grime.addColorStop(1, 'rgba(8,10,14,0.55)');
+  grime.addColorStop(1, 'rgba(9,11,16,0.46)');
   ctx.fillStyle = grime;
   ctx.fillRect(0, 0, 512, 512);
 
@@ -706,9 +706,9 @@ export function createHeadlightBeamTexture(): THREE.CanvasTexture {
   ctx.clearRect(0, 0, 128, 256);
 
   const vGrad = ctx.createLinearGradient(0, 256, 0, 0);
-  vGrad.addColorStop(0, 'rgba(235, 245, 255, 0.72)');
-  vGrad.addColorStop(0.35, 'rgba(200, 228, 255, 0.3)');
-  vGrad.addColorStop(0.8, 'rgba(160, 200, 255, 0.06)');
+  vGrad.addColorStop(0, 'rgba(235, 245, 255, 0.56)');
+  vGrad.addColorStop(0.32, 'rgba(200, 228, 255, 0.22)');
+  vGrad.addColorStop(0.75, 'rgba(160, 200, 255, 0.05)');
   vGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
   ctx.fillStyle = vGrad;
@@ -723,8 +723,8 @@ export function createHeadlightBeamTexture(): THREE.CanvasTexture {
   ctx.globalCompositeOperation = 'destination-in';
   const hGrad = ctx.createLinearGradient(0, 0, 128, 0);
   hGrad.addColorStop(0, 'rgba(0,0,0,0)');
-  hGrad.addColorStop(0.28, 'rgba(0,0,0,1)');
-  hGrad.addColorStop(0.72, 'rgba(0,0,0,1)');
+  hGrad.addColorStop(0.4, 'rgba(0,0,0,1)');
+  hGrad.addColorStop(0.6, 'rgba(0,0,0,1)');
   hGrad.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = hGrad;
   ctx.fillRect(0, 0, 128, 256);
@@ -734,31 +734,40 @@ export function createHeadlightBeamTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-/** Realistic neutral cool-twilight HDR reflection probe for automotive clearcoat (no orange/yellow road blotches!) */
+/** Realistic neutral cool-twilight HDR reflection probe for automotive clearcoat (restrained so night water never washes out) */
 export function createProceduralEnvMap(renderer: THREE.WebGLRenderer): THREE.Texture {
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envScene = new THREE.Scene();
-  envScene.background = new THREE.Color(0x0b1220);
+  envScene.background = new THREE.Color(0x0d1526);
 
-  // Neutral twilight sky dome inside reflection probe (crisp steel-blue horizon, zero orange cast on roads)
+  // Restrained neutral twilight sky dome inside reflection probe (crisp steel-blue horizon, zero white-out on bay water)
   const skyGradGeo = new THREE.SphereGeometry(40, 24, 16);
-  const skyTex = createRealisticSkyTexture('#070d1b', '#14233d', '#2d4568', '#93b4d8', false);
+  const skyTex = createRealisticSkyTexture('#091122', '#182b4a', '#354f74', '#9ec0e0', false);
   const skyMesh = new THREE.Mesh(
     skyGradGeo,
     new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide })
   );
   envScene.add(skyMesh);
 
+  // Subtle dark-slate tarmac ground bounce so lower panels avoid pure-black crush without flattening shadows
+  const groundBounceGeo = new THREE.CircleGeometry(38, 24);
+  groundBounceGeo.rotateX(-Math.PI / 2);
+  const groundBounceMat = new THREE.MeshBasicMaterial({ color: 0x151e2c });
+  const groundBounce = new THREE.Mesh(groundBounceGeo, groundBounceMat);
+  groundBounce.position.y = -6;
+  envScene.add(groundBounce);
+
   // Clean soft studio/highway overhead cool-white reflection strips so supercar clearcoat gleams sharply
-  const softLampA = new THREE.MeshBasicMaterial({ color: 0xcbdcf2 });
-  const softLampB = new THREE.MeshBasicMaterial({ color: 0xa8c4e5 });
+  const softLampA = new THREE.MeshBasicMaterial({ color: 0xd4e4f7 });
+  const softLampB = new THREE.MeshBasicMaterial({ color: 0xb2cce8 });
+  const lampGeo = new THREE.BoxGeometry(5.5, 0.55, 0.55);
 
   for (let i = -2; i <= 2; i++) {
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.55, 0.55), i % 2 === 0 ? softLampA : softLampB);
+    const lamp = new THREE.Mesh(lampGeo, i % 2 === 0 ? softLampA : softLampB);
     lamp.position.set(i * 8, 17, -11);
     envScene.add(lamp);
 
-    const lampBack = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.55, 0.55), softLampB);
+    const lampBack = new THREE.Mesh(lampGeo, softLampB);
     lampBack.position.set(i * 8, 15, 13);
     envScene.add(lampBack);
   }
@@ -766,6 +775,11 @@ export function createProceduralEnvMap(renderer: THREE.WebGLRenderer): THREE.Tex
   const rt = pmrem.fromScene(envScene, 0.045);
   skyTex.dispose();
   skyGradGeo.dispose();
+  groundBounceGeo.dispose();
+  groundBounceMat.dispose();
+  lampGeo.dispose();
+  softLampA.dispose();
+  softLampB.dispose();
   pmrem.dispose();
   return rt.texture;
 }

@@ -94,6 +94,7 @@ export class GameEngine {
   private readonly hemiLight: THREE.HemisphereLight;
   private readonly dirKeyLight: THREE.DirectionalLight;
   private readonly dirRimLight: THREE.DirectionalLight;
+  private baseExposure = 1.24;
 
   // Race Entities
   private racers: RacerPhysics[] = [];
@@ -142,19 +143,20 @@ export class GameEngine {
       powerPreference: 'high-performance',
     });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = this.baseExposure;
 
     this.cameraController = new CameraController(initW / Math.max(initH, 1));
 
     // Procedural Realistic Twilight + Streetlamp HDR Reflection Probe
     this.scene.environment = createProceduralEnvMap(this.renderer);
+    this.scene.environmentIntensity = 1.0;
 
     // Three-Point Photorealistic Atmospheric Lighting (adapted per track theme in loadTrack)
-    this.hemiLight = new THREE.HemisphereLight(0x9bc0eb, 0x222938, 1.32);
-    this.dirKeyLight = new THREE.DirectionalLight(0xffddb5, 1.9);
+    this.hemiLight = new THREE.HemisphereLight(0xa4c6ee, 0x2c3648, 1.48);
+    this.dirKeyLight = new THREE.DirectionalLight(0xffe0bc, 2.05);
     this.dirKeyLight.position.set(140, 185, 120);
-    this.dirRimLight = new THREE.DirectionalLight(0x93c5fd, 1.0);
-    this.dirRimLight.position.set(-150, 95, -160);
+    this.dirRimLight = new THREE.DirectionalLight(0x98c9fd, 0.72);
+    this.dirRimLight.position.set(-140, 175, -85);
     this.scene.add(this.hemiLight, this.dirKeyLight, this.dirRimLight);
 
     this.scene.add(this.particles.group, this.skidMarks.mesh, this.showcaseGroup);
@@ -427,12 +429,18 @@ export class GameEngine {
     this.audio.setVolumes(a.masterVolume, a.sfxVolume, a.musicVolume);
   }
 
+  private syncExposure(): void {
+    const userBrightness = clamp(settingsManager.settings.graphics.brightness ?? 1.0, 0.8, 1.4);
+    this.renderer.toneMappingExposure = this.baseExposure * userBrightness;
+  }
+
   private applyGraphicsSettings(g: GraphicsSettings, forceRebuild: boolean): void {
     const w = Math.max(1, Math.round(window.visualViewport?.width ?? window.innerWidth));
     const h = Math.max(1, Math.round(window.visualViewport?.height ?? window.innerHeight));
     const dpr = this.computeEffectiveDpr(g.resolutionScale);
     const mobile = isMobileDevice();
 
+    this.syncExposure();
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h);
     this.cameraController.setAspect(w / Math.max(h, 1));
@@ -612,95 +620,114 @@ export class GameEngine {
     // Tailor realistic atmospheric sunlight & ambient sky bounce to each circuit's time-of-day
     if (cfg.theme === 'bridge') {
       // Golden-hour ocean sunset
-      this.hemiLight.color.setHex(0xffd2a6);
-      this.hemiLight.groundColor.setHex(0x283548);
-      this.hemiLight.intensity = 1.42;
-      this.dirKeyLight.color.setHex(0xffb870);
-      this.dirKeyLight.intensity = 2.25;
-      this.dirKeyLight.position.set(220, 115, 160);
-      this.dirRimLight.color.setHex(0x93c5fd);
-      this.dirRimLight.intensity = 0.95;
+      this.hemiLight.color.setHex(0xffd6ad);
+      this.hemiLight.groundColor.setHex(0x344359);
+      this.hemiLight.intensity = 1.52;
+      this.dirKeyLight.color.setHex(0xffbc78);
+      this.dirKeyLight.intensity = 2.3;
+      this.dirKeyLight.position.set(220, 125, 160);
+      this.dirRimLight.color.setHex(0x98c9fd);
+      this.dirRimLight.intensity = 0.68;
+      this.scene.environmentIntensity = 1.0;
+      this.baseExposure = 1.21;
     } else if (cfg.theme === 'island') {
       // Pacific twilight-sunset grand coastal island lighting
-      this.hemiLight.color.setHex(0xffcfa3);
-      this.hemiLight.groundColor.setHex(0x1f3344);
-      this.hemiLight.intensity = 1.45;
-      this.dirKeyLight.color.setHex(0xffbe7a);
-      this.dirKeyLight.intensity = 2.2;
-      this.dirKeyLight.position.set(260, 130, 180);
-      this.dirRimLight.color.setHex(0x7dd3fc);
-      this.dirRimLight.intensity = 1.05;
+      this.hemiLight.color.setHex(0xffd3aa);
+      this.hemiLight.groundColor.setHex(0x2c4458);
+      this.hemiLight.intensity = 1.54;
+      this.dirKeyLight.color.setHex(0xffc280);
+      this.dirKeyLight.intensity = 2.26;
+      this.dirKeyLight.position.set(260, 140, 180);
+      this.dirRimLight.color.setHex(0x82d8fc);
+      this.dirRimLight.intensity = 0.72;
+      this.scene.environmentIntensity = 1.0;
+      this.baseExposure = 1.21;
     } else if (cfg.theme === 'manx') {
       // Crisp late-afternoon Irish Sea golden Atlantic break over emerald Manx hills
-      this.hemiLight.color.setHex(0xb8d4f0);
-      this.hemiLight.groundColor.setHex(0x233825);
-      this.hemiLight.intensity = 1.52;
-      this.dirKeyLight.color.setHex(0xffe0a3);
-      this.dirKeyLight.intensity = 2.15;
-      this.dirKeyLight.position.set(-220, 155, 190);
-      this.dirRimLight.color.setHex(0x93c5fd);
-      this.dirRimLight.intensity = 0.95;
+      this.hemiLight.color.setHex(0xc0daf4);
+      this.hemiLight.groundColor.setHex(0x304a33);
+      this.hemiLight.intensity = 1.62;
+      this.dirKeyLight.color.setHex(0xffe2aa);
+      this.dirKeyLight.intensity = 2.24;
+      this.dirKeyLight.position.set(-220, 165, 190);
+      this.dirRimLight.color.setHex(0x98c9fd);
+      this.dirRimLight.intensity = 0.7;
+      this.scene.environmentIntensity = 1.0;
+      this.baseExposure = 1.21;
     } else if (cfg.theme === 'nujiang') {
       // Crisp high-altitude Tibetan Plateau cobalt-sky sunlight over warm ochre Hengduan cliffs
-      this.hemiLight.color.setHex(0xbce0ff);
-      this.hemiLight.groundColor.setHex(0x4a3222);
-      this.hemiLight.intensity = 1.55;
-      this.dirKeyLight.color.setHex(0xffe6b8);
-      this.dirKeyLight.intensity = 2.32;
+      this.hemiLight.color.setHex(0xc4e4ff);
+      this.hemiLight.groundColor.setHex(0x583e2b);
+      this.hemiLight.intensity = 1.62;
+      this.dirKeyLight.color.setHex(0xffe8be);
+      this.dirKeyLight.intensity = 2.38;
       this.dirKeyLight.position.set(-210, 260, 160);
-      this.dirRimLight.color.setHex(0x93c5fd);
-      this.dirRimLight.intensity = 1.05;
+      this.dirRimLight.color.setHex(0x98c9fd);
+      this.dirRimLight.intensity = 0.75;
+      this.scene.environmentIntensity = 1.0;
+      this.baseExposure = 1.19;
     } else if (cfg.theme === 'fjord') {
       // Nordic Arctic aurora twilight: cool emerald-cyan zenith + icy blue moonlight rim over dark basalt cliffs
-      this.hemiLight.color.setHex(0x7ee8e0);
-      this.hemiLight.groundColor.setHex(0x162436);
-      this.hemiLight.intensity = 1.48;
-      this.dirKeyLight.color.setHex(0xcbe8ff);
-      this.dirKeyLight.intensity = 2.05;
+      this.hemiLight.color.setHex(0x88ece4);
+      this.hemiLight.groundColor.setHex(0x23364f);
+      this.hemiLight.intensity = 1.58;
+      this.dirKeyLight.color.setHex(0xd0ebff);
+      this.dirKeyLight.intensity = 2.15;
       this.dirKeyLight.position.set(-180, 220, -240);
-      this.dirRimLight.color.setHex(0x5eead4);
-      this.dirRimLight.intensity = 1.15;
+      this.dirRimLight.color.setHex(0x66eed9);
+      this.dirRimLight.intensity = 0.82;
+      this.scene.environmentIntensity = 1.0;
+      this.baseExposure = 1.25;
     } else if (cfg.theme === 'akina') {
-      // Authentic Akina Mountain Pass nocturnal alpine lighting (high-contrast dark gorge + golden headlights & wet asphalt sheen!)
-      this.hemiLight.color.setHex(0xa8c5e8);
-      this.hemiLight.groundColor.setHex(0x1c2722);
-      this.hemiLight.intensity = 1.38;
-      this.dirKeyLight.color.setHex(0xffd4a3);
-      this.dirKeyLight.intensity = 1.98;
-      this.dirKeyLight.position.set(180, 155, 140);
-      this.dirRimLight.color.setHex(0x94b8e8);
-      this.dirRimLight.intensity = 0.96;
+      // Authentic Akina Mountain Pass nocturnal alpine lighting (deep dark gorge + readable tarmac & headlights)
+      this.hemiLight.color.setHex(0xb0ccec);
+      this.hemiLight.groundColor.setHex(0x293832);
+      this.hemiLight.intensity = 1.52;
+      this.dirKeyLight.color.setHex(0xffd8aa);
+      this.dirKeyLight.intensity = 2.08;
+      this.dirKeyLight.position.set(180, 160, 140);
+      this.dirRimLight.color.setHex(0x9bc0ee);
+      this.dirRimLight.intensity = 0.72;
+      this.scene.environmentIntensity = 1.0;
+      this.baseExposure = 1.26;
     } else if (cfg.theme === 'tunnel') {
       // Modern illuminated sub-surface expressway tunnel
-      this.hemiLight.color.setHex(0xcbd5e1);
-      this.hemiLight.groundColor.setHex(0x1f242e);
-      this.hemiLight.intensity = 1.25;
-      this.dirKeyLight.color.setHex(0xfef3c7);
-      this.dirKeyLight.intensity = 1.5;
+      this.hemiLight.color.setHex(0xd6e0ec);
+      this.hemiLight.groundColor.setHex(0x353f50);
+      this.hemiLight.intensity = 1.52;
+      this.dirKeyLight.color.setHex(0xfff4cf);
+      this.dirKeyLight.intensity = 1.82;
       this.dirKeyLight.position.set(80, 200, 90);
-      this.dirRimLight.color.setHex(0xbae6fd);
-      this.dirRimLight.intensity = 1.05;
+      this.dirRimLight.color.setHex(0xbfe8ff);
+      this.dirRimLight.intensity = 0.78;
+      this.scene.environmentIntensity = 1.0;
+      this.baseExposure = 1.27;
     } else if (cfg.theme === 'mountain') {
       // Crisp Japanese alpine dusk pass
-      this.hemiLight.color.setHex(0xa8c5e8);
-      this.hemiLight.groundColor.setHex(0x202c26);
-      this.hemiLight.intensity = 1.38;
-      this.dirKeyLight.color.setHex(0xffd4a3);
-      this.dirKeyLight.intensity = 1.95;
-      this.dirKeyLight.position.set(160, 145, 130);
-      this.dirRimLight.color.setHex(0x94b8e8);
-      this.dirRimLight.intensity = 0.92;
+      this.hemiLight.color.setHex(0xb0ccec);
+      this.hemiLight.groundColor.setHex(0x2c3c35);
+      this.hemiLight.intensity = 1.52;
+      this.dirKeyLight.color.setHex(0xffd8aa);
+      this.dirKeyLight.intensity = 2.06;
+      this.dirKeyLight.position.set(160, 155, 130);
+      this.dirRimLight.color.setHex(0x9bc0ee);
+      this.dirRimLight.intensity = 0.7;
+      this.scene.environmentIntensity = 1.0;
+      this.baseExposure = 1.25;
     } else {
       // Tokyo Bayshore twilight-to-night expressway
-      this.hemiLight.color.setHex(0x96b8e6);
-      this.hemiLight.groundColor.setHex(0x1e2532);
-      this.hemiLight.intensity = 1.32;
-      this.dirKeyLight.color.setHex(0xffdfba);
-      this.dirKeyLight.intensity = 1.88;
+      this.hemiLight.color.setHex(0xa4c6ee);
+      this.hemiLight.groundColor.setHex(0x2c3648);
+      this.hemiLight.intensity = 1.48;
+      this.dirKeyLight.color.setHex(0xffe0bc);
+      this.dirKeyLight.intensity = 2.05;
       this.dirKeyLight.position.set(140, 185, 120);
-      this.dirRimLight.color.setHex(0x93c5fd);
-      this.dirRimLight.intensity = 1.0;
+      this.dirRimLight.color.setHex(0x98c9fd);
+      this.dirRimLight.intensity = 0.72;
+      this.scene.environmentIntensity = 1.0;
+      this.baseExposure = 1.24;
     }
+    this.syncExposure();
 
     this.trackBuild = buildTrackMesh(this.spline);
     this.trackBuild.setHyperZonesVisible(this.enableHyperNitro);
