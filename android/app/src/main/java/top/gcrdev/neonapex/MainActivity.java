@@ -17,6 +17,9 @@ import java.util.Arrays;
 public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Set FLAG_SECURE before setContentView so Xiaomi HyperOS ContentCatcher (传送门/图片识别)
+        // and other OEM screen-sniffing assistants skip this window and NEVER steal long-press touches!
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         super.onCreate(savedInstanceState);
 
         // Keep phone screen awake during tilt/auto-gas races

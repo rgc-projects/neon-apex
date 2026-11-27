@@ -1,6 +1,15 @@
 import { CAR_SIGNATURES, CarAudioSignature } from '../config/carSignatures';
 import { clamp } from '../utils/math';
 
+function createClassicCurve(): Float32Array<ArrayBuffer> {
+  const curve = new Float32Array(new ArrayBuffer(256 * 4));
+  for (let i = 0; i < 256; i++) {
+    const x = (i * 2) / 256 - 1;
+    curve[i] = Math.tanh(x * 2.4);
+  }
+  return curve;
+}
+
 function createWarmthCurve(drive: number): Float32Array<ArrayBuffer> {
   const curve = new Float32Array(new ArrayBuffer(256 * 4));
   const norm = Math.tanh(drive) || 1;
@@ -56,6 +65,7 @@ export class AudioEngine {
   private engineMainOsc: OscillatorNode | null = null;
   private engineSecondOsc: OscillatorNode | null = null;
   private engineSubOsc: OscillatorNode | null = null;
+  private engineMainGain: GainNode | null = null;
   private engineSecondGain: GainNode | null = null;
   private engineSubGain: GainNode | null = null;
   private engineRoarFilter: BiquadFilterNode | null = null;
@@ -171,26 +181,41 @@ export class AudioEngine {
     this.carProfile = profile;
     if (!this.initialized || !this.ctx) return;
     const now = this.ctx.currentTime;
+    const isClassic = Boolean(profile.useClassicOriginalSynth);
+
+    if (isClassic) {
+      if (this.engineMainOsc) this.engineMainOsc.type = 'sawtooth';
+      if (this.engineSecondOsc) this.engineSecondOsc.type = 'triangle';
+      this.engineMainGain?.gain.setTargetAtTime(0.45, now, 0.03);
+      this.engineSecondGain?.gain.setTargetAtTime(0.35, now, 0.03);
+      this.engineSubGain?.gain.setTargetAtTime(0.4, now, 0.03);
+      if (this.engineShaper) this.engineShaper.curve = createClassicCurve();
+      this.bodyFormant?.gain.setTargetAtTime(0, now, 0.04);
+      this.throatFormant?.gain.setTargetAtTime(0, now, 0.04);
+      this.engineMasterLpf?.Q.setTargetAtTime(2.6, now, 0.04);
+      this.engineRoarGain?.gain.setTargetAtTime(0, now, 0.04);
+      this.engineAirGain?.gain.setTargetAtTime(0, now, 0.04);
+      return;
+    }
 
     this.activeWave = createEnginePeriodicWave(this.ctx, profile.harmonicWeights);
     this.engineMainOsc?.setPeriodicWave(this.activeWave);
     if (this.engineSecondOsc) {
       this.engineSecondOsc.type = profile.isElectric ? 'sine' : 'triangle';
     }
-    if (this.engineSecondGain) {
-      this.engineSecondGain.gain.setTargetAtTime(profile.secondGain, now, 0.04);
-    }
-    if (this.engineSubGain) {
-      this.engineSubGain.gain.setTargetAtTime(profile.subGain, now, 0.04);
-    }
+    this.engineMainGain?.gain.setTargetAtTime(0.56, now, 0.04);
+    this.engineSecondGain?.gain.setTargetAtTime(profile.secondGain, now, 0.04);
+    this.engineSubGain?.gain.setTargetAtTime(profile.subGain, now, 0.04);
     if (this.engineShaper) {
       this.engineShaper.curve = createWarmthCurve(profile.warmthDrive);
     }
     if (this.bodyFormant) {
       this.bodyFormant.frequency.setTargetAtTime(profile.bodyFormantHz, now, 0.05);
+      this.bodyFormant.gain.setTargetAtTime(4.8, now, 0.04);
     }
     if (this.throatFormant) {
       this.throatFormant.frequency.setTargetAtTime(profile.throatFormantHz, now, 0.05);
+      this.throatFormant.gain.setTargetAtTime(3.2, now, 0.04);
     }
     if (this.engineMasterLpf) {
       this.engineMasterLpf.Q.setTargetAtTime(profile.lpfQ, now, 0.05);
@@ -202,57 +227,62 @@ export class AudioEngine {
 
   private setupContinuousEngine(ctx: AudioContext): void {
     const p = this.carProfile;
+    const isClassic = Boolean(p.useClassicOriginalSynth);
     this.activeWave = createEnginePeriodicWave(ctx, p.harmonicWeights);
 
-    // 1. Warm analog saturation stage (gentle tanh, never harsh square clipping)
+    // 1. Saturation stage (classic tanh(2.4x) for APEX-V12, gentle warmth for other 4 cars)
     this.engineShaper = ctx.createWaveShaper();
-    this.engineShaper.curve = createWarmthCurve(p.warmthDrive);
+    this.engineShaper.curve = isClassic ? createClassicCurve() : createWarmthCurve(p.warmthDrive);
 
-    // 2. Fixed physical exhaust-chamber formant resonators (gives real body weight!)
+    // 2. Fixed physical exhaust-chamber formant resonators (flat 0dB bypass on classic APEX-V12)
     this.bodyFormant = ctx.createBiquadFilter();
     this.bodyFormant.type = 'peaking';
     this.bodyFormant.frequency.value = p.bodyFormantHz;
     this.bodyFormant.Q.value = 1.1;
-    this.bodyFormant.gain.value = 4.8;
+    this.bodyFormant.gain.value = isClassic ? 0 : 4.8;
 
     this.throatFormant = ctx.createBiquadFilter();
     this.throatFormant.type = 'peaking';
     this.throatFormant.frequency.value = p.throatFormantHz;
-    this.throatFormant.Q.value = 1.25;
-    this.throatFormant.gain.value = 5.2;
+    this.throatFormant.Q.value = 1.3;
+    this.throatFormant.gain.value = isClassic ? 0 : 3.2;
 
-    // 3. Lively master lowpass (Q = 1.4..1.9 gives crisp motorsport roar without piercing whistle!)
+    // 3. Master lowpass
     this.engineMasterLpf = ctx.createBiquadFilter();
     this.engineMasterLpf.type = 'lowpass';
     this.engineMasterLpf.frequency.value = p.lpfBase;
-    this.engineMasterLpf.Q.value = p.lpfQ;
+    this.engineMasterLpf.Q.value = isClassic ? 2.6 : p.lpfQ;
 
     this.engineGain = ctx.createGain();
     this.engineGain.gain.value = 0.0;
 
-    // 4. Harmonic voices: Custom PeriodicWave main + smooth secondary voice + warm sine sub-bass
+    // 4. Harmonic voices
     this.engineMainOsc = ctx.createOscillator();
-    this.engineMainOsc.setPeriodicWave(this.activeWave);
+    if (isClassic) {
+      this.engineMainOsc.type = 'sawtooth';
+    } else {
+      this.engineMainOsc.setPeriodicWave(this.activeWave);
+    }
     this.engineMainOsc.frequency.value = p.pitchBase;
 
     this.engineSecondOsc = ctx.createOscillator();
-    this.engineSecondOsc.type = p.isElectric ? 'sine' : 'triangle';
+    this.engineSecondOsc.type = isClassic ? 'triangle' : p.isElectric ? 'sine' : 'triangle';
     this.engineSecondOsc.frequency.value = p.pitchBase * p.secondRatio;
 
     this.engineSubOsc = ctx.createOscillator();
     this.engineSubOsc.type = 'sine';
     this.engineSubOsc.frequency.value = p.pitchBase * 0.5;
 
-    const mainGain = ctx.createGain();
-    mainGain.gain.value = 0.56;
+    this.engineMainGain = ctx.createGain();
+    this.engineMainGain.gain.value = isClassic ? 0.45 : 0.56;
     this.engineSecondGain = ctx.createGain();
-    this.engineSecondGain.gain.value = p.secondGain;
+    this.engineSecondGain.gain.value = isClassic ? 0.35 : p.secondGain;
     this.engineSubGain = ctx.createGain();
-    this.engineSubGain.gain.value = p.subGain;
+    this.engineSubGain.gain.value = isClassic ? 0.4 : p.subGain;
 
-    this.engineMainOsc.connect(mainGain).connect(this.engineShaper);
+    this.engineMainOsc.connect(this.engineMainGain).connect(this.engineShaper);
     this.engineSecondOsc.connect(this.engineSecondGain).connect(this.engineShaper);
-    this.engineSubOsc.connect(this.engineSubGain).connect(this.bodyFormant);
+    this.engineSubOsc.connect(this.engineSubGain).connect(this.engineShaper);
 
     // 5. Organic Brown Noise exhaust/intake airflow roar (gives realistic throaty weight!)
     const roarSrc = ctx.createBufferSource();
@@ -407,46 +437,59 @@ export class AudioEngine {
     const rpm = clamp(params.rpmNorm, 0.1, 1.15);
     const speedFactor = clamp(params.speedKmh / 380, 0, 1.25);
 
-    const baseFreq = p.isElectric
-      ? p.pitchBase + speedFactor * p.pitchSpan + rpm * 16 + (params.isNitro ? 36 : 0)
-      : p.pitchBase + rpm * p.pitchSpan + params.gear * p.gearPitchStep + (params.isNitro ? 18 : 0);
-
-    const detune = p.isElectric ? 1.0 : 0.997;
-    this.engineMainOsc!.frequency.setTargetAtTime(baseFreq, now, 0.045);
-    this.engineSecondOsc!.frequency.setTargetAtTime(baseFreq * p.secondRatio * detune, now, 0.045);
-    this.engineSubOsc!.frequency.setTargetAtTime(Math.max(24, baseFreq * 0.5), now, 0.045);
-
-    // Organic exhaust roar tracks RPM & throttle load
-    const roarLevel = p.roarGain * (0.28 + rpm * 0.58 + speedFactor * 0.25 + (params.isNitro ? 0.22 : 0));
-    this.engineRoarGain!.gain.setTargetAtTime(roarLevel, now, 0.06);
-    this.engineRoarFilter!.frequency.setTargetAtTime(
-      p.roarFreqBase + (p.isElectric ? speedFactor : rpm) * p.roarFreqSpan,
-      now,
-      0.06
-    );
-
-    // Subtle airy turbo spool / EV electric shimmer (strictly gentle & non-fatiguing)
-    if (p.airWhineGain > 0) {
-      const airDrive = p.isElectric ? speedFactor : clamp(rpm * 0.65 + speedFactor * 0.55, 0, 1.2);
-      const airTarget = p.airWhineGain * (0.15 + airDrive * 0.85 + (params.isNitro ? 0.35 : 0));
-      this.engineAirGain!.gain.setTargetAtTime(airTarget, now, 0.09);
-      this.engineAirFilter!.frequency.setTargetAtTime(
-        p.airWhineBaseHz + airDrive * p.airWhineSpanHz,
-        now,
-        0.1
-      );
+    if (p.useClassicOriginalSynth) {
+      // Exact original launch-version engine sound for APEX-V12
+      const sf = clamp(params.speedKmh / 380, 0, 1.2);
+      const baseFreq = 46 + rpm * 128 + params.gear * 13 + (params.isNitro ? 26 : 0);
+      this.engineMainOsc!.frequency.setTargetAtTime(baseFreq, now, 0.04);
+      this.engineSecondOsc!.frequency.setTargetAtTime(baseFreq * 1.995, now, 0.04);
+      this.engineSubOsc!.frequency.setTargetAtTime(baseFreq * 0.5, now, 0.04);
+      this.engineMasterLpf!.frequency.setTargetAtTime(360 + rpm * 1850 + (params.isNitro ? 800 : 0), now, 0.05);
+      this.engineGain!.gain.setTargetAtTime(0.14 + sf * 0.12 + (params.isNitro ? 0.06 : 0), now, 0.05);
+      this.engineRoarGain!.gain.setTargetAtTime(0, now, 0.05);
+      this.engineAirGain!.gain.setTargetAtTime(0, now, 0.05);
     } else {
-      this.engineAirGain!.gain.setTargetAtTime(0, now, 0.06);
+      const baseFreq = p.isElectric
+        ? p.pitchBase + speedFactor * p.pitchSpan + rpm * 16 + (params.isNitro ? 36 : 0)
+        : p.pitchBase + rpm * p.pitchSpan + params.gear * p.gearPitchStep + (params.isNitro ? 18 : 0);
+
+      const detune = p.isElectric ? 1.0 : 0.997;
+      this.engineMainOsc!.frequency.setTargetAtTime(baseFreq, now, 0.045);
+      this.engineSecondOsc!.frequency.setTargetAtTime(baseFreq * p.secondRatio * detune, now, 0.045);
+      this.engineSubOsc!.frequency.setTargetAtTime(Math.max(24, baseFreq * 0.5), now, 0.045);
+
+      // Organic exhaust roar tracks RPM & throttle load
+      const roarLevel = p.roarGain * (0.28 + rpm * 0.58 + speedFactor * 0.25 + (params.isNitro ? 0.22 : 0));
+      this.engineRoarGain!.gain.setTargetAtTime(roarLevel, now, 0.06);
+      this.engineRoarFilter!.frequency.setTargetAtTime(
+        p.roarFreqBase + (p.isElectric ? speedFactor : rpm) * p.roarFreqSpan,
+        now,
+        0.06
+      );
+
+      // Subtle airy turbo spool / EV electric shimmer
+      if (p.airWhineGain > 0) {
+        const airDrive = p.isElectric ? speedFactor : clamp(rpm * 0.65 + speedFactor * 0.55, 0, 1.2);
+        const airTarget = p.airWhineGain * (0.15 + airDrive * 0.85 + (params.isNitro ? 0.35 : 0));
+        this.engineAirGain!.gain.setTargetAtTime(airTarget, now, 0.09);
+        this.engineAirFilter!.frequency.setTargetAtTime(
+          p.airWhineBaseHz + airDrive * p.airWhineSpanHz,
+          now,
+          0.1
+        );
+      } else {
+        this.engineAirGain!.gain.setTargetAtTime(0, now, 0.06);
+      }
+
+      // Gentle master lowpass (exact v2.1.3 tuning)
+      const lpfTarget =
+        p.lpfBase + (p.isElectric ? speedFactor : rpm) * p.lpfSpan + (params.isNitro ? 420 : 0);
+      this.engineMasterLpf!.frequency.setTargetAtTime(Math.min(3400, lpfTarget), now, 0.06);
+
+      const gainTarget =
+        (0.16 + speedFactor * 0.12 + (params.isNitro ? 0.05 : 0)) * p.volumeScale;
+      this.engineGain!.gain.setTargetAtTime(gainTarget, now, 0.055);
     }
-
-    // Lively master lowpass opens wide at high RPM & nitro for exhilarating punch!
-    const lpfTarget =
-      p.lpfBase + (p.isElectric ? speedFactor : rpm) * p.lpfSpan + (params.isNitro ? 720 : 0);
-    this.engineMasterLpf!.frequency.setTargetAtTime(Math.min(4400, lpfTarget), now, 0.05);
-
-    const gainTarget =
-      (0.185 + speedFactor * 0.145 + (params.isNitro ? 0.065 : 0)) * p.volumeScale;
-    this.engineGain!.gain.setTargetAtTime(gainTarget, now, 0.05);
 
     // Drift tire screech
     const screechTarget = params.isDrifting && !params.isAirborne ? 0.09 + params.driftTier * 0.022 : 0;
@@ -486,6 +529,16 @@ export class AudioEngine {
     if (!this.ctx || !this.sfxGain || this.muted) return;
     const now = this.ctx.currentTime;
     const style = this.carProfile.shiftStyle;
+
+    if (style === 'classic') {
+      // Exact original crisp gear shift pop & torque cut for APEX-V12
+      if (this.engineGain) {
+        this.engineGain.gain.setValueAtTime(0.06, now);
+        this.engineGain.gain.linearRampToValueAtTime(0.22, now + 0.08);
+      }
+      this.playTone(130, 58, 0.09, 'triangle', 0.12);
+      return;
+    }
 
     if (style === 'ev_pulse') {
       // Smooth warm electric surge accent (zero combustion bang)
@@ -531,12 +584,65 @@ export class AudioEngine {
     this.playTone(105 + Math.random() * 30, 44, 0.075, 'sine', volume * 0.85);
   }
 
-  /** Smooth, rich 0.85s acoustic rev-blip in the garage showroom using the same warm PeriodicWave + Formant + Brown Noise DSP */
+  /** Smooth 0.85s acoustic rev-blip in the garage showroom */
   public playGarageRevPreview(profile: CarAudioSignature): void {
     this.setCarAudioProfile(profile);
     if (!this.initialized || !this.ctx || !this.sfxGain || !this.brownBuffer || this.muted) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
+
+    if (profile.useClassicOriginalSynth) {
+      // Exact classic original sawtooth + triangle(1.995x) + sine(0.5x) rev-blip for APEX-V12
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = createClassicCurve();
+      const lpf = ctx.createBiquadFilter();
+      lpf.type = 'lowpass';
+      lpf.Q.value = 2.6;
+      lpf.frequency.setValueAtTime(420, now);
+      lpf.frequency.exponentialRampToValueAtTime(2200, now + 0.32);
+      lpf.frequency.exponentialRampToValueAtTime(420, now + 0.78);
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0.001, now);
+      env.gain.linearRampToValueAtTime(0.22, now + 0.08);
+      env.gain.setValueAtTime(0.21, now + 0.34);
+      env.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      shaper.connect(lpf).connect(env).connect(this.sfxGain);
+
+      const o1 = ctx.createOscillator();
+      o1.type = 'sawtooth';
+      o1.frequency.setValueAtTime(62, now);
+      o1.frequency.exponentialRampToValueAtTime(175, now + 0.32);
+      o1.frequency.exponentialRampToValueAtTime(58, now + 0.78);
+      const g1 = ctx.createGain();
+      g1.gain.value = 0.45;
+      o1.connect(g1).connect(shaper);
+
+      const o2 = ctx.createOscillator();
+      o2.type = 'triangle';
+      o2.frequency.setValueAtTime(62 * 1.995, now);
+      o2.frequency.exponentialRampToValueAtTime(175 * 1.995, now + 0.32);
+      o2.frequency.exponentialRampToValueAtTime(58 * 1.995, now + 0.78);
+      const g2 = ctx.createGain();
+      g2.gain.value = 0.35;
+      o2.connect(g2).connect(shaper);
+
+      const o3 = ctx.createOscillator();
+      o3.type = 'sine';
+      o3.frequency.setValueAtTime(31, now);
+      o3.frequency.exponentialRampToValueAtTime(87.5, now + 0.32);
+      o3.frequency.exponentialRampToValueAtTime(29, now + 0.78);
+      const g3 = ctx.createGain();
+      g3.gain.value = 0.4;
+      o3.connect(g3).connect(shaper);
+
+      o1.start(now);
+      o2.start(now);
+      o3.start(now);
+      o1.stop(now + 0.82);
+      o2.stop(now + 0.82);
+      o3.stop(now + 0.82);
+      return;
+    }
 
     const wave = createEnginePeriodicWave(ctx, profile.harmonicWeights);
 
@@ -552,23 +658,23 @@ export class AudioEngine {
     const throatF = ctx.createBiquadFilter();
     throatF.type = 'peaking';
     throatF.frequency.value = profile.throatFormantHz;
-    throatF.Q.value = 1.25;
-    throatF.gain.value = 5.2;
+    throatF.Q.value = 1.3;
+    throatF.gain.value = 3.2;
 
     const lpf = ctx.createBiquadFilter();
     lpf.type = 'lowpass';
-    lpf.Q.value = profile.lpfQ;
+    lpf.Q.value = 0.85;
     lpf.frequency.setValueAtTime(profile.lpfBase, now);
     lpf.frequency.exponentialRampToValueAtTime(
-      Math.min(4200, profile.lpfBase + profile.lpfSpan * 0.92),
+      Math.min(3200, profile.lpfBase + profile.lpfSpan * 0.85),
       now + 0.34
     );
-    lpf.frequency.exponentialRampToValueAtTime(profile.lpfBase * 0.9, now + 0.86);
+    lpf.frequency.exponentialRampToValueAtTime(profile.lpfBase * 0.85, now + 0.86);
 
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.001, now);
-    env.gain.linearRampToValueAtTime(0.28 * profile.volumeScale, now + 0.09);
-    env.gain.setValueAtTime(0.27 * profile.volumeScale, now + 0.36);
+    env.gain.linearRampToValueAtTime(0.24 * profile.volumeScale, now + 0.11);
+    env.gain.setValueAtTime(0.23 * profile.volumeScale, now + 0.36);
     env.gain.exponentialRampToValueAtTime(0.001, now + 0.88);
 
     shaper.connect(bodyF).connect(throatF).connect(lpf).connect(env).connect(this.sfxGain);
@@ -663,6 +769,14 @@ export class AudioEngine {
   public playNitroStart(isSuper: boolean): void {
     if (!this.ctx || !this.sfxGain || this.muted) return;
     const mode = this.carProfile.nitroSound;
+    if (mode === 'classic') {
+      // Exact original nitro ignition sound for APEX-V12
+      this.playTone(isSuper ? 220 : 180, isSuper ? 980 : 620, 0.42, 'sawtooth', 0.22);
+      if (isSuper) {
+        this.playTone(330, 1480, 0.48, 'triangle', 0.18);
+      }
+      return;
+    }
     if (mode === 'plasma') {
       // Smooth warm cyber plasma surge (pleasant musical fifth, never shrill)
       this.playTone(isSuper ? 260 : 210, isSuper ? 680 : 520, 0.44, 'sine', 0.18);

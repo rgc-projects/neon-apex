@@ -1,6 +1,6 @@
 {
   "name": "neon-apex",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "description": "NEON APEX — 3D Cyber Arcade Racing Game built with Three.js, WebGL Bloom, Web Audio Synthwave Engine, and Cloudflare Workers Static Assets",
   "private": true,
   "type": "module",
