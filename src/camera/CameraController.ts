@@ -81,6 +81,29 @@ export class CameraController {
     this.menuOrbitVel = deltaRad * 18;
   }
 
+  public snapMenuShowcase(showcaseOrigin: THREE.Vector3): void {
+    this.menuOrbitVel = 0;
+    const isMobLandscape = this.isMobileViewport() && this.camera.aspect >= 1.35;
+    const isMobPortrait = window.innerWidth < 760 && window.innerHeight > window.innerWidth;
+    const dist = isMobPortrait ? 9.4 : isMobLandscape ? 6.9 : 8.4;
+    const camX = showcaseOrigin.x + Math.sin(this.menuOrbitAngle) * dist;
+    const camZ = showcaseOrigin.z + Math.cos(this.menuOrbitAngle) * dist;
+    const camY =
+      showcaseOrigin.y +
+      (isMobPortrait ? 2.8 : isMobLandscape ? 2.15 : 2.45) +
+      Math.sin(this.menuOrbitAngle * 0.7) * 0.25;
+
+    this.camera.position.set(camX, camY, camZ);
+    this.camera.up.set(0, 1, 0);
+    const lookYOffset = isMobPortrait ? -0.35 : isMobLandscape ? 0.55 : 0.65;
+    this.camera.lookAt(showcaseOrigin.x, showcaseOrigin.y + lookYOffset, showcaseOrigin.z);
+
+    const menuFov = isMobLandscape ? 40 : 44;
+    this.currentFov = menuFov;
+    this.camera.fov = menuFov;
+    this.camera.updateProjectionMatrix();
+  }
+
   public updateMenuShowcase(dt: number, showcaseOrigin: THREE.Vector3): void {
     if (!this.menuDragging) {
       this.menuOrbitVel = damp(this.menuOrbitVel, 0, 5.5, dt);

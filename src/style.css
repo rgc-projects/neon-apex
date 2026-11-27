@@ -4841,11 +4841,13 @@ body.native-app .glass-hud {
   align-items: center;
   justify-content: center;
   background: radial-gradient(circle at 50% 42%, #0c1736 0%, #040714 74%);
-  transition: opacity 0.36s ease;
+  transition: opacity 0.46s cubic-bezier(0.22, 1, 0.36, 1), transform 0.46s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
 }
 
 .boot-splash.fade-out {
   opacity: 0;
+  transform: scale(1.035);
   pointer-events: none;
 }
 
@@ -4853,43 +4855,49 @@ body.native-app .glass-hud {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 20px;
 }
 
+.boot-tag {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 3.2px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  opacity: 0.88;
+}
+
 .boot-logo {
-  font-size: clamp(28px, 6vw, 44px);
+  font-size: clamp(30px, 6vw, 48px);
   font-weight: 900;
   font-style: italic;
-  letter-spacing: 3px;
+  letter-spacing: 3.5px;
   color: #ffffff;
-  text-shadow: 0 0 24px rgba(0, 242, 255, 0.45);
+  text-shadow: 0 0 26px rgba(0, 242, 255, 0.48);
 }
 
 .boot-logo span {
   color: var(--magenta);
-  text-shadow: 0 0 24px rgba(255, 42, 157, 0.55);
+  text-shadow: 0 0 26px rgba(255, 42, 157, 0.58);
 }
 
 .boot-bar {
-  width: min(240px, 68vw);
+  width: min(260px, 68vw);
   height: 4px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.22);
+  background: rgba(148, 163, 184, 0.2);
   overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .boot-bar-fill {
-  width: 55%;
+  width: 18%;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--cyan), var(--magenta));
-  animation: bootSlide 1.1s ease-in-out infinite alternate;
-}
-
-@keyframes bootSlide {
-  from { transform: translateX(-30%); }
-  to { transform: translateX(115%); }
+  background: linear-gradient(90deg, var(--cyan), #6366f1 55%, var(--magenta));
+  box-shadow: 0 0 12px rgba(0, 242, 255, 0.65);
+  transition: width 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .boot-sub {

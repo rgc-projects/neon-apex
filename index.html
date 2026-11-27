@@ -23,12 +23,13 @@
 </head>
 <body>
   <div id="app">
-    <!-- Initial Boot Splash Curtain (dismissed seamlessly once 3D engine & first track mount) -->
+    <!-- Initial Boot Splash Curtain (stays up until 3D world, primary GLB model & warmed first frames are ready) -->
     <div id="boot-splash" class="boot-splash" aria-live="polite">
       <div class="boot-splash-inner">
+        <div class="boot-tag" data-i18n="brandTag">未来街机大奖赛 · 2099</div>
         <div class="boot-logo">NEON<span>APEX</span></div>
-        <div class="boot-bar"><div class="boot-bar-fill"></div></div>
-        <div class="boot-sub" data-i18n="bootLoading">正在初始化 3D 赛道与引擎...</div>
+        <div class="boot-bar"><div id="boot-bar-fill" class="boot-bar-fill"></div></div>
+        <div id="boot-sub" class="boot-sub" data-i18n="bootLoading">正在初始化 3D 赛道与引擎...</div>
       </div>
     </div>
 

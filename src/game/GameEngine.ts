@@ -64,6 +64,8 @@ export class GameEngine {
   private readonly pauseOverdriveBtn = document.getElementById('btn-pause-overdrive')!;
   private readonly pauseHyperNitroBtn = document.getElementById('btn-pause-hyper-nitro')!;
   private readonly bootSplashEl = document.getElementById('boot-splash');
+  private readonly bootBarFillEl = document.getElementById('boot-bar-fill');
+  private readonly bootSubEl = document.getElementById('boot-sub');
   private readonly webglLostEl = document.getElementById('webgl-lost-overlay');
   private readonly webglReloadBtn = document.getElementById('btn-webgl-reload');
 
@@ -300,6 +302,8 @@ export class GameEngine {
         this.selectedLaps = TRACK_CONFIGS[idx].laps;
         this.loadTrack(idx);
         this.positionShowcaseOnTrack();
+        this.cameraController.snapMenuShowcase(this.showcaseOrigin);
+        this.sceneryBuild?.update(0, 0, this.cameraController.camera.position);
       },
       onSelectLaps: (laps) => {
         this.audio.unlock();
@@ -449,28 +453,81 @@ export class GameEngine {
     this.bindInputs();
     this.bindMenuShowroomDrag(canvas);
     window.addEventListener('resize', this.onResize);
+    window.addEventListener('orientationchange', this.onResize);
     window.visualViewport?.addEventListener('resize', this.onResize);
+    screen.orientation?.addEventListener?.('change', this.onResize);
     document.addEventListener('fullscreenchange', this.onResize);
     document.addEventListener('webkitfullscreenchange', this.onResize);
 
-    // Initial load: Track 0 + Showcase Car 0
+    // Start staged 3A boot sequence behind #boot-splash so player NEVER sees raw loading / FOV warp / fallback pop-in
+    this.setBootProgress(28, t('bootLoading'));
     this.loadTrack(0);
-    this.rebuildShowcaseCar();
     this.enterMenu();
-    this.precompileScene();
-
-    // Smoothly dismiss initial boot splash curtain after first frame setup
-    if (this.bootSplashEl) {
-      requestAnimationFrame(() => {
-        this.bootSplashEl?.classList.add('fade-out');
-        setTimeout(() => this.bootSplashEl?.remove(), 420);
-      });
-    }
 
     this.lastTime = performance.now();
     this.lastRenderAt = this.lastTime;
     this.fpsWindowStart = this.lastTime;
     this.loop(this.lastTime);
+
+    void this.finishBootSequence();
+  }
+
+  private setBootProgress(pct: number, label: string): void {
+    if (this.bootBarFillEl) {
+      this.bootBarFillEl.style.width = `${clamp(pct, 6, 100)}%`;
+    }
+    if (this.bootSubEl) {
+      this.bootSubEl.textContent = label;
+    }
+  }
+
+  private async finishBootSequence(): Promise<void> {
+    const bootStartedAt = performance.now();
+
+    // 1. Wait for native Android landscape lock to settle (max 420ms) so canvas never stretches from Portrait -> Landscape
+    if (nativeBridge.isNative) {
+      const waitDeadline = performance.now() + 420;
+      while (window.innerWidth < window.innerHeight && performance.now() < waitDeadline) {
+        await new Promise((r) => setTimeout(r, 32));
+      }
+      this.applyGraphicsSettings(settingsManager.settings.graphics, false);
+    }
+
+    // 2. Wait for primary showcase supercar GLB to decode offline (safe 3.2s cap so boot can never hang)
+    this.setBootProgress(62, t('bootStageModels'));
+    const primaryModelFile = CAR_SPECS[this.selectedCarIndex].modelFile;
+    await Promise.race([
+      supercarAssets.loadModel(primaryModelFile).catch(() => null),
+      new Promise((r) => setTimeout(r, 3200)),
+    ]);
+
+    // 3. Mount real GLB car, snap camera position + final menu FOV immediately, align sky & precompile shaders
+    this.setBootProgress(88, t('bootStageShaders'));
+    this.rebuildShowcaseCar();
+    this.cameraController.snapMenuShowcase(this.showcaseOrigin);
+    this.sceneryBuild?.update(0, 0, this.cameraController.camera.position);
+    this.precompileScene();
+
+    // 4. Render 2 real warmed frames behind the curtain so GPU textures/shaders are 100% settled
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        this.cameraController.snapMenuShowcase(this.showcaseOrigin);
+        requestAnimationFrame(() => resolve());
+      });
+    });
+
+    this.setBootProgress(100, t('bootStageReady'));
+
+    // Keep curtain briefly visible (min 380ms total) so transition feels intentional and cinematic
+    const elapsedMs = performance.now() - bootStartedAt;
+    if (elapsedMs < 380) {
+      await new Promise((r) => setTimeout(r, 380 - elapsedMs));
+    }
+
+    if (this.bootSplashEl) {
+      this.bootSplashEl.classList.add('fade-out');
+      setTimeout(() => this.bootSplashEl?.remove(), 500);
+    }
   }
 
   private handleBackAction(): boolean {
@@ -860,6 +917,8 @@ export class GameEngine {
     this.trackBuild?.setCountdownState(0);
     this.showcaseGroup.visible = true;
     this.positionShowcaseOnTrack();
+    this.cameraController.snapMenuShowcase(this.showcaseOrigin);
+    this.sceneryBuild?.update(0, 0, this.cameraController.camera.position);
     this.menuUI.setVisible(true);
     this.hud.setVisible(false);
     this.hud.showCountdown(null);
