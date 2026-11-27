@@ -9,6 +9,7 @@ export class SkidMarkSystem {
   private readonly geo: THREE.BufferGeometry;
   private readonly mat: THREE.MeshBasicMaterial;
   private quadCursor = 0;
+  private activeQuads = 0;
 
   private readonly prevLeft = new Map<string, THREE.Vector3>();
   private readonly prevRight = new Map<string, THREE.Vector3>();
@@ -31,9 +32,14 @@ export class SkidMarkSystem {
     }
 
     this.geo = new THREE.BufferGeometry();
-    this.geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
-    this.geo.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+    const posAttr = new THREE.BufferAttribute(this.positions, 3);
+    const colAttr = new THREE.BufferAttribute(this.colors, 3);
+    posAttr.setUsage(THREE.DynamicDrawUsage);
+    colAttr.setUsage(THREE.DynamicDrawUsage);
+    this.geo.setAttribute('position', posAttr);
+    this.geo.setAttribute('color', colAttr);
     this.geo.setIndex(indices);
+    this.geo.setDrawRange(0, 0);
 
     this.mat = new THREE.MeshBasicMaterial({
       vertexColors: true,
@@ -47,6 +53,7 @@ export class SkidMarkSystem {
 
     this.mesh = new THREE.Mesh(this.geo, this.mat);
     this.mesh.frustumCulled = false;
+    this.mesh.visible = false;
   }
 
   public recordWheelPair(
@@ -107,6 +114,11 @@ export class SkidMarkSystem {
 
     const base = this.quadCursor * 12;
     this.quadCursor = (this.quadCursor + 1) % this.maxQuads;
+    if (this.activeQuads < this.maxQuads) {
+      this.activeQuads++;
+      this.geo.setDrawRange(0, this.activeQuads * 6);
+    }
+    this.mesh.visible = true;
 
     this.positions[base + 0] = this._p0.x;
     this.positions[base + 1] = this._p0.y;
@@ -133,6 +145,9 @@ export class SkidMarkSystem {
     this.prevLeft.clear();
     this.prevRight.clear();
     this.quadCursor = 0;
+    this.activeQuads = 0;
+    this.geo.setDrawRange(0, 0);
+    this.mesh.visible = false;
     (this.geo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
   }
 

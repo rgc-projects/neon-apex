@@ -55,23 +55,20 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     cfg.sunColorHex,
     isDusk
   );
-  const skyRadius =
-    cfg.theme === 'manx'
-      ? 7200
-      : cfg.theme === 'akina'
-        ? 5600
-        : cfg.theme === 'island' || cfg.theme === 'fjord'
-          ? 4200
-          : 3200;
+  // Sky dome renders first behind all world geometry (depthWrite/depthTest disabled, centered at camPos),
+  // so keeping radius strictly inside the nearest camera.far (1400m) prevents spherical far-plane black-hole clipping!
+  const skyRadius = 480;
   const skyGeo = new THREE.SphereGeometry(skyRadius, 48, 28);
   const skyMat = new THREE.MeshBasicMaterial({
     map: skyTex,
     side: THREE.BackSide,
     fog: false,
     depthWrite: false,
+    depthTest: false,
   });
   const skyDome = new THREE.Mesh(skyGeo, skyMat);
   skyDome.renderOrder = -10;
+  skyDome.frustumCulled = false;
   group.add(skyDome);
   disposables.push(skyTex, skyGeo, skyMat);
 
@@ -300,7 +297,7 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
   return {
     group,
     update: (dt: number, elapsed: number, camPos: THREE.Vector3) => {
-      skyDome.position.set(camPos.x, 0, camPos.z);
+      skyDome.position.copy(camPos);
       if (cfg.theme === 'bridge' || cfg.theme === 'city' || isMegaSea || cfg.theme === 'nujiang' || cfg.theme === 'akina') {
         oceanNormal.offset.y += dt * (cfg.theme === 'nujiang' ? 0.18 : cfg.theme === 'akina' ? 0.045 : 0.08);
         oceanNormal.offset.x = Math.sin(elapsed * 0.25) * 0.08;

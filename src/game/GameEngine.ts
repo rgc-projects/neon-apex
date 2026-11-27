@@ -129,6 +129,8 @@ export class GameEngine {
   private readonly _wheelR = new THREE.Vector3();
   private readonly _exL = new THREE.Vector3();
   private readonly _exR = new THREE.Vector3();
+  private readonly _streakPos = new THREE.Vector3();
+  private smokeWheelToggle = false;
 
   // Keyboard Input
   private readonly keys = new Set<string>();
@@ -772,6 +774,7 @@ export class GameEngine {
 
     const cfg = TRACK_CONFIGS[trackIndex];
     this.spline = new TrackSpline(cfg);
+    this.scene.background = new THREE.Color(cfg.fogColor);
     this.scene.fog = new THREE.FogExp2(cfg.fogColor, cfg.fogDensity);
 
     // Tailor realistic atmospheric sunlight & ambient sky bounce to each circuit's time-of-day
@@ -1509,8 +1512,15 @@ export class GameEngine {
 
     // 1. Step every racer (Player + 5 AI)
     const camPos = this.cameraController.camera.position;
+    const isMob = isMobileDevice();
     const aiCullDistSq = 520 * 520;
+    // Only emit particles/skidmarks for nearby AI racers so distant off-screen AI never waste mobile GPU fillrate
+    const aiVfxCullDistSq = isMob ? 135 * 135 : 240 * 240;
+    // Normalize continuous per-frame particle emission rates against 60Hz baseline so 90/120Hz phones never spawn 2x!
+    const rateScale = clamp(simDt * 60, 0.25, 1.5);
+
     for (const r of this.racers) {
+      let distSq = 0;
       if (r.isPlayer) {
         const effectiveInput =
           this.state === 'FINISH_SLOWMO'
@@ -1522,13 +1532,18 @@ export class GameEngine {
         const aiDiff = settingsManager.settings.controls.aiDifficulty ?? 'pro';
         const { input, paceScale } = ai.computeInput(simDt, r, this.racers, player, this.spline, aiDiff);
         r.step(simDt, input, this.spline, paceScale);
+        distSq = r.worldPos.distanceToSquared(camPos);
         // Distance-cull sub-pixel AI cars >520m away (saves 160K-360K tris & 15+ DC per distant car!)
-        r.model.root.visible = r.worldPos.distanceToSquared(camPos) <= aiCullDistSq;
+        r.model.root.visible = distSq <= aiCullDistSq;
       }
 
-      // Check destructible neon cones!
+      const emitNearbyVfx = r.isPlayer || distSq <= aiVfxCullDistSq;
+
+      // Check destructible neon cones (skip particle burst for far-away AI!)
       const smashed = this.destructibles?.checkHit(r.worldPos, r.worldForward, r.speed, (conePos) => {
-        this.particles.emitImpactBurst(conePos, 0xff7b00, 14);
+        if (emitNearbyVfx) {
+          this.particles.emitImpactBurst(conePos, 0xff7b00, r.isPlayer ? 12 : 6);
+        }
         if (r.isPlayer && this.state === 'RACING') {
           r.styleScore += 50;
           this.audio.playConeSmash();
@@ -1539,31 +1554,47 @@ export class GameEngine {
 
       // Per-car Drift Sparks, Tire Smoke & Ground Skid Marks (driven by each vehicle's VFX signature!)
       const rSig = getCarSignature(r.spec);
-      r.model.getRearWheelWorldPositions(this._wheelL, this._wheelR);
-      const layingSkids = r.isDrifting && !r.isAirborne && r.speed > 20;
+      const layingSkids = emitNearbyVfx && r.isDrifting && !r.isAirborne && r.speed > 20;
+      if (layingSkids) {
+        r.model.getRearWheelWorldPositions(this._wheelL, this._wheelR);
+      }
       this.skidMarks.recordWheelPair(r.id, this._wheelL, this._wheelR, r.frame.up, layingSkids, r.driftTier);
 
       if (layingSkids) {
-        const sparkCount = r.isPlayer ? 3 + r.driftTier + rSig.vfx.sparkBonus : 1;
-        this.particles.emitDriftSparks(
-          this._wheelL,
-          r.worldForward,
-          r.frame.up,
-          r.driftTier,
-          sparkCount,
-          rSig.vfx.sparkPalette
-        );
-        this.particles.emitDriftSparks(
-          this._wheelR,
-          r.worldForward,
-          r.frame.up,
-          r.driftTier,
-          sparkCount,
-          rSig.vfx.sparkPalette
-        );
-        if (Math.random() < (r.isPlayer ? rSig.vfx.smokeChance : 0.35)) {
-          this.particles.emitTireSmoke(this._wheelL, r.worldForward, r.frame.up, rSig.vfx.smokeTint);
-          this.particles.emitTireSmoke(this._wheelR, r.worldForward, r.frame.up, rSig.vfx.smokeTint);
+        if (Math.random() < rateScale) {
+          const sparkCount = r.isPlayer ? 2 + r.driftTier + rSig.vfx.sparkBonus : 1;
+          this.particles.emitDriftSparks(
+            this._wheelL,
+            r.worldForward,
+            r.frame.up,
+            r.driftTier,
+            sparkCount,
+            rSig.vfx.sparkPalette
+          );
+          this.particles.emitDriftSparks(
+            this._wheelR,
+            r.worldForward,
+            r.frame.up,
+            r.driftTier,
+            sparkCount,
+            rSig.vfx.sparkPalette
+          );
+        }
+        const smokeProb = (r.isPlayer ? rSig.vfx.smokeChance : 0.22) * rateScale;
+        if (Math.random() < smokeProb) {
+          if (isMob) {
+            // Alternate left/right rear tire on mobile so smoke puffs never double-stack on the same frame!
+            this.smokeWheelToggle = !this.smokeWheelToggle;
+            this.particles.emitTireSmoke(
+              this.smokeWheelToggle ? this._wheelL : this._wheelR,
+              r.worldForward,
+              r.frame.up,
+              rSig.vfx.smokeTint
+            );
+          } else {
+            this.particles.emitTireSmoke(this._wheelL, r.worldForward, r.frame.up, rSig.vfx.smokeTint);
+            this.particles.emitTireSmoke(this._wheelR, r.worldForward, r.frame.up, rSig.vfx.smokeTint);
+          }
         }
       }
 
@@ -1573,9 +1604,9 @@ export class GameEngine {
       const boosting =
         !boostLockedInDrift &&
         (r.isNitroActive || r.miniBoostTimer > 0 || r.boostPadTimer > 0 || r.overdriveStage >= 1);
-      if (boosting) {
+      if (boosting && emitNearbyVfx) {
         r.model.getExhaustWorldPositions(this._exL, this._exR);
-        if (Math.random() < (r.isPlayer ? 0.9 : 0.4)) {
+        if (Math.random() < (r.isPlayer ? 0.82 : 0.32) * rateScale) {
           const blueFlame = r.isSuperNitro || (!r.isNitroActive && r.overdriveStage >= 1);
           const exhaustHex = blueFlame ? rSig.vfx.superExhaustHex : rSig.vfx.exhaustHex;
           this.particles.emitNitroExhaust(this._exL, r.worldForward, blueFlame, exhaustHex);
@@ -1591,7 +1622,8 @@ export class GameEngine {
           r.worldUp,
           !boostLockedInDrift && (boosting || r.speed > 92),
           superTrail,
-          superTrail ? rSig.vfx.superTrailHex : rSig.vfx.trailHex
+          superTrail ? rSig.vfx.superTrailHex : rSig.vfx.trailHex,
+          simDt
         );
 
         // Audio-synced Anti-Lag / Overrun Pop & Bang during high-speed drift or braking (signature for M4 / V12!)
@@ -1612,20 +1644,22 @@ export class GameEngine {
             this.particles.emitBackfireBurst(popPos, r.worldForward, rSig.vfx.backfireHex, false, 7);
           }
         }
-        if (r.isSlipstreaming && Math.random() < 0.65) {
-          const streakPos = r.worldPos
-            .clone()
+        if (r.isSlipstreaming && Math.random() < 0.55 * rateScale) {
+          this._streakPos
+            .copy(r.worldPos)
             .addScaledVector(r.worldForward, 5 + Math.random() * 5)
             .addScaledVector(r.worldRight, (Math.random() - 0.5) * 3.4)
             .addScaledVector(r.worldUp, 0.6 + Math.random() * 1.1);
-          this.particles.emitSlipstreamStreak(streakPos, r.worldForward);
+          this.particles.emitSlipstreamStreak(this._streakPos, r.worldForward);
         }
       }
     }
 
     // 2. Multi-car Slipstream & Collision Resolution
     resolveMultiCarInteractions(this.racers, this.spline, simDt, (mid, intensity, involvesPlayer) => {
-      this.particles.emitImpactBurst(mid, 0x00f2ff, involvesPlayer ? 22 : 10);
+      if (involvesPlayer || mid.distanceToSquared(camPos) <= aiVfxCullDistSq) {
+        this.particles.emitImpactBurst(mid, 0x00f2ff, involvesPlayer ? 16 : 7);
+      }
       if (involvesPlayer && this.state === 'RACING') {
         this.audio.playCollision(intensity);
         this.cameraController.addShake(intensity * 0.62);
