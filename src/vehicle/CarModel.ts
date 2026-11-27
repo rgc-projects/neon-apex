@@ -947,7 +947,8 @@ export class CarModel {
     this.chassis.add(this.nitroFlameGroup);
 
     this.nitroPointLight.position.set(0, 0.55, z + 0.7);
-    if (this.isPlayer) {
+    this.nitroPointLight.visible = false;
+    if (this.isPlayer && !isMobileDevice()) {
       this.chassis.add(this.nitroPointLight);
     }
   }
@@ -1066,10 +1067,12 @@ export class CarModel {
         this.flameCones[i].scale.set(radScale, radScale, lenScale);
       }
 
+      this.nitroPointLight.visible = true;
       this.nitroPointLight.color.setHex(outerHex);
       this.nitroPointLight.intensity = 2.4 * boostIntensity * flicker;
     } else {
       this.nitroFlameGroup.visible = false;
+      this.nitroPointLight.visible = false;
       this.nitroPointLight.intensity = 0;
     }
   }

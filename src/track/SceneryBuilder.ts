@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isMobileDevice } from '../settings/SettingsManager';
 import { TrackSpline } from './TrackSpline';
 import {
   createBuildingPBRTextures,
@@ -285,6 +286,12 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     buildRealisticSubterraneanCavern(spline, group, disposables, rand, animatedFans);
   }
 
+  // Off-track mobile optimization: downgrade background buildings/trees/mountains/concrete
+  // from heavy per-pixel PBR+PMREM to fast MeshLambertMaterial while keeping Hero Cars & Road 100% full PBR!
+  if (isMobileDevice()) {
+    optimizeOffTrackSceneryForMobile(group, disposables);
+  }
+
   return {
     group,
     update: (dt: number, elapsed: number, camPos: THREE.Vector3) => {
@@ -312,6 +319,57 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
       disposables.forEach((d) => d.dispose());
     },
   };
+}
+
+/**
+ * Industry-standard mobile off-track shader tiering:
+ * Converts opaque non-normal-mapped off-track PBR materials (skyscrapers, mountains, trees,
+ * concrete piers, tunnel arches, bridge towers/cables) into fast MeshLambertMaterial,
+ * cutting mobile fragment GPU load on ~75% of screen pixels while leaving Hero Cars & Road untouched.
+ */
+function optimizeOffTrackSceneryForMobile(
+  group: THREE.Group,
+  disposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[]
+): void {
+  const matCache = new Map<THREE.MeshStandardMaterial, THREE.MeshLambertMaterial>();
+
+  const convertMat = (mat: THREE.Material): THREE.Material => {
+    if (!(mat instanceof THREE.MeshStandardMaterial)) return mat;
+    if (mat.normalMap) {
+      // Keep animated ocean water normal-mapped, but disable costly HDR PMREM reflections on flat bay water
+      mat.envMapIntensity = Math.min(mat.envMapIntensity, 0.45);
+      return mat;
+    }
+    const existing = matCache.get(mat);
+    if (existing) return existing;
+
+    const lambert = new THREE.MeshLambertMaterial({
+      color: mat.color.clone(),
+      map: mat.map,
+      emissive: mat.emissive.clone(),
+      emissiveMap: mat.emissiveMap,
+      emissiveIntensity: mat.emissiveIntensity,
+      vertexColors: mat.vertexColors,
+      transparent: mat.transparent,
+      opacity: mat.opacity,
+      side: mat.side,
+      fog: mat.fog,
+      flatShading: mat.flatShading,
+    });
+    matCache.set(mat, lambert);
+    disposables.push(lambert);
+    return lambert;
+  };
+
+  group.traverse((obj) => {
+    if (obj instanceof THREE.Mesh) {
+      if (Array.isArray(obj.material)) {
+        obj.material = obj.material.map(convertMat);
+      } else if (obj.material) {
+        obj.material = convertMat(obj.material);
+      }
+    }
+  });
 }
 
 /** Realistic arched concrete expressway tunnel vault + recessed linear industrial LED ceiling luminaires */
@@ -584,8 +642,12 @@ function buildRealisticSuspensionBridge(
 
     pylonGroup.add(leftLeg, rightLeg, brace1, brace2, brace3, lightBar, b1, b2);
 
-    // Realistic steel stay cables fanning cleanly to the bridge deck
+    // Realistic steel stay cables batched into 1 InstancedMesh per pylon (cuts 32 draw calls -> 1!)
     const deckY = f.pos.y - waterY + 1.2;
+    const cableInst = new THREE.InstancedMesh(cableGeo, cableMat, 32);
+    const cableDummy = new THREE.Object3D();
+    const upY = new THREE.Vector3(0, 1, 0);
+    let cableIdx = 0;
     for (const side of [-1, 1]) {
       for (let c = 1; c <= 8; c++) {
         for (const dir of [-1, 1]) {
@@ -593,14 +655,15 @@ function buildRealisticSuspensionBridge(
           const botPt = new THREE.Vector3(side * (spline.halfWidth + 1.0), deckY, dir * c * 22);
           const delta = botPt.clone().sub(topPt);
           const len = delta.length();
-          const cable = new THREE.Mesh(cableGeo, cableMat);
-          cable.scale.set(1, len, 1);
-          cable.position.copy(topPt).addScaledVector(delta, 0.5);
-          cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
-          pylonGroup.add(cable);
+          cableDummy.scale.set(1, len, 1);
+          cableDummy.position.copy(topPt).addScaledVector(delta, 0.5);
+          cableDummy.quaternion.setFromUnitVectors(upY, delta.normalize());
+          cableDummy.updateMatrix();
+          cableInst.setMatrixAt(cableIdx++, cableDummy.matrix);
         }
       }
     }
+    pylonGroup.add(cableInst);
     group.add(pylonGroup);
   }
 
