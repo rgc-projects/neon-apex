@@ -1194,12 +1194,17 @@ export class GameEngine {
 
     const g = settingsManager.settings.graphics;
     if (g.fpsCap > 0) {
-      const minInterval = 1000 / g.fpsCap - 1.5;
-      if (now - this.lastRenderAt < minInterval) {
+      const targetInterval = 1000 / g.fpsCap;
+      const deltaMs = now - this.lastRenderAt;
+      if (deltaMs < targetInterval - 2.0) {
         return;
       }
+      // Phase-aligned pacing avoids 16.7ms/25ms beat judder on 90Hz/120Hz displays
+      this.lastRenderAt =
+        deltaMs > targetInterval * 2.5 ? now : now - (deltaMs % targetInterval);
+    } else {
+      this.lastRenderAt = now;
     }
-    this.lastRenderAt = now;
 
     const frameStart = performance.now();
     const rawDt = Math.min((now - this.lastTime) / 1000, 0.05);

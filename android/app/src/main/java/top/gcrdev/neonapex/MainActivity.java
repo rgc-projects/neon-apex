@@ -39,6 +39,8 @@ public class MainActivity extends BridgeActivity {
             WebSettings settings = webView.getSettings();
             settings.setMediaPlaybackRequiresUserGesture(false);
             webView.setBackgroundColor(0xFF040714);
+            // Guarantee GPU-accelerated compositing layer for 90-120Hz WebGL racing
+            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
             // Consume OS-level long-press events so holding drift/nitro/steering NEVER triggers
             // Android text selection, translation overlays, or HyperOS/MIUI screen recognition

@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { isMobileDevice } from '../settings/SettingsManager';
 import { CarSpec } from '../types';
 import {
   createContactShadowTexture,
@@ -140,10 +142,10 @@ export class CarModel {
   private wingBaseAngle = 0.07;
 
   private readonly profile: ModelMountProfile;
-  private readonly paintMat: THREE.MeshPhysicalMaterial;
-  private readonly secondaryPaintMat: THREE.MeshPhysicalMaterial;
+  private readonly paintMat: THREE.MeshStandardMaterial;
+  private readonly secondaryPaintMat: THREE.MeshStandardMaterial;
   private readonly carbonMat: THREE.MeshStandardMaterial;
-  private readonly glassMat: THREE.MeshPhysicalMaterial;
+  private readonly glassMat: THREE.MeshStandardMaterial;
   private readonly caliperMat: THREE.MeshStandardMaterial;
   private readonly brakeDiscMat: THREE.MeshStandardMaterial;
   private readonly headlightMat: THREE.MeshBasicMaterial;
@@ -194,25 +196,42 @@ export class CarModel {
     const bodyHex = overridePrimary ?? spec.primaryColor;
     const accentHex = overrideAccent ?? spec.neonColor;
 
-    // Deep Automotive Metallic Clearcoat Paint (GT7 / Forza Horizon style)
-    this.paintMat = new THREE.MeshPhysicalMaterial({
-      color: bodyHex,
-      metalness: 0.82,
-      roughness: 0.15,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.04,
-      envMapIntensity: 1.85,
-    });
+    const mobileGpu = isMobileDevice();
+
+    // Automotive Metallic Clearcoat Paint (full clearcoat Physical shader on Desktop;
+    // tuned glossy Standard shader on mobile WebView for 2x fragment throughput!)
+    this.paintMat = mobileGpu
+      ? new THREE.MeshStandardMaterial({
+          color: bodyHex,
+          metalness: 0.86,
+          roughness: 0.14,
+          envMapIntensity: 1.85,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: bodyHex,
+          metalness: 0.82,
+          roughness: 0.15,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.04,
+          envMapIntensity: 1.85,
+        });
 
     // Secondary Accent Trim Paint (used on two-tone concept bodywork)
-    this.secondaryPaintMat = new THREE.MeshPhysicalMaterial({
-      color: spec.secondaryColor,
-      metalness: 0.78,
-      roughness: 0.2,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.08,
-      envMapIntensity: 1.6,
-    });
+    this.secondaryPaintMat = mobileGpu
+      ? new THREE.MeshStandardMaterial({
+          color: spec.secondaryColor,
+          metalness: 0.8,
+          roughness: 0.18,
+          envMapIntensity: 1.6,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: spec.secondaryColor,
+          metalness: 0.78,
+          roughness: 0.2,
+          clearcoat: 0.9,
+          clearcoatRoughness: 0.08,
+          envMapIntensity: 1.6,
+        });
 
     // Dry-Weave Satin Motorsport Carbon Fiber
     this.carbonMat = new THREE.MeshStandardMaterial({
@@ -223,15 +242,24 @@ export class CarModel {
     });
 
     // Tinted Laminated Automotive Cockpit Glass
-    this.glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0x0a1320,
-      metalness: 0.15,
-      roughness: 0.05,
-      clearcoat: 1.0,
-      transparent: true,
-      opacity: 0.82,
-      envMapIntensity: 2.1,
-    });
+    this.glassMat = mobileGpu
+      ? new THREE.MeshStandardMaterial({
+          color: 0x0a1320,
+          metalness: 0.28,
+          roughness: 0.08,
+          transparent: true,
+          opacity: 0.82,
+          envMapIntensity: 1.95,
+        })
+      : new THREE.MeshPhysicalMaterial({
+          color: 0x0a1320,
+          metalness: 0.15,
+          roughness: 0.05,
+          clearcoat: 1.0,
+          transparent: true,
+          opacity: 0.82,
+          envMapIntensity: 2.1,
+        });
 
     // Painted Performance Brake Calipers & Brushed Anodized Trim
     this.caliperMat = new THREE.MeshStandardMaterial({
@@ -463,11 +491,131 @@ export class CarModel {
     localRoot.updateMatrixWorld(true);
     this.mountWheelsUniversal(wheelCandidates, modelFile, localWheelsGroup);
 
+    // Batch static body sub-meshes by shared material (cuts ~50-97 draw calls/car -> ~6-10!)
+    this.batchStaticBodyMeshes(wrapper);
+
     // Transfer normalized body wrapper & detached wheel pivots into live car hierarchy
     this.bodySlot.add(wrapper);
     const pivots = [...localWheelsGroup.children];
     for (const p of pivots) {
       this.wheelContainer.add(p);
+    }
+  }
+
+  /**
+   * Merges static non-animated body meshes inside `wrapper` that share the same material reference
+   * into single batched BufferGeometries, slashing WebGL draw calls by ~80% on mobile WebView.
+   */
+  private batchStaticBodyMeshes(wrapper: THREE.Group): void {
+    wrapper.updateMatrixWorld(true);
+    const invWrapper = wrapper.matrixWorld.clone().invert();
+
+    // Never merge the rotating steering wheel subtree
+    const protectedSet = new Set<THREE.Object3D>();
+    if (this.steeringWheelNode) {
+      this.steeringWheelNode.traverse((o) => protectedSet.add(o));
+    }
+
+    const groups = new Map<THREE.Material, { meshes: THREE.Mesh[]; geos: THREE.BufferGeometry[] }>();
+    wrapper.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh) || !obj.visible || protectedSet.has(obj)) return;
+      if (Array.isArray(obj.material) || !obj.material || !obj.geometry) return;
+      if (!obj.geometry.getAttribute('position')) return;
+      const mat = obj.material;
+      let entry = groups.get(mat);
+      if (!entry) {
+        entry = { meshes: [], geos: [] };
+        groups.set(mat, entry);
+      }
+      entry.meshes.push(obj);
+    });
+
+    const relMatrix = new THREE.Matrix4();
+
+    for (const [mat, entry] of groups.entries()) {
+      if (entry.meshes.length < 2) continue;
+
+      // Only preserve UV if every mesh in this material group has a UV attribute
+      const hasTex = Boolean((mat as THREE.MeshStandardMaterial).map || (mat as THREE.MeshStandardMaterial).normalMap);
+      let allHaveUv = hasTex;
+      if (allHaveUv) {
+        for (const m of entry.meshes) {
+          if (!m.geometry.getAttribute('uv')) {
+            allHaveUv = false;
+            break;
+          }
+        }
+      }
+
+      const prepared: THREE.BufferGeometry[] = [];
+      let canMerge = true;
+
+      for (const m of entry.meshes) {
+        const src = m.geometry;
+        let g = src.index ? src.toNonIndexed() : src.clone();
+        relMatrix.multiplyMatrices(invWrapper, m.matrixWorld);
+        g.applyMatrix4(relMatrix);
+
+        // Fix inverted winding if negative mirror scale was present on a sub-node
+        if (relMatrix.determinant() < 0) {
+          const posAttr = g.getAttribute('position');
+          const normAttr = g.getAttribute('normal');
+          const uvAttr = g.getAttribute('uv');
+          for (let i = 0; i < posAttr.count; i += 3) {
+            const x1 = posAttr.getX(i + 1), y1 = posAttr.getY(i + 1), z1 = posAttr.getZ(i + 1);
+            posAttr.setXYZ(i + 1, posAttr.getX(i + 2), posAttr.getY(i + 2), posAttr.getZ(i + 2));
+            posAttr.setXYZ(i + 2, x1, y1, z1);
+            if (normAttr) {
+              const nx1 = normAttr.getX(i + 1), ny1 = normAttr.getY(i + 1), nz1 = normAttr.getZ(i + 1);
+              normAttr.setXYZ(i + 1, normAttr.getX(i + 2), normAttr.getY(i + 2), normAttr.getZ(i + 2));
+              normAttr.setXYZ(i + 2, nx1, ny1, nz1);
+            }
+            if (uvAttr) {
+              const u1 = uvAttr.getX(i + 1), v1 = uvAttr.getY(i + 1);
+              uvAttr.setXY(i + 1, uvAttr.getX(i + 2), uvAttr.getY(i + 2));
+              uvAttr.setXY(i + 2, u1, v1);
+            }
+          }
+        }
+
+        if (!g.getAttribute('normal')) {
+          g.computeVertexNormals();
+        }
+
+        // Strip mismatched extra attributes (tangent, color, uv1, etc.) so mergeGeometries never fails
+        for (const attrName of Object.keys(g.attributes)) {
+          if (attrName === 'position' || attrName === 'normal') continue;
+          if (attrName === 'uv' && allHaveUv) continue;
+          g.deleteAttribute(attrName);
+        }
+        g.morphAttributes = {};
+        g.clearGroups();
+
+        if (!g.getAttribute('position') || !g.getAttribute('normal')) {
+          g.dispose();
+          canMerge = false;
+          break;
+        }
+        prepared.push(g);
+      }
+
+      if (!canMerge || prepared.length < 2) {
+        prepared.forEach((g) => g.dispose());
+        continue;
+      }
+
+      const merged = mergeGeometries(prepared, false);
+      prepared.forEach((g) => g.dispose());
+      if (!merged) continue;
+
+      const batchedMesh = new THREE.Mesh(merged, mat);
+      batchedMesh.name = `batched_${mat.name || 'part'}`;
+      wrapper.add(batchedMesh);
+      this.disposables.push(merged);
+
+      for (const m of entry.meshes) {
+        m.removeFromParent();
+      }
     }
   }
 

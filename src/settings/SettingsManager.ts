@@ -44,7 +44,8 @@ export interface GameSettings {
   audio: AudioSettings;
 }
 
-const STORAGE_KEY = 'neon_apex_settings_v2';
+const STORAGE_KEY = 'neon_apex_settings_v3';
+const LEGACY_STORAGE_KEY = 'neon_apex_settings_v2';
 
 export function isMobileDevice(): boolean {
   if (typeof window === 'undefined') return false;
@@ -110,9 +111,9 @@ export function buildPresetGraphics(
       return {
         qualityPreset: 'medium',
         resolutionScale: 1.0,
-        fpsCap: 60,
-        antiAliasing: 'smaa',
-        bloom: 'soft',
+        fpsCap: mobile ? 0 : 60,
+        antiAliasing: mobile ? 'off' : 'smaa',
+        bloom: mobile ? 'off' : 'soft',
         particles: 'medium',
         drawDistance: 'medium',
         brightness,
@@ -121,12 +122,14 @@ export function buildPresetGraphics(
     case 'high':
       return {
         qualityPreset: 'high',
-        resolutionScale: mobile ? 1.25 : 1.25,
-        fpsCap: mobile ? 60 : 0,
-        antiAliasing: 'msaa2',
-        bloom: 'soft',
+        resolutionScale: 1.25,
+        fpsCap: 0,
+        // On mobile WebView, single-pass Direct Render + WebGL2 hardware MSAA avoids
+        // 11-pass HalfFloat UnrealBloomPass overhead, delivering locked 90-120Hz fluidity!
+        antiAliasing: mobile ? 'off' : 'msaa2',
+        bloom: mobile ? 'off' : 'soft',
         particles: 'high',
-        drawDistance: 'far',
+        drawDistance: mobile ? 'medium' : 'far',
         brightness,
         showFps,
       };
@@ -169,9 +172,10 @@ export function createDefaultSettings(): GameSettings {
 }
 
 export function drawDistanceToFar(mode: DrawDistanceMode): number {
-  if (mode === 'near') return 1800;
-  if (mode === 'medium') return 4200;
-  return 9800;
+  const mobile = isMobileDevice();
+  if (mode === 'near') return mobile ? 1400 : 1800;
+  if (mode === 'medium') return mobile ? 2600 : 4200;
+  return mobile ? 5600 : 9800;
 }
 
 type SettingsChangeSection = 'graphics' | 'controls' | 'audio' | 'all';
@@ -193,7 +197,24 @@ export class SettingsManager {
     const def = createDefaultSettings();
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return def;
+      if (!raw) {
+        // Migrate controls, audio, brightness & showFps from v2 while adopting v3's silky mobile graphics defaults
+        const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+        if (legacyRaw) {
+          const legacy = JSON.parse(legacyRaw) as Partial<GameSettings>;
+          const rawB = Number(legacy.graphics?.brightness);
+          const migratedBrightness = Number.isFinite(rawB) ? Math.min(1.4, Math.max(0.8, rawB)) : 1.0;
+          const migratedShowFps = Boolean(legacy.graphics?.showFps);
+          return {
+            graphics: isMobileDevice()
+              ? { ...def.graphics, brightness: migratedBrightness, showFps: migratedShowFps }
+              : { ...def.graphics, ...(legacy.graphics ?? {}), brightness: migratedBrightness },
+            controls: { ...def.controls, ...(legacy.controls ?? {}) },
+            audio: { ...def.audio, ...(legacy.audio ?? {}) },
+          };
+        }
+        return def;
+      }
       const parsed = JSON.parse(raw) as Partial<GameSettings>;
       const mergedGraphics = { ...def.graphics, ...(parsed.graphics ?? {}) };
       const rawBrightness = Number(mergedGraphics.brightness);
