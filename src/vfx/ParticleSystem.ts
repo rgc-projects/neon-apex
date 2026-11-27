@@ -290,11 +290,20 @@ export class ParticleSystem {
     carForward: THREE.Vector3,
     carUp: THREE.Vector3,
     tier: 0 | 1 | 2 | 3,
-    count = 3
+    count = 3,
+    palette?: [number, number, number, number]
   ): void {
-    // Crisp hot metallic sparks progressing orange -> white-gold -> electric blue-white on Ultra Drift
-    const hex = tier === 3 ? 0x93c5fd : tier === 2 ? 0xffe49e : tier === 1 ? 0xffa940 : 0xff8c2b;
-    this._col.setHex(hex).multiplyScalar(1.35);
+    // Per-car drift spark progression (e.g. fiery gold on combustion, electric cyan arcs on EV!)
+    const hex = palette
+      ? palette[tier]
+      : tier === 3
+        ? 0x93c5fd
+        : tier === 2
+          ? 0xffe49e
+          : tier === 1
+            ? 0xffa940
+            : 0xff8c2b;
+    this._col.setHex(hex).multiplyScalar(1.38);
 
     const scaledCount = Math.max(
       this.qualityScale >= 0.65 ? 1 : Math.random() < this.qualityScale ? 1 : 0,
@@ -339,13 +348,45 @@ export class ParticleSystem {
     }
   }
 
-  public emitNitroExhaust(pos: THREE.Vector3, carForward: THREE.Vector3, isSuper: boolean): void {
-    this._col.setHex(isSuper ? 0x93c5fd : 0xffb04a).multiplyScalar(1.45);
+  public emitNitroExhaust(
+    pos: THREE.Vector3,
+    carForward: THREE.Vector3,
+    isSuper: boolean,
+    customHex?: number
+  ): void {
+    this._col.setHex(customHex ?? (isSuper ? 0x93c5fd : 0xffb04a)).multiplyScalar(1.48);
     this._vel.copy(carForward).multiplyScalar(-(12 + Math.random() * 9));
     this._vel.x += (Math.random() - 0.5) * 1.1;
     this._vel.y += (Math.random() - 0.5) * 0.9;
     this._vel.z += (Math.random() - 0.5) * 1.1;
     this.sparks.spawn(pos, this._vel, this._col, 0.08 + Math.random() * 0.06, 0, 3.8);
+  }
+
+  /** Audio-synced exhaust backfire pop / anti-lag crackle / EV plasma arc burst */
+  public emitBackfireBurst(
+    pos: THREE.Vector3,
+    carForward: THREE.Vector3,
+    hexColor: number,
+    isElectricArc = false,
+    count = 9
+  ): void {
+    this._col.setHex(hexColor).multiplyScalar(1.8);
+    const scaledCount = Math.max(2, Math.round(count * this.qualityScale));
+    for (let i = 0; i < scaledCount; i++) {
+      this._vel.copy(carForward).multiplyScalar(-(10 + Math.random() * 14));
+      const spread = isElectricArc ? 4.8 : 2.6;
+      this._vel.x += (Math.random() - 0.5) * spread;
+      this._vel.y += (Math.random() - 0.35) * spread;
+      this._vel.z += (Math.random() - 0.5) * spread;
+      this.sparks.spawn(
+        pos,
+        this._vel,
+        this._col,
+        isElectricArc ? 0.12 + Math.random() * 0.08 : 0.09 + Math.random() * 0.09,
+        isElectricArc ? 0 : 12,
+        isElectricArc ? 4.5 : 3.2
+      );
+    }
   }
 
   public emitSlipstreamStreak(pos: THREE.Vector3, carForward: THREE.Vector3): void {
@@ -359,9 +400,10 @@ export class ParticleSystem {
     rightPos: THREE.Vector3,
     up: THREE.Vector3,
     active: boolean,
-    isSuper: boolean
+    isSuper: boolean,
+    customHex?: number
   ): void {
-    this._col.setHex(isSuper ? 0x60a5fa : 0xf97316);
+    this._col.setHex(customHex ?? (isSuper ? 0x60a5fa : 0xf97316));
     this.trailLeft.pushPoint(leftPos, up, active, this._col);
     this.trailRight.pushPoint(rightPos, up, active, this._col);
   }

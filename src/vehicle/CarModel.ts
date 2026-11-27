@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { getCarSignature } from '../config/carSignatures';
 import { isMobileDevice } from '../settings/SettingsManager';
 import { CarSpec } from '../types';
 import {
@@ -49,6 +50,12 @@ interface ModelMountProfile {
     z: number;
     offsets: number[];
   };
+  /** Rear taillight halo sprite coordinates (symmetrical ±x, y, z) */
+  taillights: {
+    x: number;
+    y: number;
+    z: number;
+  };
   /** Hood camera anchor */
   hoodCam: [number, number, number];
 }
@@ -64,6 +71,7 @@ const MODEL_PROFILES: Record<string, ModelMountProfile> = {
     wing: { width: 1.98, y: 1.21, z: 2.12, strutBaseY: 0.88, strutX: 0.5, endH: 0.25, baseAngle: 0.07 },
     aero: { skirtX: 1.04, skirtLen: 2.34, splitterW: 2.04, splitterZ: -2.32, diffuserZ: 2.34, addAeroSkirts: true },
     exhaust: { y: 0.34, z: 2.46, offsets: [-0.32, 0.32] },
+    taillights: { x: 0.76, y: 0.90, z: 2.44 },
     hoodCam: [0, 1.18, -0.35],
   },
   // 2015 McLaren P1 GTR (PHANTOM-X)
@@ -76,6 +84,7 @@ const MODEL_PROFILES: Record<string, ModelMountProfile> = {
     wing: { width: 2.08, y: 1.18, z: 2.22, strutBaseY: 0.86, strutX: 0.48, endH: 0.26, baseAngle: 0.08 },
     aero: { skirtX: 1.02, skirtLen: 2.26, splitterW: 2.0, splitterZ: -2.36, diffuserZ: 2.38, addAeroSkirts: false },
     exhaust: { y: 0.52, z: 2.42, offsets: [-0.24, 0.24] },
+    taillights: { x: 0.66, y: 0.64, z: 2.36 },
     hoodCam: [0, 1.16, -0.38],
   },
   // BMW M4 Competition Touge Drift Spec (KATANA-RS)
@@ -88,6 +97,7 @@ const MODEL_PROFILES: Record<string, ModelMountProfile> = {
     wing: { width: 2.04, y: 1.4, z: 2.08, strutBaseY: 1.05, strutX: 0.5, endH: 0.3, baseAngle: 0.12 },
     aero: { skirtX: 1.04, skirtLen: 2.24, splitterW: 2.0, splitterZ: -2.32, diffuserZ: 2.34, addAeroSkirts: false },
     exhaust: { y: 0.32, z: 2.48, offsets: [-0.46, -0.3, 0.3, 0.46] },
+    taillights: { x: 0.74, y: 0.84, z: 2.44 },
     hoodCam: [0, 1.24, -0.32],
   },
   // Lamborghini Aventador S-Class Wedge (VALKYRIE-GT)
@@ -100,6 +110,7 @@ const MODEL_PROFILES: Record<string, ModelMountProfile> = {
     wing: { width: 2.18, y: 1.18, z: 2.22, strutBaseY: 0.86, strutX: 0.52, endH: 0.26, baseAngle: 0.08 },
     aero: { skirtX: 1.12, skirtLen: 2.36, splitterW: 2.16, splitterZ: -2.4, diffuserZ: 2.4, addAeroSkirts: false },
     exhaust: { y: 0.42, z: 2.48, offsets: [-0.26, -0.09, 0.09, 0.26] },
+    taillights: { x: 0.78, y: 0.72, z: 2.46 },
     hoodCam: [0, 1.12, -0.36],
   },
   // Khronos Concept EV Hypercar (ECLIPSE-EVO)
@@ -112,6 +123,7 @@ const MODEL_PROFILES: Record<string, ModelMountProfile> = {
     wing: { width: 2.12, y: 1.16, z: 2.04, strutBaseY: 0.84, strutX: 0.5, endH: 0.24, baseAngle: 0.07 },
     aero: { skirtX: 1.14, skirtLen: 2.15, splitterW: 2.18, splitterZ: -2.2, diffuserZ: 2.14, addAeroSkirts: false },
     exhaust: { y: 0.38, z: 2.22, offsets: [-0.46, -0.18, 0.18, 0.46] },
+    taillights: { x: 0.74, y: 0.86, z: 2.12 },
     hoodCam: [0, 1.1, -0.34],
   },
 };
@@ -151,6 +163,9 @@ export class CarModel {
   private readonly headlightMat: THREE.MeshBasicMaterial;
   private readonly brakeLightMat: THREE.MeshStandardMaterial;
   private readonly rearBounceMat: THREE.MeshBasicMaterial;
+  private readonly tailHaloMat: THREE.SpriteMaterial;
+  private readonly tailHaloL: THREE.Sprite;
+  private readonly tailHaloR: THREE.Sprite;
   private readonly alloyMat: THREE.MeshStandardMaterial;
   private readonly darkAlloyMat: THREE.MeshStandardMaterial;
   private readonly tireMat: THREE.MeshStandardMaterial;
@@ -171,7 +186,13 @@ export class CarModel {
   private readonly disposables: (THREE.BufferGeometry | THREE.Material)[] = [];
   private flamePhase = Math.random() * 10;
   private brakeHeat = 0;
+  private backfireTimer = 0;
   private disposed = false;
+
+  /** Briefly flashes exhaust flame cones (synced with upshift / overrun pop / garage rev blip) */
+  public triggerBackfire(duration = 0.11): void {
+    this.backfireTimer = Math.max(this.backfireTimer, duration);
+  }
 
   constructor(
     public readonly spec: CarSpec,
@@ -304,6 +325,25 @@ export class CarModel {
       depthWrite: false,
     });
 
+    // Lightweight additive crimson taillight glow halos (preserves rich neon brake glow
+    // even in single-pass Direct Render mode without 11-pass UnrealBloomPass!)
+    this.tailHaloMat = new THREE.SpriteMaterial({
+      map: sharedGlowTex,
+      color: 0xff1d38,
+      transparent: true,
+      opacity: 0.34,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.tailHaloL = new THREE.Sprite(this.tailHaloMat);
+    this.tailHaloR = new THREE.Sprite(this.tailHaloMat);
+    const tl = this.profile.taillights;
+    this.tailHaloL.position.set(-tl.x, tl.y, tl.z);
+    this.tailHaloR.position.set(tl.x, tl.y, tl.z);
+    this.tailHaloL.scale.set(0.86, 0.58, 1);
+    this.tailHaloR.scale.set(0.86, 0.58, 1);
+    this.chassis.add(this.tailHaloL, this.tailHaloR);
+
     // Shared Alloy Rim, Satin Metal & Rubber Tire Materials
     this.alloyMat = new THREE.MeshStandardMaterial({
       color: 0xcfd6df,
@@ -345,6 +385,7 @@ export class CarModel {
       this.headlightMat,
       this.brakeLightMat,
       this.rearBounceMat,
+      this.tailHaloMat,
       this.alloyMat,
       this.darkAlloyMat,
       this.tireMat,
@@ -506,14 +547,19 @@ export class CarModel {
    * Merges static non-animated body meshes inside `wrapper` that share the same material reference
    * into single batched BufferGeometries, slashing WebGL draw calls by ~80% on mobile WebView.
    */
-  private batchStaticBodyMeshes(wrapper: THREE.Group): void {
+  private batchStaticBodyMeshes(wrapper: THREE.Group, extraProtected?: (THREE.Object3D | null)[]): void {
     wrapper.updateMatrixWorld(true);
     const invWrapper = wrapper.matrixWorld.clone().invert();
 
-    // Never merge the rotating steering wheel subtree
+    // Never merge animated subtrees (rotating steering wheel, active-aero wing blades)
     const protectedSet = new Set<THREE.Object3D>();
     if (this.steeringWheelNode) {
       this.steeringWheelNode.traverse((o) => protectedSet.add(o));
+    }
+    if (extraProtected) {
+      for (const node of extraProtected) {
+        if (node) node.traverse((o) => protectedSet.add(o));
+      }
     }
 
     const groups = new Map<THREE.Material, { meshes: THREE.Mesh[]; geos: THREE.BufferGeometry[] }>();
@@ -816,6 +862,9 @@ export class CarModel {
         }
       }
 
+      // Batch static sub-meshes inside each wheel's spinPivot (rims, spokes, tires sharing material)
+      this.batchStaticBodyMeshes(spinPivot);
+
       this.wheelSpinNodes.push(spinPivot);
       if (isFront) {
         if (side < 0) this.frontLeftPivot = steerPivot;
@@ -900,6 +949,10 @@ export class CarModel {
       this.aeroSlot.add(skirtL, skirtR, splitter);
       this.disposables.push(skirtGeo, splitGeo, strakeGeo);
     }
+
+    // Batch static aero components (struts, endplates, splitter, skirts, diffuser strakes)
+    // while keeping active-aero DRS wing blade & flap separate for live animation!
+    this.batchStaticBodyMeshes(this.aeroSlot, [this.rearWingBlade, this.rearWingFlap]);
   }
 
   private buildNitroThrusters(): void {
@@ -1029,33 +1082,41 @@ export class CarModel {
       this.rearWingFlap.rotation.x += (targetFlapX - this.rearWingFlap.rotation.x) * Math.min(1, dt * 10);
     }
 
-    // Reactive LED brake taillights + wet-tarmac crimson bounce + glowing hot brake rotors!
+    // Reactive LED brake taillights + wet-tarmac crimson bounce + lightweight additive taillight halos!
     this.brakeLightMat.emissiveIntensity = isBraking ? 3.2 : isDrifting ? 1.95 : 1.0;
     this.rearBounceMat.opacity = isBraking ? 0.28 : isDrifting ? 0.18 : 0.09;
+    this.tailHaloMat.opacity = isBraking ? 0.72 : isDrifting ? 0.48 : 0.28;
+    const haloScaleX = isBraking ? 1.38 : isDrifting ? 1.06 : 0.84;
+    const haloScaleY = isBraking ? 0.92 : isDrifting ? 0.7 : 0.56;
+    this.tailHaloL.scale.set(haloScaleX, haloScaleY, 1);
+    this.tailHaloR.scale.set(haloScaleX, haloScaleY, 1);
 
     const targetHeat = isBraking && speed > 18 ? 1.8 : isDrifting ? 0.55 : 0;
     this.brakeHeat += (targetHeat - this.brakeHeat) * Math.min(1, dt * (targetHeat > this.brakeHeat ? 5.5 : 2.2));
     this.brakeDiscMat.emissiveIntensity = this.brakeHeat;
 
-    // Animated realistic afterburner exhaust flames
-    if (boostIntensity > 0.05) {
+    // Animated per-car afterburner exhaust flames & audio-synced backfire flashes
+    if (this.backfireTimer > 0) {
+      this.backfireTimer = Math.max(0, this.backfireTimer - dt);
+    }
+    const effectiveBoost = Math.max(boostIntensity, this.backfireTimer > 0 ? 0.62 : 0);
+
+    if (effectiveBoost > 0.05) {
       this.flamePhase += dt * 46;
       this.nitroFlameGroup.visible = true;
       const flicker = 0.85 + Math.sin(this.flamePhase) * 0.22 + Math.cos(this.flamePhase * 1.7) * 0.1;
-      const lenScale = (0.5 + boostIntensity * 1.1) * flicker;
-      const radScale = 0.72 + boostIntensity * 0.3;
+      const vfx = getCarSignature(this.spec).vfx;
+      const [radMul, lenMul] = vfx.flameScale;
+      const isPopOnly = boostIntensity <= 0.05 && this.backfireTimer > 0;
+      const lenScale = (0.5 + effectiveBoost * 1.1) * flicker * lenMul * (isPopOnly ? 0.68 : 1.0);
+      const radScale = (0.72 + effectiveBoost * 0.3) * radMul;
 
-      const isEV = this.spec.bodyStyle === 'eclipse';
       const outerHex = isSuperNitro
-        ? 0x3b82f6
-        : isEV
-          ? 0x06b6d4
-          : 0xff7a1a;
-      const innerHex = isSuperNitro
-        ? 0xe0f2fe
-        : isEV
-          ? 0xcffafe
-          : 0xdbeafe;
+        ? vfx.superOuter
+        : isPopOnly
+          ? vfx.backfireHex
+          : vfx.flameOuter;
+      const innerHex = isSuperNitro ? vfx.superInner : vfx.flameInner;
 
       for (const m of this.flameOuterMats) {
         m.color.setHex(outerHex).multiplyScalar(1.48);
@@ -1069,7 +1130,7 @@ export class CarModel {
 
       this.nitroPointLight.visible = true;
       this.nitroPointLight.color.setHex(outerHex);
-      this.nitroPointLight.intensity = 2.4 * boostIntensity * flicker;
+      this.nitroPointLight.intensity = 2.4 * effectiveBoost * flicker;
     } else {
       this.nitroFlameGroup.visible = false;
       this.nitroPointLight.visible = false;

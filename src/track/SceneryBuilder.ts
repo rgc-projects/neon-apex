@@ -286,6 +286,11 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
     buildRealisticSubterraneanCavern(spline, group, disposables, rand, animatedFans);
   }
 
+  // Smart spatial chunk frustum culling: ONLY split triangle-heavy map-wide InstancedMeshes
+  // (>= 36K total triangles) into a coarse 3x3 quadrant grid so Three.js skips 60-75% of heavy
+  // off-screen forests/rocks behind the camera without exploding Draw Calls on lightweight boxes!
+  chunkLargeInstancedMeshes(group);
+
   // Off-track mobile optimization: downgrade background buildings/trees/mountains/concrete
   // from heavy per-pixel PBR+PMREM to fast MeshLambertMaterial while keeping Hero Cars & Road 100% full PBR!
   if (isMobileDevice()) {
@@ -319,6 +324,99 @@ export function buildScenery(spline: TrackSpline): SceneryBuildResult {
       disposables.forEach((d) => d.dispose());
     },
   };
+}
+
+/**
+ * Splits triangle-heavy map-wide InstancedMeshes (>= 36,000 total triangles) into a coarse
+ * 3x3 spatial quadrant grid with tight bounding spheres. Lightweight box-based arrays (e.g.
+ * 220 skyscrapers = 2.6K tris) stay as 1 single draw call instead of multiplying draw calls!
+ */
+function chunkLargeInstancedMeshes(root: THREE.Group): void {
+  const candidates: THREE.InstancedMesh[] = [];
+  root.traverse((obj) => {
+    if (obj instanceof THREE.InstancedMesh && obj.count >= 64) {
+      const geo = obj.geometry;
+      const triCount = geo.index
+        ? geo.index.count / 3
+        : (geo.getAttribute('position')?.count ?? 0) / 3;
+      if (triCount * obj.count >= 36000) {
+        candidates.push(obj);
+      } else {
+        obj.computeBoundingSphere();
+      }
+    }
+  });
+
+  const mat4 = new THREE.Matrix4();
+  const color = new THREE.Color();
+
+  for (const inst of candidates) {
+    const parent = inst.parent;
+    if (!parent) continue;
+
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < inst.count; i++) {
+      inst.getMatrixAt(i, mat4);
+      const x = mat4.elements[12];
+      const z = mat4.elements[14];
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+    }
+
+    const span = Math.max(maxX - minX, maxZ - minZ);
+    if (span < 900) {
+      inst.computeBoundingSphere();
+      continue;
+    }
+    const cellSize = Math.max(850, span / 3);
+    const hasColors = inst.instanceColor !== null;
+    const buckets = new Map<string, number[]>();
+
+    for (let i = 0; i < inst.count; i++) {
+      inst.getMatrixAt(i, mat4);
+      const x = mat4.elements[12];
+      const z = mat4.elements[14];
+      const key = `${Math.floor((x - minX) / cellSize)}_${Math.floor((z - minZ) / cellSize)}`;
+      let list = buckets.get(key);
+      if (!list) {
+        list = [];
+        buckets.set(key, list);
+      }
+      list.push(i);
+    }
+
+    if (buckets.size < 3) {
+      inst.computeBoundingSphere();
+      continue;
+    }
+
+    for (const indices of buckets.values()) {
+      const chunk = new THREE.InstancedMesh(inst.geometry, inst.material, indices.length);
+      chunk.position.copy(inst.position);
+      chunk.quaternion.copy(inst.quaternion);
+      chunk.scale.copy(inst.scale);
+      chunk.renderOrder = inst.renderOrder;
+      chunk.frustumCulled = true;
+
+      for (let j = 0; j < indices.length; j++) {
+        const srcIdx = indices[j];
+        inst.getMatrixAt(srcIdx, mat4);
+        chunk.setMatrixAt(j, mat4);
+        if (hasColors) {
+          inst.getColorAt(srcIdx, color);
+          chunk.setColorAt(j, color);
+        }
+      }
+      chunk.instanceMatrix.needsUpdate = true;
+      if (chunk.instanceColor) chunk.instanceColor.needsUpdate = true;
+      chunk.computeBoundingSphere();
+      parent.add(chunk);
+    }
+
+    parent.remove(inst);
+  }
 }
 
 /**

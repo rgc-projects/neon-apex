@@ -110,11 +110,13 @@ export class HUD {
     this.rotateHintBanner.classList.toggle('hidden', !(isTouch && isPortrait));
   }
 
-  public updateFps(fps: number, frameMs: number, visible: boolean): void {
+  public updateFps(fps: number, frameMs: number, visible: boolean, devTelemetry?: string): void {
     this.fpsBadge.classList.toggle('hidden', !visible);
     if (!visible) return;
     const rounded = Math.round(fps);
-    this.fpsBadge.textContent = `${rounded} FPS · ${frameMs.toFixed(1)}ms`;
+    this.fpsBadge.textContent = devTelemetry
+      ? `${rounded} FPS · ${frameMs.toFixed(1)}ms · ${devTelemetry}`
+      : `${rounded} FPS · ${frameMs.toFixed(1)}ms`;
     this.fpsBadge.classList.toggle('low', rounded < 36);
     this.fpsBadge.classList.toggle('mid', rounded >= 36 && rounded < 52);
   }

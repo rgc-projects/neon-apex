@@ -8,6 +8,7 @@ import {
   createDistanceBoardTexture,
   createHighwaySignTexture,
   createHyperZoneGateTexture,
+  createParticleGlowTexture,
   createRampTexture,
   createRoadPBRTextures,
   createStartFinishTexture,
@@ -547,12 +548,27 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
     color: new THREE.Color(isWarmLamp ? 0xffd28a : 0xe0f2fe).multiplyScalar(1.6),
     toneMapped: false,
   });
-  disposables.push(poleGeo, armGeo, headGeo, lampPoleMat, lampLensMat);
+  // Lightweight additive streetlamp halo card (1 instanced draw call for all streetlamps —
+  // preserves rich night-racing glow even when 11-pass UnrealBloomPass is OFF on mobile!)
+  const lampHaloTex = createParticleGlowTexture();
+  const lampHaloGeo = new THREE.PlaneGeometry(5.2, 5.2);
+  lampHaloGeo.rotateX(Math.PI * 0.18);
+  const lampHaloMat = new THREE.MeshBasicMaterial({
+    map: lampHaloTex,
+    color: isWarmLamp ? 0xffc978 : 0x7dd3fc,
+    transparent: true,
+    opacity: 0.34,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  disposables.push(poleGeo, armGeo, headGeo, lampPoleMat, lampLensMat, lampHaloTex, lampHaloGeo, lampHaloMat);
 
   const totalLamps = lampSamples.length * 2;
   const poleInst = new THREE.InstancedMesh(poleGeo, lampPoleMat, totalLamps);
   const armInst = new THREE.InstancedMesh(armGeo, lampPoleMat, totalLamps);
   const headInst = new THREE.InstancedMesh(headGeo, lampLensMat, totalLamps);
+  const haloInst = new THREE.InstancedMesh(lampHaloGeo, lampHaloMat, totalLamps);
 
   let lIdx = 0;
   for (const sIdx of lampSamples) {
@@ -573,15 +589,18 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
       dummy.updateMatrix();
       armInst.setMatrixAt(lIdx, dummy.matrix);
 
-      // Illuminated luminaire head
+      // Illuminated luminaire head + lightweight additive halo glow
       dummy.position.copy(f.pos).addScaledVector(f.right, side * (halfW - 3.2)).addScaledVector(f.up, 10.85);
       dummy.updateMatrix();
       headInst.setMatrixAt(lIdx, dummy.matrix);
+      dummy.position.addScaledVector(f.up, -0.35);
+      dummy.updateMatrix();
+      haloInst.setMatrixAt(lIdx, dummy.matrix);
 
       lIdx++;
     }
   }
-  group.add(poleInst, armInst, headInst);
+  group.add(poleInst, armInst, headInst, haloInst);
 
   // 6. Authentic Overhead Expressway Sign Gantries (Japanese/English Green/Blue Highway Signs!)
   const signMeta: Record<string, [string, string, string]> = {

@@ -6,6 +6,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 
 import { AI_PROFILES, CAR_SPECS } from '../config/cars';
+import { getCarSignature } from '../config/carSignatures';
 import { TRACK_CONFIGS } from '../config/tracks';
 import { GameState, InputState, RaceResults, RacerStanding } from '../types';
 import { TrackSpline } from '../track/TrackSpline';
@@ -115,6 +116,8 @@ export class GameEngine {
   private lastCountdownStage = -1;
   private startRevRpm = 0.18;
   private finishSlowMoTimer = 0;
+  private showcaseRevTimer = 0;
+  private overrunPopCooldown = 0;
   private elapsed = 0;
   private lastTime = performance.now();
   private animFrameId = 0;
@@ -286,6 +289,10 @@ export class GameEngine {
         this.audio.unlock();
         this.selectedCarIndex = idx;
         this.rebuildShowcaseCar();
+        const sig = getCarSignature(CAR_SPECS[idx]);
+        this.audio.playGarageRevPreview(sig.audio);
+        this.showcaseRevTimer = 0.44;
+        this.showcaseCar?.triggerBackfire(0.32);
       },
       onSelectTrack: (idx) => {
         this.audio.unlock();
@@ -617,6 +624,10 @@ export class GameEngine {
 
   private renderScene(): void {
     if (this.contextLost) return;
+    if (this.renderer.info.autoReset) {
+      this.renderer.info.autoReset = false;
+    }
+    this.renderer.info.reset();
     if (this.useDirectRender || !this.composer) {
       this.renderer.render(this.scene, this.cameraController.camera);
     } else {
@@ -868,6 +879,8 @@ export class GameEngine {
 
     const raceLaps = this.selectedLaps || TRACK_CONFIGS[this.selectedTrackIndex].laps;
     const playerSpec = CAR_SPECS[this.selectedCarIndex];
+    this.audio.setCarAudioProfile(getCarSignature(playerSpec).audio);
+    this.overrunPopCooldown = 0;
 
     // Spawn 5 AI Racers + 1 Player = 6-car Grid (Player starts in P4 for instant action!)
     const gridOrder: { isPlayer: boolean; aiIndex?: number }[] = [
@@ -1249,7 +1262,10 @@ export class GameEngine {
     if (span >= 400) {
       const fps = (this.fpsFrames * 1000) / Math.max(span, 1);
       const avgFrameMs = span / Math.max(this.fpsFrames, 1);
-      this.hud.updateFps(fps, avgFrameMs, true);
+      const devTelemetry = import.meta.env.DEV
+        ? `${this.renderer.info.render.calls}DC · ${Math.round(this.renderer.info.render.triangles / 1000)}K△ · ${this.useDirectRender ? 'DIRECT' : 'POST'}`
+        : undefined;
+      this.hud.updateFps(fps, avgFrameMs, true, devTelemetry);
       this.fpsFrames = 0;
       this.fpsAccumMs = 0;
       this.fpsWindowStart = now;
@@ -1257,20 +1273,24 @@ export class GameEngine {
   }
 
   private updateMenuState(dt: number): void {
+    if (this.showcaseRevTimer > 0) {
+      this.showcaseRevTimer = Math.max(0, this.showcaseRevTimer - dt);
+    }
     if (this.showcaseCar) {
       this.showcaseCar.root.rotation.y += dt * 0.42;
+      const revBoost = this.showcaseRevTimer > 0 ? clamp(this.showcaseRevTimer / 0.32, 0, 1) * 0.82 : 0;
       this.showcaseCar.updateVisuals({
         dt,
         speed: 14,
         steerVisual: Math.sin(this.elapsed * 0.8) * 0.35,
         visualSlipAngle: 0,
         bodyRoll: 0,
-        bodyPitch: 0,
+        bodyPitch: revBoost > 0 ? -0.024 * revBoost : 0,
         suspensionY: Math.sin(this.elapsed * 2.2) * 0.015,
         isBraking: false,
         isDrifting: false,
-        boostIntensity: 0,
-        isSuperNitro: this.selectedCarIndex === 1,
+        boostIntensity: revBoost,
+        isSuperNitro: false,
       });
     }
     this.cameraController.updateMenuShowcase(dt, this.showcaseOrigin);
@@ -1382,6 +1402,13 @@ export class GameEngine {
       },
       onGearShift: () => {
         this.audio.playGearShift();
+        const pSig = getCarSignature(player.spec);
+        player.model.triggerBackfire(pSig.vfx.backfireStyle === 'pop_multi' ? 0.14 : 0.1);
+        player.model.getExhaustWorldPositions(this._exL, this._exR);
+        const isArc = pSig.vfx.backfireStyle === 'arc';
+        const burstCount = pSig.vfx.backfireStyle === 'pop_multi' ? 12 : 8;
+        this.particles.emitBackfireBurst(this._exL, player.worldForward, pSig.vfx.backfireHex, isArc, burstCount);
+        this.particles.emitBackfireBurst(this._exR, player.worldForward, pSig.vfx.backfireHex, isArc, burstCount);
       },
       onNitroStart: (isSuper) => {
         this.audio.playNitroStart(isSuper);
@@ -1422,6 +1449,8 @@ export class GameEngine {
     };
 
     // 1. Step every racer (Player + 5 AI)
+    const camPos = this.cameraController.camera.position;
+    const aiCullDistSq = 520 * 520;
     for (const r of this.racers) {
       if (r.isPlayer) {
         const effectiveInput =
@@ -1434,6 +1463,8 @@ export class GameEngine {
         const aiDiff = settingsManager.settings.controls.aiDifficulty ?? 'pro';
         const { input, paceScale } = ai.computeInput(simDt, r, this.racers, player, this.spline, aiDiff);
         r.step(simDt, input, this.spline, paceScale);
+        // Distance-cull sub-pixel AI cars >520m away (saves 160K-360K tris & 15+ DC per distant car!)
+        r.model.root.visible = r.worldPos.distanceToSquared(camPos) <= aiCullDistSq;
       }
 
       // Check destructible neon cones!
@@ -1447,18 +1478,33 @@ export class GameEngine {
       });
       void smashed;
 
-      // Per-car Drift Sparks, Tire Smoke & Ground Skid Marks
+      // Per-car Drift Sparks, Tire Smoke & Ground Skid Marks (driven by each vehicle's VFX signature!)
+      const rSig = getCarSignature(r.spec);
       r.model.getRearWheelWorldPositions(this._wheelL, this._wheelR);
       const layingSkids = r.isDrifting && !r.isAirborne && r.speed > 20;
       this.skidMarks.recordWheelPair(r.id, this._wheelL, this._wheelR, r.frame.up, layingSkids, r.driftTier);
 
       if (layingSkids) {
-        const sparkCount = r.isPlayer ? 3 + r.driftTier : 1;
-        this.particles.emitDriftSparks(this._wheelL, r.worldForward, r.frame.up, r.driftTier, sparkCount);
-        this.particles.emitDriftSparks(this._wheelR, r.worldForward, r.frame.up, r.driftTier, sparkCount);
-        if (Math.random() < (r.isPlayer ? 0.72 : 0.35)) {
-          this.particles.emitTireSmoke(this._wheelL, r.worldForward, r.frame.up);
-          this.particles.emitTireSmoke(this._wheelR, r.worldForward, r.frame.up);
+        const sparkCount = r.isPlayer ? 3 + r.driftTier + rSig.vfx.sparkBonus : 1;
+        this.particles.emitDriftSparks(
+          this._wheelL,
+          r.worldForward,
+          r.frame.up,
+          r.driftTier,
+          sparkCount,
+          rSig.vfx.sparkPalette
+        );
+        this.particles.emitDriftSparks(
+          this._wheelR,
+          r.worldForward,
+          r.frame.up,
+          r.driftTier,
+          sparkCount,
+          rSig.vfx.sparkPalette
+        );
+        if (Math.random() < (r.isPlayer ? rSig.vfx.smokeChance : 0.35)) {
+          this.particles.emitTireSmoke(this._wheelL, r.worldForward, r.frame.up, rSig.vfx.smokeTint);
+          this.particles.emitTireSmoke(this._wheelR, r.worldForward, r.frame.up, rSig.vfx.smokeTint);
         }
       }
 
@@ -1472,19 +1518,41 @@ export class GameEngine {
         r.model.getExhaustWorldPositions(this._exL, this._exR);
         if (Math.random() < (r.isPlayer ? 0.9 : 0.4)) {
           const blueFlame = r.isSuperNitro || (!r.isNitroActive && r.overdriveStage >= 1);
-          this.particles.emitNitroExhaust(this._exL, r.worldForward, blueFlame);
-          this.particles.emitNitroExhaust(this._exR, r.worldForward, blueFlame);
+          const exhaustHex = blueFlame ? rSig.vfx.superExhaustHex : rSig.vfx.exhaustHex;
+          this.particles.emitNitroExhaust(this._exL, r.worldForward, blueFlame, exhaustHex);
+          this.particles.emitNitroExhaust(this._exR, r.worldForward, blueFlame, exhaustHex);
         }
       }
       if (r.isPlayer) {
         r.model.getExhaustWorldPositions(this._exL, this._exR);
+        const superTrail = r.isSuperNitro || (!r.isNitroActive && r.overdriveStage === 2);
         this.particles.updatePlayerTrails(
           this._exL,
           this._exR,
           r.worldUp,
           !boostLockedInDrift && (boosting || r.speed > 92),
-          r.isSuperNitro || (!r.isNitroActive && r.overdriveStage === 2)
+          superTrail,
+          superTrail ? rSig.vfx.superTrailHex : rSig.vfx.trailHex
         );
+
+        // Audio-synced Anti-Lag / Overrun Pop & Bang during high-speed drift or braking (signature for M4 / V12!)
+        if (this.overrunPopCooldown > 0) {
+          this.overrunPopCooldown -= simDt;
+        } else if (
+          this.state === 'RACING' &&
+          rSig.audio.overrunCrackle > 0 &&
+          !boosting &&
+          r.speed > 44 &&
+          (r.isDrifting || playerInput.brake)
+        ) {
+          if (Math.random() < rSig.audio.overrunCrackle * simDt * 4.5) {
+            this.overrunPopCooldown = rSig.vfx.backfireStyle === 'pop_multi' ? 0.14 : 0.34;
+            this.audio.playOverrunPop();
+            r.model.triggerBackfire(0.085);
+            const popPos = Math.random() > 0.5 ? this._exL : this._exR;
+            this.particles.emitBackfireBurst(popPos, r.worldForward, rSig.vfx.backfireHex, false, 7);
+          }
+        }
         if (r.isSlipstreaming && Math.random() < 0.65) {
           const streakPos = r.worldPos
             .clone()

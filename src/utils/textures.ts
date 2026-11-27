@@ -83,15 +83,7 @@ export function createRoadPBRTextures(asphaltTint: string): RoadPBRTextures {
   }
   nCtx.putImageData(normImg, 0, 0);
 
-  // Subtle transverse expansion joints & tar-sealed asphalt seams
-  aCtx.strokeStyle = 'rgba(6,8,12,0.55)';
-  aCtx.lineWidth = 3;
-  for (let y = 128; y < S; y += 256) {
-    aCtx.beginPath();
-    aCtx.moveTo(0, y);
-    aCtx.lineTo(S, y);
-    aCtx.stroke();
-  }
+  // Seamless continuous hot-mix asphalt (no artificial evenly-spaced transverse slice lines!)
 
   // Realistic shoulder rumble margins
   aCtx.fillStyle = 'rgba(18,22,30,0.46)';
