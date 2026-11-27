@@ -1,7 +1,10 @@
 package top.gcrdev.neonapex;
 
+import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.ActionMode;
+import android.view.View;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -9,6 +12,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
+import java.util.Arrays;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -27,13 +31,38 @@ public class MainActivity extends BridgeActivity {
         }
 
         applyImmersiveFullscreen();
+        setupAntiAssistAndGestureGuards();
 
-        // Allow seamless Web Audio synthwave & engine audio inside Android WebView
+        // Allow seamless Web Audio synthwave & engine audio + block OS long-press / screen-assist popups
         if (getBridge() != null && getBridge().getWebView() != null) {
             WebView webView = getBridge().getWebView();
             WebSettings settings = webView.getSettings();
             settings.setMediaPlaybackRequiresUserGesture(false);
             webView.setBackgroundColor(0xFF040714);
+
+            // Consume OS-level long-press events so holding drift/nitro/steering NEVER triggers
+            // Android text selection, translation overlays, or HyperOS/MIUI screen recognition
+            webView.setLongClickable(false);
+            webView.setOnLongClickListener(v -> true);
+            webView.setHapticFeedbackEnabled(false);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                webView.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                webView.setImportantForContentCapture(
+                    View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+                );
+            }
+        }
+    }
+
+    @Override
+    public void onActionModeStarted(ActionMode mode) {
+        super.onActionModeStarted(mode);
+        // Immediately dismiss any OS floating Copy / Translate / Search action bar over gameplay
+        if (mode != null) {
+            mode.finish();
         }
     }
 
@@ -48,6 +77,30 @@ public class MainActivity extends BridgeActivity {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
             applyImmersiveFullscreen();
+        }
+    }
+
+    private void setupAntiAssistAndGestureGuards() {
+        View decor = getWindow().getDecorView();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            decor.setImportantForContentCapture(
+                View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+            );
+        }
+        // Exclude bottom-left and bottom-right thumb zones (<=200dp per edge) from OS back-swipe gestures
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            decor.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+                int w = r - l;
+                int h = b - t;
+                if (w <= 0 || h <= 0) return;
+                float density = getResources().getDisplayMetrics().density;
+                int edgeW = Math.round(72f * density);
+                int maxZoneH = Math.min(h, Math.round(196f * density));
+                int topY = Math.max(0, h - maxZoneH);
+                Rect leftThumb = new Rect(0, topY, edgeW, h);
+                Rect rightThumb = new Rect(Math.max(0, w - edgeW), topY, w, h);
+                v.setSystemGestureExclusionRects(Arrays.asList(leftThumb, rightThumb));
+            });
         }
     }
 

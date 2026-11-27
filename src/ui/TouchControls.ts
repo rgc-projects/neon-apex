@@ -145,6 +145,32 @@ export class TouchControls {
       { passive: false }
     );
 
+    // Block mobile browser / WebView long-press context menus & text-selection translation popups
+    // everywhere outside text inputs (e.g. circuit catalog search bar)
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
+    };
+    window.addEventListener(
+      'contextmenu',
+      (e) => {
+        if (!isEditableTarget(e.target)) {
+          e.preventDefault();
+        }
+      },
+      { passive: false }
+    );
+    document.addEventListener(
+      'selectstart',
+      (e) => {
+        if (!isEditableTarget(e.target)) {
+          e.preventDefault();
+        }
+      },
+      { passive: false }
+    );
+
     this.bindVirtualJoystick();
     this.bindSlideSteerButtons();
     this.bindSlideRightActionArc();
