@@ -1620,7 +1620,7 @@ export class GameEngine {
           this._exL,
           this._exR,
           r.worldUp,
-          !boostLockedInDrift && (boosting || r.speed > 92),
+          !boostLockedInDrift && boosting,
           superTrail,
           superTrail ? rSig.vfx.superTrailHex : rSig.vfx.trailHex,
           simDt

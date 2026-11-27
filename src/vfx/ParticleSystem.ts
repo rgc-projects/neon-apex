@@ -196,22 +196,24 @@ class PooledPointsLayer {
   }
 }
 
-/** Smooth dynamic glowing ribbon trail streaming from a car's exhausts/taillights */
+/** Smooth dynamic glowing ribbon trail streaming from a car's exhausts during active boost */
 class NitroRibbonTrail {
   public readonly mesh: THREE.Mesh;
   private readonly maxPts: number;
-  private readonly history: { pos: THREE.Vector3; up: THREE.Vector3; active: boolean }[] = [];
+  private readonly history: { pos: THREE.Vector3; up: THREE.Vector3 }[] = [];
   private readonly positions: Float32Array;
   private readonly colors: Float32Array;
   private readonly geo: THREE.BufferGeometry;
   private readonly mat: THREE.MeshBasicMaterial;
-  private readonly halfWidth = 0.085;
-  private activeSegments = 0;
+  private readonly halfWidth = 0.068;
+  private wasActive = false;
+  private livePts = 0;
+  private tailFade = 0;
 
-  constructor(maxPts = 24) {
+  constructor(maxPts = 14) {
     this.maxPts = maxPts;
     for (let i = 0; i < this.maxPts; i++) {
-      this.history.push({ pos: new THREE.Vector3(), up: new THREE.Vector3(0, 1, 0), active: false });
+      this.history.push({ pos: new THREE.Vector3(), up: new THREE.Vector3(0, 1, 0) });
     }
     this.positions = new Float32Array(this.maxPts * 2 * 3);
     this.colors = new Float32Array(this.maxPts * 2 * 3);
@@ -230,11 +232,12 @@ class NitroRibbonTrail {
     this.geo.setAttribute('position', posAttr);
     this.geo.setAttribute('color', colAttr);
     this.geo.setIndex(indices);
+    this.geo.setDrawRange(0, 0);
 
     this.mat = new THREE.MeshBasicMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: 0.44,
+      opacity: 0.34,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
       depthWrite: false,
@@ -247,54 +250,65 @@ class NitroRibbonTrail {
   }
 
   public pushPoint(pos: THREE.Vector3, up: THREE.Vector3, active: boolean, color: THREE.Color): void {
-    if (!active && this.activeSegments === 0) {
+    if (active) {
+      if (!this.wasActive) {
+        // Fresh boost start: seed head cleanly at current exhaust so it NEVER bridges across the track!
+        this.history[0].pos.copy(pos);
+        this.history[0].up.copy(up);
+        this.livePts = 1;
+      } else {
+        const moveMax = Math.min(this.livePts, this.maxPts - 1);
+        for (let i = moveMax; i > 0; i--) {
+          this.history[i].pos.copy(this.history[i - 1].pos);
+          this.history[i].up.copy(this.history[i - 1].up);
+        }
+        this.history[0].pos.copy(pos);
+        this.history[0].up.copy(up);
+        if (this.livePts < this.maxPts) this.livePts++;
+      }
+      this.wasActive = true;
+      this.tailFade = 1.0;
+    } else {
+      this.wasActive = false;
+      if (this.tailFade <= 0.02 || this.livePts < 2) {
+        this.livePts = 0;
+        this.tailFade = 0;
+        this.mesh.visible = false;
+        return;
+      }
+      // Dissolve existing ribbon in place without attaching a stretched line to the car's new position!
+      this.tailFade *= 0.72;
+      if (this.tailFade <= 0.02) {
+        this.livePts = 0;
+        this.tailFade = 0;
+        this.mesh.visible = false;
+        return;
+      }
+    }
+
+    if (this.livePts < 2) {
       this.mesh.visible = false;
       return;
     }
 
-    // Shift history back
-    let liveCount = 0;
-    for (let i = this.maxPts - 1; i > 0; i--) {
-      this.history[i].pos.copy(this.history[i - 1].pos);
-      this.history[i].up.copy(this.history[i - 1].up);
-      this.history[i].active = this.history[i - 1].active;
-      if (this.history[i].active) liveCount++;
-    }
-    this.history[0].pos.copy(pos);
-    this.history[0].up.copy(up);
-    this.history[0].active = active;
-    if (active) liveCount++;
-
-    this.activeSegments = liveCount;
-    this.mesh.visible = liveCount > 1;
-    if (!this.mesh.visible) return;
-
-    for (let i = 0; i < this.maxPts; i++) {
+    const denom = Math.max(1, this.livePts - 1);
+    for (let i = 0; i < this.livePts; i++) {
       const h = this.history[i];
       const v0 = i * 6;
       const v1 = v0 + 3;
-      const fade = h.active ? Math.pow(1 - i / (this.maxPts - 1), 1.6) : 0;
-      const w = this.halfWidth * (0.25 + 0.75 * fade);
+      const fade = Math.pow(1 - i / denom, 1.8) * this.tailFade;
+      const w = this.halfWidth * (0.18 + 0.82 * fade);
 
-      if (!h.active) {
-        this.positions[v0] = pos.x;
-        this.positions[v0 + 1] = pos.y;
-        this.positions[v0 + 2] = pos.z;
-        this.positions[v1] = pos.x;
-        this.positions[v1 + 1] = pos.y;
-        this.positions[v1 + 2] = pos.z;
-      } else {
-        this.positions[v0] = h.pos.x + h.up.x * w;
-        this.positions[v0 + 1] = h.pos.y + h.up.y * w;
-        this.positions[v0 + 2] = h.pos.z + h.up.z * w;
-        this.positions[v1] = h.pos.x - h.up.x * w;
-        this.positions[v1 + 1] = h.pos.y - h.up.y * w;
-        this.positions[v1 + 2] = h.pos.z - h.up.z * w;
-      }
+      this.positions[v0] = h.pos.x + h.up.x * w;
+      this.positions[v0 + 1] = h.pos.y + h.up.y * w;
+      this.positions[v0 + 2] = h.pos.z + h.up.z * w;
+      this.positions[v1] = h.pos.x - h.up.x * w;
+      this.positions[v1 + 1] = h.pos.y - h.up.y * w;
+      this.positions[v1 + 2] = h.pos.z - h.up.z * w;
 
-      const r = color.r * fade * 1.35;
-      const g = color.g * fade * 1.35;
-      const b = color.b * fade * 1.35;
+      const r = color.r * fade * 1.25;
+      const g = color.g * fade * 1.25;
+      const b = color.b * fade * 1.25;
       this.colors[v0] = r;
       this.colors[v0 + 1] = g;
       this.colors[v0 + 2] = b;
@@ -303,13 +317,17 @@ class NitroRibbonTrail {
       this.colors[v1 + 2] = b;
     }
 
+    this.geo.setDrawRange(0, (this.livePts - 1) * 6);
+    this.mesh.visible = true;
     (this.geo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
     (this.geo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
   }
 
   public clear(): void {
-    for (const h of this.history) h.active = false;
-    this.activeSegments = 0;
+    this.wasActive = false;
+    this.livePts = 0;
+    this.tailFade = 0;
+    this.geo.setDrawRange(0, 0);
     this.mesh.visible = false;
   }
 
@@ -354,8 +372,8 @@ export class ParticleSystem {
 
     this.sparks = new PooledPointsLayer(sparkPool, 0.14, this.glowTex, true, 0.94, 0.04);
     this.smoke = new PooledPointsLayer(smokePool, smokeSize, this.glowTex, false, smokeOpacity, 0.045);
-    this.trailLeft = new NitroRibbonTrail(this.isMobile ? 18 : 26);
-    this.trailRight = new NitroRibbonTrail(this.isMobile ? 18 : 26);
+    this.trailLeft = new NitroRibbonTrail(this.isMobile ? 11 : 15);
+    this.trailRight = new NitroRibbonTrail(this.isMobile ? 11 : 15);
 
     this.group.add(this.sparks.points, this.smoke.points, this.trailLeft.mesh, this.trailRight.mesh);
   }
