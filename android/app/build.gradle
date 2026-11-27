@@ -32,7 +32,11 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             def ksPath = System.getenv("ANDROID_KEYSTORE_PATH")
-            signingConfig (ksPath != null && file(ksPath).exists()) ? signingConfigs.release : signingConfigs.debug
+            if (ksPath != null && file(ksPath).exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
         }
     }
 }
