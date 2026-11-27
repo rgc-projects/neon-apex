@@ -192,6 +192,9 @@ export class AudioEngine {
     if (this.throatFormant) {
       this.throatFormant.frequency.setTargetAtTime(profile.throatFormantHz, now, 0.05);
     }
+    if (this.engineMasterLpf) {
+      this.engineMasterLpf.Q.setTargetAtTime(profile.lpfQ, now, 0.05);
+    }
     if (this.engineAirGain) {
       this.engineAirGain.gain.setTargetAtTime(0, now, 0.04);
     }
@@ -215,14 +218,14 @@ export class AudioEngine {
     this.throatFormant = ctx.createBiquadFilter();
     this.throatFormant.type = 'peaking';
     this.throatFormant.frequency.value = p.throatFormantHz;
-    this.throatFormant.Q.value = 1.3;
-    this.throatFormant.gain.value = 3.2;
+    this.throatFormant.Q.value = 1.25;
+    this.throatFormant.gain.value = 5.2;
 
-    // 3. Gentle master lowpass (Q = 0.85 prevents piercing synthesizer whistle!)
+    // 3. Lively master lowpass (Q = 1.4..1.9 gives crisp motorsport roar without piercing whistle!)
     this.engineMasterLpf = ctx.createBiquadFilter();
     this.engineMasterLpf.type = 'lowpass';
     this.engineMasterLpf.frequency.value = p.lpfBase;
-    this.engineMasterLpf.Q.value = 0.85;
+    this.engineMasterLpf.Q.value = p.lpfQ;
 
     this.engineGain = ctx.createGain();
     this.engineGain.gain.value = 0.0;
@@ -436,14 +439,14 @@ export class AudioEngine {
       this.engineAirGain!.gain.setTargetAtTime(0, now, 0.06);
     }
 
-    // Gentle master lowpass opens smoothly with RPM without whistling
+    // Lively master lowpass opens wide at high RPM & nitro for exhilarating punch!
     const lpfTarget =
-      p.lpfBase + (p.isElectric ? speedFactor : rpm) * p.lpfSpan + (params.isNitro ? 420 : 0);
-    this.engineMasterLpf!.frequency.setTargetAtTime(Math.min(3400, lpfTarget), now, 0.06);
+      p.lpfBase + (p.isElectric ? speedFactor : rpm) * p.lpfSpan + (params.isNitro ? 720 : 0);
+    this.engineMasterLpf!.frequency.setTargetAtTime(Math.min(4400, lpfTarget), now, 0.05);
 
     const gainTarget =
-      (0.16 + speedFactor * 0.12 + (params.isNitro ? 0.05 : 0)) * p.volumeScale;
-    this.engineGain!.gain.setTargetAtTime(gainTarget, now, 0.055);
+      (0.185 + speedFactor * 0.145 + (params.isNitro ? 0.065 : 0)) * p.volumeScale;
+    this.engineGain!.gain.setTargetAtTime(gainTarget, now, 0.05);
 
     // Drift tire screech
     const screechTarget = params.isDrifting && !params.isAirborne ? 0.09 + params.driftTier * 0.022 : 0;
@@ -549,23 +552,23 @@ export class AudioEngine {
     const throatF = ctx.createBiquadFilter();
     throatF.type = 'peaking';
     throatF.frequency.value = profile.throatFormantHz;
-    throatF.Q.value = 1.3;
-    throatF.gain.value = 3.2;
+    throatF.Q.value = 1.25;
+    throatF.gain.value = 5.2;
 
     const lpf = ctx.createBiquadFilter();
     lpf.type = 'lowpass';
-    lpf.Q.value = 0.85;
+    lpf.Q.value = profile.lpfQ;
     lpf.frequency.setValueAtTime(profile.lpfBase, now);
     lpf.frequency.exponentialRampToValueAtTime(
-      Math.min(3200, profile.lpfBase + profile.lpfSpan * 0.85),
+      Math.min(4200, profile.lpfBase + profile.lpfSpan * 0.92),
       now + 0.34
     );
-    lpf.frequency.exponentialRampToValueAtTime(profile.lpfBase * 0.85, now + 0.86);
+    lpf.frequency.exponentialRampToValueAtTime(profile.lpfBase * 0.9, now + 0.86);
 
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.001, now);
-    env.gain.linearRampToValueAtTime(0.24 * profile.volumeScale, now + 0.11);
-    env.gain.setValueAtTime(0.23 * profile.volumeScale, now + 0.36);
+    env.gain.linearRampToValueAtTime(0.28 * profile.volumeScale, now + 0.09);
+    env.gain.setValueAtTime(0.27 * profile.volumeScale, now + 0.36);
     env.gain.exponentialRampToValueAtTime(0.001, now + 0.88);
 
     shaper.connect(bodyF).connect(throatF).connect(lpf).connect(env).connect(this.sfxGain);

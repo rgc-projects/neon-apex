@@ -5,35 +5,36 @@ export type NitroSoundStyle = 'jet' | 'turbo' | 'plasma';
 export type BackfireVfxStyle = 'spark' | 'flame' | 'pop_multi' | 'arc';
 
 export interface CarAudioSignature {
-  /** Pure electric propulsion uses speed-linear clean chordal inverter hum */
+  /** Pure electric propulsion uses speed-linear energetic harmonic inverter synth */
   isElectric: boolean;
   /**
-   * Custom PeriodicWave harmonic weights (index 0 = 1st harmonic / fundamental, up to 10th).
-   * Eliminates harsh sawtooth buzz by sculpting warm cylinder firing-order spectra!
+   * Custom 12-harmonic PeriodicWave spectrum: preserves crisp motorsport bite & upper-mid
+   * racing energy (sounds punchy even on phone speakers!) while rolling off harsh buzz above 12th.
    */
   harmonicWeights: number[];
-  /** Secondary voice ratio relative to fundamental (e.g. 0.5 sub, 1.5 I6 fifth, 2.0 V12 octave) */
+  /** Secondary voice ratio relative to fundamental (e.g. 1.5 I6 fifth, 2.0 V8/V12 octave) */
   secondRatio: number;
   secondGain: number;
-  /** Warm sub-bass body foundation ratio (0.5 = one octave down) */
+  /** Punchy sub-bass body foundation */
   subGain: number;
   /** Fundamental frequency (Hz) at idle & sweep range across RPM / speed */
   pitchBase: number;
   pitchSpan: number;
   gearPitchStep: number;
-  /** Fixed acoustic exhaust-chamber formants (Hz) — gives metallic body weight without synth buzz */
+  /** Fixed acoustic exhaust-chamber formants (Hz) — bright racing throat + body punch */
   bodyFormantHz: number;
   throatFormantHz: number;
-  /** Gentle master lowpass sweep (always low Q <= 0.9 to prevent shrill filter whistle) */
+  /** Lively master lowpass sweep (Q = 1.65 for exciting racing bite without piercing whistle) */
   lpfBase: number;
   lpfSpan: number;
-  /** Warmth saturation drive (gentle 1.1..1.9 — warm analog growl, never harsh clipping) */
+  lpfQ: number;
+  /** Analog motorsport saturation drive (2.1..2.65 = punchy growl like original!) */
   warmthDrive: number;
   /** Organic Brown Noise exhaust roar level & center frequency (Hz) */
   roarGain: number;
   roarFreqBase: number;
   roarFreqSpan: number;
-  /** Subtle turbo air spool / EV inverter shimmer gain (0 = none) */
+  /** Airy turbo spool / EV electric turbine shimmer */
   airWhineGain: number;
   airWhineBaseHz: number;
   airWhineSpanHz: number;
@@ -41,7 +42,7 @@ export interface CarAudioSignature {
   volumeScale: number;
   /** Characteristic upshift sound */
   shiftStyle: EngineShiftStyle;
-  /** Probability of warm muffled exhaust burble during drift/decel (0..1) */
+  /** Probability of punchy exhaust overrun burble during drift/decel (0..1) */
   overrunCrackle: number;
   /** Nitro continuous & ignition sound character */
   nitroSound: NitroSoundStyle;
@@ -80,32 +81,32 @@ export interface CarSignatureProfile {
 }
 
 export const CAR_SIGNATURES: Record<string, CarSignatureProfile> = {
-  // APEX-V12 (Ferrari 458 Spider GT3) — Warm, singing Italian flat-plane NA V8
+  // APEX-V12 (Ferrari 458 Spider GT3) — Crisp, punchy, high-revving Italian NA V8 scream!
   'apex-v12': {
     audio: {
       isElectric: false,
-      // Smooth even-order Italian flat-plane harmonics with gentle high-end rolloff
-      harmonicWeights: [1.0, 0.72, 0.28, 0.42, 0.14, 0.18, 0.06, 0.05],
+      harmonicWeights: [1.0, 0.82, 0.44, 0.56, 0.28, 0.34, 0.18, 0.2, 0.11, 0.09, 0.05, 0.03],
       secondRatio: 2.0,
-      secondGain: 0.24,
+      secondGain: 0.34,
       subGain: 0.42,
       pitchBase: 52,
-      pitchSpan: 118,
-      gearPitchStep: 11,
-      bodyFormantHz: 145,
-      throatFormantHz: 560,
-      lpfBase: 420,
-      lpfSpan: 1550,
-      warmthDrive: 1.45,
-      roarGain: 0.34,
-      roarFreqBase: 220,
-      roarFreqSpan: 520,
+      pitchSpan: 142,
+      gearPitchStep: 13,
+      bodyFormantHz: 185,
+      throatFormantHz: 960,
+      lpfBase: 520,
+      lpfSpan: 2450,
+      lpfQ: 1.75,
+      warmthDrive: 2.35,
+      roarGain: 0.32,
+      roarFreqBase: 320,
+      roarFreqSpan: 860,
       airWhineGain: 0.0,
-      airWhineBaseHz: 1400,
-      airWhineSpanHz: 800,
-      volumeScale: 1.0,
+      airWhineBaseHz: 1600,
+      airWhineSpanHz: 900,
+      volumeScale: 1.08,
       shiftStyle: 'dct_crack',
-      overrunCrackle: 0.14,
+      overrunCrackle: 0.16,
       nitroSound: 'jet',
     },
     vfx: {
@@ -127,30 +128,30 @@ export const CAR_SIGNATURES: Record<string, CarSignatureProfile> = {
     },
   },
 
-  // PHANTOM-X (McLaren P1 GTR) — Deep, velvety Twin-Turbo V8 + airy turbo spool & subtle BOV
+  // PHANTOM-X (McLaren P1 GTR) — Muscular Twin-Turbo V8 roar + turbo compressor spool & crisp BOV!
   'phantom-x': {
     audio: {
       isElectric: false,
-      // Turbo turbine naturally damps upper harmonics -> deep, authoritative Le Mans baritone
-      harmonicWeights: [1.0, 0.62, 0.38, 0.22, 0.12, 0.07, 0.03, 0.02],
+      harmonicWeights: [1.0, 0.74, 0.52, 0.38, 0.26, 0.2, 0.13, 0.09, 0.06, 0.04, 0.02, 0.01],
       secondRatio: 1.5,
-      secondGain: 0.22,
-      subGain: 0.58,
-      pitchBase: 40,
-      pitchSpan: 92,
-      gearPitchStep: 9,
-      bodyFormantHz: 115,
-      throatFormantHz: 420,
-      lpfBase: 320,
-      lpfSpan: 1150,
-      warmthDrive: 1.6,
-      roarGain: 0.44,
-      roarFreqBase: 175,
-      roarFreqSpan: 420,
-      airWhineGain: 0.08,
-      airWhineBaseHz: 1350,
-      airWhineSpanHz: 1350,
-      volumeScale: 1.05,
+      secondGain: 0.3,
+      subGain: 0.54,
+      pitchBase: 46,
+      pitchSpan: 118,
+      gearPitchStep: 11,
+      bodyFormantHz: 150,
+      throatFormantHz: 760,
+      lpfBase: 440,
+      lpfSpan: 2050,
+      lpfQ: 1.55,
+      warmthDrive: 2.45,
+      roarGain: 0.42,
+      roarFreqBase: 260,
+      roarFreqSpan: 720,
+      airWhineGain: 0.11,
+      airWhineBaseHz: 1450,
+      airWhineSpanHz: 1550,
+      volumeScale: 1.1,
       shiftStyle: 'bov_pssh',
       overrunCrackle: 0.08,
       nitroSound: 'turbo',
@@ -174,32 +175,32 @@ export const CAR_SIGNATURES: Record<string, CarSignatureProfile> = {
     },
   },
 
-  // KATANA-RS (BMW M4 Competition) — Silky balanced Twin-Turbo Inline-6 + warm muffled burble!
+  // KATANA-RS (BMW M4 Competition) — Singing aggressive Inline-6 S58 + punchy touge Pop & Bang!
   'drift-k': {
     audio: {
       isElectric: false,
-      // Balanced inline-6 1st / 3rd / 6th resonant purr (smooth & musical, never raspy buzz)
-      harmonicWeights: [1.0, 0.44, 0.56, 0.22, 0.14, 0.16, 0.05, 0.03],
+      harmonicWeights: [1.0, 0.54, 0.72, 0.34, 0.24, 0.36, 0.14, 0.11, 0.09, 0.06, 0.03, 0.02],
       secondRatio: 1.5,
-      secondGain: 0.3,
-      subGain: 0.46,
-      pitchBase: 45,
-      pitchSpan: 102,
-      gearPitchStep: 10,
-      bodyFormantHz: 130,
-      throatFormantHz: 490,
-      lpfBase: 360,
-      lpfSpan: 1320,
-      warmthDrive: 1.55,
-      roarGain: 0.4,
-      roarFreqBase: 200,
-      roarFreqSpan: 480,
-      airWhineGain: 0.045,
-      airWhineBaseHz: 1550,
-      airWhineSpanHz: 1050,
-      volumeScale: 1.02,
+      secondGain: 0.38,
+      subGain: 0.44,
+      pitchBase: 49,
+      pitchSpan: 132,
+      gearPitchStep: 12,
+      bodyFormantHz: 170,
+      throatFormantHz: 880,
+      lpfBase: 480,
+      lpfSpan: 2250,
+      lpfQ: 1.85,
+      warmthDrive: 2.5,
+      roarGain: 0.38,
+      roarFreqBase: 300,
+      roarFreqSpan: 820,
+      airWhineGain: 0.06,
+      airWhineBaseHz: 1650,
+      airWhineSpanHz: 1150,
+      volumeScale: 1.08,
       shiftStyle: 'crackle_pop',
-      overrunCrackle: 0.52,
+      overrunCrackle: 0.56,
       nitroSound: 'jet',
     },
     vfx: {
@@ -221,32 +222,32 @@ export const CAR_SIGNATURES: Record<string, CarSignatureProfile> = {
     },
   },
 
-  // VALKYRIE-GT (Lamborghini Aventador) — Rich, chesty 6.5L NA V12 orchestral howl!
+  // VALKYRIE-GT (Lamborghini Aventador) — Ferocious high-RPM F1-style 6.5L NA V12 howl!
   'valkyrie-gt': {
     audio: {
       isElectric: false,
-      // Dense, velvety 12-cylinder singing harmonic cascade + big displacement low weight
-      harmonicWeights: [1.0, 0.78, 0.58, 0.38, 0.24, 0.18, 0.09, 0.06],
+      harmonicWeights: [1.0, 0.88, 0.68, 0.54, 0.38, 0.32, 0.22, 0.18, 0.12, 0.09, 0.06, 0.04],
       secondRatio: 2.0,
-      secondGain: 0.32,
-      subGain: 0.56,
-      pitchBase: 54,
-      pitchSpan: 134,
-      gearPitchStep: 12,
-      bodyFormantHz: 155,
-      throatFormantHz: 650,
-      lpfBase: 460,
-      lpfSpan: 1780,
-      warmthDrive: 1.75,
-      roarGain: 0.42,
-      roarFreqBase: 240,
-      roarFreqSpan: 600,
+      secondGain: 0.4,
+      subGain: 0.5,
+      pitchBase: 58,
+      pitchSpan: 164,
+      gearPitchStep: 14,
+      bodyFormantHz: 205,
+      throatFormantHz: 1120,
+      lpfBase: 580,
+      lpfSpan: 2750,
+      lpfQ: 1.9,
+      warmthDrive: 2.65,
+      roarGain: 0.38,
+      roarFreqBase: 360,
+      roarFreqSpan: 980,
       airWhineGain: 0.0,
-      airWhineBaseHz: 1600,
-      airWhineSpanHz: 900,
-      volumeScale: 1.06,
+      airWhineBaseHz: 1800,
+      airWhineSpanHz: 1000,
+      volumeScale: 1.12,
       shiftStyle: 'v12_bang',
-      overrunCrackle: 0.24,
+      overrunCrackle: 0.26,
       nitroSound: 'jet',
     },
     vfx: {
@@ -268,30 +269,30 @@ export const CAR_SIGNATURES: Record<string, CarSignatureProfile> = {
     },
   },
 
-  // ECLIPSE-EVO (Khronos Concept EV) — Porsche Taycan / Rimac style warm futuristic Electric Sport Sound!
+  // ECLIPSE-EVO (Khronos Concept EV) — Energetic Formula-E / Rimac dual-motor electric surge!
   'eclipse-evo': {
     audio: {
       isElectric: true,
-      // Ultra-smooth glassy warm fundamental + soft octave/fifth (zero shrill tinnitus!)
-      harmonicWeights: [1.0, 0.38, 0.16, 0.06, 0.02],
+      harmonicWeights: [1.0, 0.52, 0.28, 0.16, 0.08, 0.04],
       secondRatio: 1.5,
-      secondGain: 0.34,
-      subGain: 0.48,
-      pitchBase: 76,
-      pitchSpan: 168,
+      secondGain: 0.4,
+      subGain: 0.44,
+      pitchBase: 108,
+      pitchSpan: 245,
       gearPitchStep: 0,
-      bodyFormantHz: 165,
-      throatFormantHz: 460,
-      lpfBase: 620,
-      lpfSpan: 1450,
-      warmthDrive: 1.05,
-      roarGain: 0.16,
-      roarFreqBase: 360,
-      roarFreqSpan: 900,
-      airWhineGain: 0.075,
-      airWhineBaseHz: 920,
-      airWhineSpanHz: 1250,
-      volumeScale: 0.98,
+      bodyFormantHz: 220,
+      throatFormantHz: 820,
+      lpfBase: 860,
+      lpfSpan: 2200,
+      lpfQ: 1.4,
+      warmthDrive: 1.35,
+      roarGain: 0.2,
+      roarFreqBase: 480,
+      roarFreqSpan: 1200,
+      airWhineGain: 0.12,
+      airWhineBaseHz: 1150,
+      airWhineSpanHz: 1650,
+      volumeScale: 1.06,
       shiftStyle: 'ev_pulse',
       overrunCrackle: 0,
       nitroSound: 'plasma',

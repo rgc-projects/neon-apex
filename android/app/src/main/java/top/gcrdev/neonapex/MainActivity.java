@@ -42,10 +42,10 @@ public class MainActivity extends BridgeActivity {
             // Guarantee GPU-accelerated compositing layer for 90-120Hz WebGL racing
             webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
-            // Consume OS-level long-press events so holding drift/nitro/steering NEVER triggers
-            // Android text selection, translation overlays, or HyperOS/MIUI screen recognition
+            // Disable WebView long-clickable state WITHOUT attaching an OnLongClickListener
+            // (Android's setOnLongClickListener silently resets longClickable=true, causing
+            // WebView to trigger 400ms long-press gesture cancellation / dropped touches!)
             webView.setLongClickable(false);
-            webView.setOnLongClickListener(v -> true);
             webView.setHapticFeedbackEnabled(false);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

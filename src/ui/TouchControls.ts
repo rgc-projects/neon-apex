@@ -609,7 +609,21 @@ export class TouchControls {
       'touchmove',
       (e) => {
         e.preventDefault();
-        if (this.tiltEnabled || this.steerTouchId === null) return;
+        if (this.tiltEnabled) {
+          // Auto-recover left-thumb tilt drift if a finger is still on the pad
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            const id = `td:${e.changedTouches[i].identifier}`;
+            if (!this.activeHold.tiltDrift.has(id)) pressTiltDrift(id);
+          }
+          return;
+        }
+        // Auto-recover steering if a spurious OS touchcancel dropped steerTouchId mid-slide!
+        if (this.steerTouchId === null && e.changedTouches.length > 0) {
+          const touch = e.changedTouches[0];
+          this.steerTouchId = touch.identifier;
+          this.beginJoystickAt(touch.clientX, touch.clientY);
+          return;
+        }
         for (let i = 0; i < e.changedTouches.length; i++) {
           const touch = e.changedTouches[i];
           if (touch.identifier === this.steerTouchId) {
@@ -629,6 +643,11 @@ export class TouchControls {
           this.steerTouchId = null;
           this.endJoystick();
         }
+      }
+      // Safety reconcile: if zero fingers remain on screen, never leave joystick jammed
+      if (e.touches.length === 0 && this.steerTouchId !== null) {
+        this.steerTouchId = null;
+        this.endJoystick();
       }
     };
     this.joystickZone.addEventListener('touchend', endTouchSteer, { passive: false });
@@ -707,90 +726,113 @@ export class TouchControls {
       return clientX < splitX ? 'steerLeft' : 'steerRight';
     };
 
-    const bindBtn = (el: HTMLElement, initialKey: SteerButtonKey) => {
-      el.addEventListener(
-        'touchstart',
-        (e) => {
-          e.preventDefault();
-          this.onAnyInteract?.();
-          for (let i = 0; i < e.changedTouches.length; i++) {
-            setSteerKey(`t:${e.changedTouches[i].identifier}`, initialKey);
-          }
-        },
-        { passive: false }
-      );
-
-      el.addEventListener(
-        'touchmove',
-        (e) => {
-          e.preventDefault();
-          for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            const id = `t:${touch.identifier}`;
-            if (this.steerPointerMap.has(id)) {
-              setSteerKey(id, resolveSteerKeyAtX(touch.clientX));
-            }
-          }
-        },
-        { passive: false }
-      );
-
-      const onEnd = (e: TouchEvent) => {
-        e.preventDefault();
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          releaseSteerKey(`t:${e.changedTouches[i].identifier}`);
+    const reconcileSteerTouches = (activeTouches: TouchList) => {
+      const alive = new Set<string>();
+      for (let i = 0; i < activeTouches.length; i++) {
+        alive.add(`t:${activeTouches[i].identifier}`);
+      }
+      for (const id of [...this.steerPointerMap.keys()]) {
+        if (id.startsWith('t:') && !alive.has(id)) {
+          releaseSteerKey(id);
         }
-      };
-      el.addEventListener('touchend', onEnd, { passive: false });
-      el.addEventListener('touchcancel', onEnd, { passive: false });
-
-      el.addEventListener('pointerdown', (e) => {
-        if (e.pointerType === 'touch') return;
-        e.preventDefault();
-        this.onAnyInteract?.();
-        setSteerKey(`p:${e.pointerId}`, initialKey);
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch {
-          // Ignore synthetic events
-        }
-      });
-
-      el.addEventListener('pointermove', (e) => {
-        if (e.pointerType === 'touch') return;
-        const id = `p:${e.pointerId}`;
-        if (this.steerPointerMap.has(id)) {
-          setSteerKey(id, resolveSteerKeyAtX(e.clientX));
-        }
-      });
-
-      const onPtrUp = (e: PointerEvent) => {
-        if (e.pointerType === 'touch') return;
-        releaseSteerKey(`p:${e.pointerId}`);
-      };
-      el.addEventListener('pointerup', onPtrUp);
-      el.addEventListener('pointercancel', onPtrUp);
-      el.addEventListener('lostpointercapture', onPtrUp);
+      }
     };
 
-    bindBtn(this.steerLeftBtn, 'steerLeft');
-    bindBtn(this.steerRightBtn, 'steerRight');
+    // Bind directly to the entire steering pad wrapper (eliminates dead gap between ◀ and ▶ + outer edge!)
+    this.steerButtonsWrap.addEventListener(
+      'touchstart',
+      (e) => {
+        e.preventDefault();
+        this.onAnyInteract?.();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const touch = e.changedTouches[i];
+          setSteerKey(`t:${touch.identifier}`, resolveSteerKeyAtX(touch.clientX));
+        }
+      },
+      { passive: false }
+    );
+
+    this.steerButtonsWrap.addEventListener(
+      'touchmove',
+      (e) => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const touch = e.changedTouches[i];
+          setSteerKey(`t:${touch.identifier}`, resolveSteerKeyAtX(touch.clientX));
+        }
+      },
+      { passive: false }
+    );
+
+    const onTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        releaseSteerKey(`t:${e.changedTouches[i].identifier}`);
+      }
+      reconcileSteerTouches(e.touches);
+    };
+    this.steerButtonsWrap.addEventListener('touchend', onTouchEnd, { passive: false });
+    this.steerButtonsWrap.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+    // Mouse / stylus fallback for desktop testing
+    this.steerButtonsWrap.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch') return;
+      e.preventDefault();
+      this.onAnyInteract?.();
+      setSteerKey(`p:${e.pointerId}`, resolveSteerKeyAtX(e.clientX));
+      try {
+        this.steerButtonsWrap.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore synthetic events
+      }
+    });
+
+    this.steerButtonsWrap.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;
+      const id = `p:${e.pointerId}`;
+      if (this.steerPointerMap.has(id)) {
+        setSteerKey(id, resolveSteerKeyAtX(e.clientX));
+      }
+    });
+
+    const onPtrUp = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') return;
+      releaseSteerKey(`p:${e.pointerId}`);
+    };
+    this.steerButtonsWrap.addEventListener('pointerup', onPtrUp);
+    this.steerButtonsWrap.addEventListener('pointercancel', onPtrUp);
+    this.steerButtonsWrap.addEventListener('lostpointercapture', onPtrUp);
   }
 
   /**
-   * Right-Hand Ergonomic Thumb-Arc Action Pad with:
+   * Right-Hand Full-Area Ergonomic Thumb-Arc Action Pad with:
+   * - Generous nearest-button proximity snapping (+34px forgiveness halo -> ZERO missed edge taps!)
    * - Zero-lift Thumb Slide-to-Engage across DRIFT / NITRO / BRAKE / GAS
+   * - Auto-recovery on touchmove & stale-touch reconciliation so buttons NEVER drop or jam
    * - Dual-mode NITRO: Quick Tap (<240ms) latches continuous boost; Long Hold releases cleanly
    */
   private bindSlideRightActionArc(): void {
-    const resolveActionAt = (clientX: number, clientY: number): RightActionKey | null => {
-      const hit = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('.arc-btn');
-      if (!hit || hit.classList.contains('hidden')) return null;
-      if (hit === this.driftBtn) return 'drift';
-      if (hit === this.nitroBtn) return 'nitro';
-      if (hit === this.brakeBtn) return 'brake';
-      if (hit === this.gasBtn) return 'gas';
-      return null;
+    const actionKeys: RightActionKey[] = ['drift', 'nitro', 'brake', 'gas'];
+
+    const resolveActionAt = (clientX: number, clientY: number, slopPx = 34): RightActionKey | null => {
+      let bestKey: RightActionKey | null = null;
+      let bestDist = Infinity;
+
+      for (const key of actionKeys) {
+        const el = this.rightButtons[key].el;
+        if (el.classList.contains('hidden')) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) continue;
+        const cx = rect.left + rect.width * 0.5;
+        const cy = rect.top + rect.height * 0.5;
+        const radius = Math.max(rect.width, rect.height) * 0.5;
+        const dist = Math.hypot(clientX - cx, clientY - cy);
+        if (dist <= radius + slopPx && dist - radius < bestDist) {
+          bestDist = dist - radius;
+          bestKey = key;
+        }
+      }
+      return bestKey;
     };
 
     const activateKey = (id: string, key: RightActionKey, isSlide: boolean) => {
@@ -849,8 +891,14 @@ export class TouchControls {
 
     const handleSlideMove = (id: string, clientX: number, clientY: number) => {
       const st = this.rightPointerMap.get(id);
-      if (!st) return;
-      const hitKey = resolveActionAt(clientX, clientY);
+      if (!st) {
+        // Auto-recover if touch started slightly outside or OS dropped initial event
+        const hit = resolveActionAt(clientX, clientY, 26);
+        if (hit) activateKey(id, hit, true);
+        return;
+      }
+      // Tighten slide transition threshold so thumb doesn't accidentally misfire adjacent buttons
+      const hitKey = resolveActionAt(clientX, clientY, 10);
       if (hitKey && hitKey !== st.key) {
         st.slid = true;
         releaseKey(id, true);
@@ -858,81 +906,86 @@ export class TouchControls {
       }
     };
 
-    const bindRightBtn = (key: RightActionKey) => {
-      const { el } = this.rightButtons[key];
-
-      el.addEventListener(
-        'touchstart',
-        (e) => {
-          e.preventDefault();
-          this.onAnyInteract?.();
-          for (let i = 0; i < e.changedTouches.length; i++) {
-            activateKey(`t:${e.changedTouches[i].identifier}`, key, false);
-          }
-        },
-        { passive: false }
-      );
-
-      el.addEventListener(
-        'touchmove',
-        (e) => {
-          e.preventDefault();
-          for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            handleSlideMove(`t:${touch.identifier}`, touch.clientX, touch.clientY);
-          }
-        },
-        { passive: false }
-      );
-
-      const onTouchEnd = (e: TouchEvent) => {
-        e.preventDefault();
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          releaseKey(`t:${e.changedTouches[i].identifier}`, false);
+    const reconcileRightTouches = (activeTouches: TouchList) => {
+      const alive = new Set<string>();
+      for (let i = 0; i < activeTouches.length; i++) {
+        alive.add(`t:${activeTouches[i].identifier}`);
+      }
+      for (const id of [...this.rightPointerMap.keys()]) {
+        if (id.startsWith('t:') && !alive.has(id)) {
+          releaseKey(id, false);
         }
-      };
-      el.addEventListener('touchend', onTouchEnd, { passive: false });
-      el.addEventListener('touchcancel', onTouchEnd, { passive: false });
-
-      el.addEventListener('pointerdown', (e) => {
-        if (e.pointerType === 'touch') return;
-        e.preventDefault();
-        this.onAnyInteract?.();
-        activateKey(`p:${e.pointerId}`, key, false);
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch {
-          // Ignore synthetic events
-        }
-      });
-
-      el.addEventListener('pointermove', (e) => {
-        if (e.pointerType === 'touch') return;
-        handleSlideMove(`p:${e.pointerId}`, e.clientX, e.clientY);
-      });
-
-      const onPtrUp = (e: PointerEvent) => {
-        if (e.pointerType === 'touch') return;
-        releaseKey(`p:${e.pointerId}`, false);
-      };
-      el.addEventListener('pointerup', onPtrUp);
-      el.addEventListener('pointercancel', onPtrUp);
-      el.addEventListener('lostpointercapture', onPtrUp);
+      }
     };
 
-    // Keep container touch-action guarded so rapid thumb slides never scroll or zoom WebView
+    // Single full-area container handler eliminates dead gaps & missed button-rim taps!
     this.actionArc.addEventListener(
-      'touchmove',
+      'touchstart',
       (e) => {
-        if (this.rightPointerMap.size > 0) e.preventDefault();
+        e.preventDefault();
+        this.onAnyInteract?.();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const touch = e.changedTouches[i];
+          const hit = resolveActionAt(touch.clientX, touch.clientY, 34);
+          if (hit) {
+            activateKey(`t:${touch.identifier}`, hit, false);
+          }
+        }
       },
       { passive: false }
     );
 
-    bindRightBtn('drift');
-    bindRightBtn('nitro');
-    bindRightBtn('brake');
-    bindRightBtn('gas');
+    this.actionArc.addEventListener(
+      'touchmove',
+      (e) => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const touch = e.changedTouches[i];
+          handleSlideMove(`t:${touch.identifier}`, touch.clientX, touch.clientY);
+        }
+      },
+      { passive: false }
+    );
+
+    const onTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        releaseKey(`t:${e.changedTouches[i].identifier}`, false);
+      }
+      reconcileRightTouches(e.touches);
+    };
+    this.actionArc.addEventListener('touchend', onTouchEnd, { passive: false });
+    this.actionArc.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+    // Mouse / stylus fallback for desktop testing
+    this.actionArc.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch') return;
+      e.preventDefault();
+      this.onAnyInteract?.();
+      const hit = resolveActionAt(e.clientX, e.clientY, 24);
+      if (!hit) return;
+      activateKey(`p:${e.pointerId}`, hit, false);
+      try {
+        this.actionArc.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore synthetic events
+      }
+    });
+
+    this.actionArc.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;
+      if (this.rightPointerMap.has(`p:${e.pointerId}`)) {
+        handleSlideMove(`p:${e.pointerId}`, e.clientX, e.clientY);
+      }
+    });
+
+    const onPtrUp = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') return;
+      releaseKey(`p:${e.pointerId}`, false);
+    };
+    this.actionArc.addEventListener('pointerup', onPtrUp);
+    this.actionArc.addEventListener('pointercancel', onPtrUp);
+    this.actionArc.addEventListener('lostpointercapture', onPtrUp);
   }
 
   public getInput(isCountdown: boolean): InputState {

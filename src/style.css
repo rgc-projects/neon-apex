@@ -2368,12 +2368,10 @@ body.touch-mode .hud-keybinds {
   width: clamp(128px, 24vw, 146px);
   height: clamp(128px, 24vw, 146px);
   border-radius: 50%;
-  opacity: 0.56;
-  background: radial-gradient(circle at 50% 50%, rgba(10, 18, 38, 0.28) 0%, rgba(6, 11, 26, 0.58) 72%, rgba(0, 242, 255, 0.14) 100%);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1.5px solid rgba(0, 242, 255, 0.42);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42), inset 0 0 20px rgba(0, 242, 255, 0.08);
+  opacity: 0.62;
+  background: radial-gradient(circle at 50% 50%, rgba(10, 18, 38, 0.36) 0%, rgba(6, 11, 26, 0.68) 72%, rgba(0, 242, 255, 0.18) 100%);
+  border: 1.5px solid rgba(0, 242, 255, 0.48);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42), inset 0 0 18px rgba(0, 242, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2504,28 +2502,37 @@ body.touch-mode .hud-keybinds {
   touch-action: pan-y;
 }
 
-/* Right Thumb: Modern Ergonomic Thumb-Arc Action Pad */
+/* Right Thumb: Full-Area Responsive Action Pad (eliminates dead gaps & missed edge taps!) */
 .touch-action-arc {
   position: fixed;
-  right: max(18px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  width: 214px;
-  height: 204px;
-  pointer-events: none;
+  right: 0;
+  bottom: 0;
+  padding-right: max(18px, env(safe-area-inset-right));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  width: 244px;
+  height: 234px;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   transform-origin: bottom right;
   transform: scale(var(--touch-scale, 1));
   opacity: var(--touch-opacity, 0.92);
 }
 
-/* Left Thumb Option B: Classic Left / Right Tactile Steering Buttons */
+/* Left Thumb Option B: Full-Area Left / Right Steering Pad (zero dead gap between arrows!) */
 .touch-steer-buttons {
   position: fixed;
-  left: max(18px, env(safe-area-inset-left));
-  bottom: max(22px, env(safe-area-inset-bottom));
+  left: 0;
+  bottom: 0;
+  padding: 20px 22px max(22px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
   display: flex;
   align-items: center;
   gap: 14px;
-  pointer-events: none;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   transform-origin: bottom left;
   transform: scale(var(--touch-scale, 1));
   opacity: var(--touch-opacity, 0.92);
@@ -2566,11 +2573,10 @@ body.touch-mode .hud-keybinds {
 .touch-btn {
   pointer-events: auto;
   touch-action: none;
+  -webkit-tap-highlight-color: transparent;
   border-radius: 50%;
-  border: 1.8px solid rgba(255, 255, 255, 0.28);
-  background: rgba(8, 13, 30, 0.58);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  border: 1.8px solid rgba(255, 255, 255, 0.3);
+  background: rgba(8, 13, 30, 0.72);
   color: #ffffff;
   display: flex;
   flex-direction: column;
@@ -2578,8 +2584,16 @@ body.touch-mode .hud-keybinds {
   justify-content: center;
   gap: 2px;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.16);
   transition: transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+button,
+.car-card,
+.track-card,
+.hud-mini-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .arc-btn {
@@ -2607,8 +2621,8 @@ body.touch-mode .hud-keybinds {
 
 /* Primary Thumb Anchor (Natural Bottom-Right Rest): Large Circular DRIFT Button */
 .drift-btn {
-  right: 4px;
-  bottom: 4px;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
   width: 98px;
   height: 98px;
   border-color: rgba(0, 242, 255, 0.62);
@@ -2640,8 +2654,8 @@ body.touch-mode .hud-keybinds {
 
 /* Upper-Right Thumb Arc (~12 o'clock): Circular NITRO Button */
 .nitro-btn {
-  right: 12px;
-  bottom: 114px;
+  right: calc(max(18px, env(safe-area-inset-right)) + 8px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 110px);
   width: 78px;
   height: 78px;
   border-color: rgba(148, 163, 184, 0.4);
@@ -2687,8 +2701,8 @@ body.touch-mode .hud-keybinds {
 
 /* Inner-Left Thumb Arc (~9 o'clock): Circular BRAKE / Tap-to-Drift Button */
 .brake-btn {
-  right: 118px;
-  bottom: 12px;
+  right: calc(max(18px, env(safe-area-inset-right)) + 114px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 8px);
   width: 74px;
   height: 74px;
   border-color: rgba(255, 46, 99, 0.52);
@@ -2703,8 +2717,8 @@ body.touch-mode .hud-keybinds {
 
 /* Contextual Inner-Upper Arc (~10:30 o'clock): Countdown REV / Manual GAS Button */
 .gas-btn {
-  right: 102px;
-  bottom: 100px;
+  right: calc(max(18px, env(safe-area-inset-right)) + 98px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 96px);
   width: 74px;
   height: 74px;
   border-color: rgba(0, 255, 157, 0.65);
@@ -3568,17 +3582,17 @@ body.touch-mode .drift-bar-bg {
     height: 46px;
   }
 
-  /* Compact Ultrawide Landscape Right-Thumb Arc (zero overlap even with mobile browser bar!) */
+  /* Compact Ultrawide Landscape Full-Area Right-Thumb Arc (zero dead-zone edge taps!) */
   .touch-action-arc {
-    right: max(14px, env(safe-area-inset-right));
-    bottom: max(10px, env(safe-area-inset-bottom));
-    width: 186px;
-    height: 162px;
+    right: 0;
+    bottom: 0;
+    width: 224px;
+    height: 196px;
   }
 
   .drift-btn {
-    right: 2px;
-    bottom: 2px;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
     width: 82px;
     height: 82px;
   }
@@ -3588,22 +3602,22 @@ body.touch-mode .drift-bar-bg {
   }
 
   .nitro-btn {
-    right: 10px;
-    bottom: 92px;
+    right: calc(max(14px, env(safe-area-inset-right)) + 10px);
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 92px);
     width: 66px;
     height: 66px;
   }
 
   .brake-btn {
-    right: 98px;
-    bottom: 8px;
+    right: calc(max(14px, env(safe-area-inset-right)) + 98px);
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 8px);
     width: 64px;
     height: 64px;
   }
 
   .gas-btn {
-    right: 88px;
-    bottom: 82px;
+    right: calc(max(14px, env(safe-area-inset-right)) + 88px);
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 82px);
     width: 64px;
     height: 64px;
   }
@@ -3825,8 +3839,9 @@ body.touch-mode .drift-bar-bg {
   }
 
   .touch-action-arc {
-    bottom: 6px;
-    height: 148px;
+    right: 0;
+    bottom: 0;
+    height: 176px;
   }
 
   .drift-btn {
@@ -3835,22 +3850,22 @@ body.touch-mode .drift-bar-bg {
   }
 
   .nitro-btn {
-    right: 8px;
-    bottom: 84px;
+    right: calc(max(14px, env(safe-area-inset-right)) + 8px);
+    bottom: calc(max(8px, env(safe-area-inset-bottom)) + 84px);
     width: 58px;
     height: 58px;
   }
 
   .brake-btn {
-    right: 88px;
-    bottom: 6px;
+    right: calc(max(14px, env(safe-area-inset-right)) + 88px);
+    bottom: calc(max(8px, env(safe-area-inset-bottom)) + 6px);
     width: 58px;
     height: 58px;
   }
 
   .gas-btn {
-    right: 78px;
-    bottom: 74px;
+    right: calc(max(14px, env(safe-area-inset-right)) + 78px);
+    bottom: calc(max(8px, env(safe-area-inset-bottom)) + 74px);
     width: 56px;
     height: 56px;
   }
