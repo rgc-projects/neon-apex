@@ -7,6 +7,7 @@ export type ParticleQuality = 'low' | 'medium' | 'high';
 export type DrawDistanceMode = 'near' | 'medium' | 'far';
 export type FpsCap = 30 | 60 | 90 | 120 | 0;
 export type SteerMode = 'joystick' | 'buttons' | 'tilt';
+export type AIDifficulty = 'rookie' | 'pro' | 'apex';
 
 export interface GraphicsSettings {
   qualityPreset: QualityPreset;
@@ -28,6 +29,7 @@ export interface ControlSettings {
   buttonOpacity: number;    // 0.45..1.0
   haptics: boolean;
   defaultCamera: CameraMode;
+  aiDifficulty: AIDifficulty;
 }
 
 export interface AudioSettings {
@@ -156,6 +158,7 @@ export function createDefaultSettings(): GameSettings {
       buttonOpacity: 0.92,
       haptics: true,
       defaultCamera: 'CHASE',
+      aiDifficulty: 'pro',
     },
     audio: {
       masterVolume: 0.75,

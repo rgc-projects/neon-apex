@@ -21,15 +21,18 @@ A dual-platform 3D photorealistic arcade racing game fusing **Need for Speed**'s
   | 10 | Super Akina Touge | 超级秋名山 · 极限蛇形天道 | 26.1 km | 35° | 1 | 5 extreme-banked rollercoaster serpentine ribbons, 5 hairpins & 3 straights |
 
 - **Scalable Two-Tier Circuit Browser**: Fixed-height sidebar hub (Hero blueprint preview, `◀/▶` quick stepping, category filters, `localStorage` favorites) + full-screen `1040px` Blueprint Grid Catalog modal with instant search, sorting, and category counters.
-- **3 Playable GT Supercars**:
-  - **APEX-V12** (*Balanced* / 均衡型) — All-round GT3 downforce and predictable drift control.
-  - **PHANTOM-X** (*Top Speed* / 极速型) — Low-drag Le Mans speed weapon with quad super-nitro thrust.
-  - **KATANA-RS** (*Drift Master* / 漂移型) — Lightweight touge drift GT with rapid snap rotation and boost charging.
+- **5 Playable GT & S-Class Hypercars (5 Distinct Offline Draco-Compressed 3D GLB Models)**:
+  - **APEX-V12** (*Balanced* / 均衡型 — *Ferrari 458 Spider*) — All-round GT3 downforce and predictable drift control.
+  - **PHANTOM-X** (*Top Speed* / 极速型 — *McLaren P1 GTR*) — Low-drag Le Mans speed weapon with factory GTR wing and quad super-nitro thrust.
+  - **KATANA-RS** (*Drift Master* / 漂移型 — *BMW M4 Competition*) — Lightweight touge drift coupe with swan-neck GT3 wing, front carbon canards, and rapid boost charging.
+  - **VALKYRIE-GT** (*S-Class Hyper* / S级全能 — *Lamborghini Aventador*) — Flagship pearl-white S-Class wedge hypercar combining 390+ km/h base pace with biplane DRS wing and rock-solid high-bank grip.
+  - **ECLIPSE-EVO** (*EV Prototype* / S级电驱 — *Khronos Concept EV*) — Quad-motor stealth-carbon electric hypercar with electric plasma cyan nitro thrusters, maximum corner-exit torque, and lightning drift charging.
 - **Full Bilingual i18n (`简体中文` / `English`)**: Zero-reload language toggle in the header and Settings modal with automatic system locale detection and persistence across menus, all 10 tracks, HUD telemetry, pause, and results.
 - **Commercial-Grade 4-Tab Settings Hub & Real-Time Graphics Engine**:
   - **Graphics**: 4 presets (*Low / Medium / High / Ultra*) + automatic hardware tiering (Desktop PC defaults to full *Ultra* DPR 2.0 + 4× WebGL2 MSAA + HDR Bloom + SMAA; mobile devices auto-scale), plus live Resolution Scale (`75%–150%`), FPS Cap (`30/60/90/120/Max`), Anti-Aliasing (`Off/SMAA/2×MSAA/4×MSAA+SMAA`), Lens Bloom (`Off/Soft/Cinematic`), Particle/Speedlines Density, Draw Distance (`Near/Medium/Far`), **Scene Brightness (`80%–140%`)** live exposure calibration, and Live FPS / frame-time monitor.
-  - **Controls**: 3 mobile steering modes (*Dynamic Floating Joystick*, *Classic Left/Right Buttons*, *Gyroscope Tilt*), Auto-Throttle toggle, Steering Sensitivity, Touch Button Scale (`80%–125%`) & Opacity (`45%–100%`), Haptic Vibration, and Default Camera (*Chase / Hood*).
-  - **Audio**: 100% procedural Web Audio engine (6-gear RPM synth, tire screech, nitro jet, SFX, synthwave BGM) with independent Master / SFX / BGM sliders and zero external audio files.
+  - **Controls**: 3 mobile steering modes (*Dynamic Floating Joystick*, *Classic Left/Right Buttons*, *Gyroscope Tilt*), **3 AI Rival Difficulty Tiers** (*Rookie / Pro / Apex*), **HTML5 Gamepad API** controller support (Xbox/PS/Bluetooth), Auto-Throttle toggle, Steering Sensitivity, Touch Button Scale (`80%–125%`) & Opacity (`45%–100%`), Haptic Vibration, and Default Camera (*Chase / Hood*).
+  - **Progression & Personal Records**: Per-circuit `localStorage` persistence for Best Lap, Best Race Time, Top Speed, and Gold/Silver/Bronze trophies (`🏆 X/10`), **`★ NEW BEST LAP`** results banners, and one-tap **Next Circuit** chaining.
+  - **Audio & Production Resilience**: 100% procedural Web Audio engine (6-gear RPM synth, tire screech, nitro jet, SFX, synthwave BGM) with independent Master / SFX / BGM sliders, automatic background tab/app audio suspend & race auto-pause, WebGL context-loss recovery, and shader precompilation.
 - **Opt-In Race Assists (All Default OFF)**: Toggle *Drift Nitro* (`🔥 漂移同喷`), *Straightaway Overdrive* (`🚀 长道超频`), *Hyper Straight Infinite Nitro* (`⚡ 长道满氮`), and *1 / 2 / 3 Laps* from the menu or pause screen.
 - **Mainstream Smartphone & Android APK Ready**: Full `env(safe-area-inset-*)` notch/punch-hole support, dual-side landscape lock, edge-to-edge immersive fullscreen, keep-screen-on during races, native Haptics, auto-pause on app background, and smart Android Back button navigation.
 
@@ -94,4 +97,10 @@ This project uses a **single codebase**: Cloudflare Workers deploys `./dist`, wh
 ## Credits & License
 
 - Game source code & procedural assets: **MIT License**.
-- Base 3D Supercar mesh (`public/models/supercar.glb`): *Ferrari 458 Italia* by `vicent091036`, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), customized with procedural metallic clearcoat PBR materials, GT3 carbon aero kits, and reactive lighting.
+- Bundled Offline Draco-Compressed 3D Vehicle Models (`public/models/`):
+  - `supercar.glb` (**APEX-V12**): *Ferrari 458 Italia* by `vicent091036`, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+  - `phantom-p1.glb` (**PHANTOM-X**): *2015 McLaren P1 GTR* (Draco-optimized offline mesh).
+  - `katana-m4.glb` (**KATANA-RS**): *BMW M4 Competition M Package* by `SRT Performance`, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (quadrant-split articulated wheels, Draco-optimized offline mesh).
+  - `valkyrie-aventador.glb` (**VALKYRIE-GT**): *Lamborghini Aventador* (from MIT-licensed Three.js configurator asset, Draco-optimized offline mesh).
+  - `eclipse-concept.glb` (**ECLIPSE-EVO**): *Khronos glTF Car Concept* by Eric Chadwick / Darmstadt Graphics Group (based on CC0 model by Unity Fan), licensed under [CC BY 4.0 International](https://creativecommons.org/licenses/by/4.0/).
+  - All vehicles are dynamically enhanced with procedural automotive clearcoat PBR materials, articulated front steering, glowing brake rotors, tailored GT3 carbon aero, and reactive afterburner / electric plasma thrusters.

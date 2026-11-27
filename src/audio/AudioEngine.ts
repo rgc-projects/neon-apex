@@ -204,6 +204,26 @@ export class AudioEngine {
     return this.muted;
   }
 
+  /** Cleanly suspend AudioContext when tab/app moves to background to stop BGM & engine noise */
+  public suspend(): void {
+    if (!this.initialized || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    this.engineGain?.gain.setTargetAtTime(0, now, 0.03);
+    this.screechGain?.gain.setTargetAtTime(0, now, 0.03);
+    this.nitroGain?.gain.setTargetAtTime(0, now, 0.03);
+    if (this.ctx.state === 'running') {
+      void this.ctx.suspend().catch(() => {});
+    }
+  }
+
+  /** Resume AudioContext when returning to foreground */
+  public resumeIfAllowed(): void {
+    if (!this.initialized || !this.ctx) return;
+    if (this.ctx.state === 'suspended') {
+      void this.ctx.resume().catch(() => {});
+    }
+  }
+
   public setEngineActive(active: boolean, racingMode: boolean): void {
     this.engineActive = active;
     this.racingIntensity = racingMode ? 1 : 0;

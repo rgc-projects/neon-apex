@@ -15,11 +15,14 @@ export class ResultsUI {
   private readonly standingsEl = document.getElementById('results-standings')!;
 
   private readonly raceAgainBtn = document.getElementById('btn-race-again')!;
+  private readonly nextTrackBtn = document.getElementById('btn-results-next-track');
   private readonly backMenuBtn = document.getElementById('btn-back-menu')!;
+  private readonly recordBannerEl = document.getElementById('results-record-banner');
   private lastResults: RaceResults | null = null;
 
-  constructor(callbacks: { onRaceAgain: () => void; onBackToMenu: () => void }) {
+  constructor(callbacks: { onRaceAgain: () => void; onNextTrack?: () => void; onBackToMenu: () => void }) {
     this.raceAgainBtn.addEventListener('click', callbacks.onRaceAgain);
+    this.nextTrackBtn?.addEventListener('click', () => callbacks.onNextTrack?.());
     this.backMenuBtn.addEventListener('click', callbacks.onBackToMenu);
 
     i18n.subscribe(() => {
@@ -52,6 +55,17 @@ export class ResultsUI {
           : t('resultsFinished', { rank: rankStr });
 
     this.badgeEl.textContent = `#${res.rank}`;
+    if (this.recordBannerEl) {
+      if (res.isNewBestLap) {
+        this.recordBannerEl.textContent = t('resNewBestLap');
+        this.recordBannerEl.classList.remove('hidden');
+      } else if (res.isNewBestRace) {
+        this.recordBannerEl.textContent = t('resNewRecord');
+        this.recordBannerEl.classList.remove('hidden');
+      } else {
+        this.recordBannerEl.classList.add('hidden');
+      }
+    }
     this.totalTimeEl.textContent = formatTime(res.totalTime);
     this.bestLapEl.textContent = res.bestLapTime !== null ? formatTime(res.bestLapTime) : '--:--.--';
     this.topSpeedEl.textContent = `${Math.round(res.topSpeedKmh)} KM/H`;

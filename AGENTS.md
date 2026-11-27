@@ -6,10 +6,10 @@ This document is the authoritative operating manual for AI coding agents and hum
 
 ## 1. Project Identity & Architecture
 
-- **Product**: **NEON APEX** — 3D Photorealistic Arcade Racing Game (`v2.0.1`, Android `versionCode 3`).
+- **Product**: **NEON APEX** — 3D Photorealistic Arcade Racing Game (`v2.1.0`, Android `versionCode 4`).
 - **Single-Codebase, Dual-Platform Stack**:
   - **Web**: Vite 6 + TypeScript 5.6 + Three.js `^0.170.0` (WebGL2 + EffectComposer + MSAA/SMAA + UnrealBloom) + 100% Procedural Web Audio API, deployed to **Cloudflare Workers Static Assets** (`wrangler.jsonc` → `./dist`, live domain `neon-apex.gcrdev.top`).
-  - **Android Native**: **Capacitor 7** (`capacitor.config.ts` + `android/`) wrapping `./dist` for 100% offline execution inside Android System WebView (bundled `supercar.glb` + local Draco WASM decoder + procedural audio), compiled via GitHub Actions (`.github/workflows/build-android.yml`).
+  - **Android Native**: **Capacitor 7** (`capacitor.config.ts` + `android/`) wrapping `./dist` for 100% offline execution inside Android System WebView (5 bundled Draco-compressed vehicle `.glb`s + local Draco WASM decoder + procedural audio), compiled via GitHub Actions (`.github/workflows/build-android.yml`).
 - **GitHub Repository**: `https://github.com/rgc-projects/neon-apex` (production branch: `main`).
 
 ---
@@ -25,7 +25,7 @@ neon-apex/
 ├── .github/workflows/
 │   └── build-android.yml             # CI: Node 22 + JDK 21 + Gradle 8.11.1 -> NEON-APEX-v2.0.0-android.apk artifact
 ├── public/
-│   ├── models/supercar.glb           # Bundled Ferrari 458 Italia mesh (CC BY 4.0)
+│   ├── models/                       # 5 bundled Draco-compressed GLBs (supercar, phantom-p1, katana-m4, valkyrie-aventador, eclipse-concept)
 │   ├── draco/                        # Offline Draco WASM decoder (zero runtime CDN requests)
 │   ├── manifest.json                 # PWA fullscreen manifest (start_url: "./")
 │   └── _headers                      # Cloudflare immutable asset caching headers
@@ -51,7 +51,7 @@ neon-apex/
     ├── game/
     │   └── GameEngine.ts             # Main loop, dynamic WebGL2/Direct render pipeline, FPS cap/meter, race state machine
     ├── config/
-    │   ├── cars.ts                   # 3 playable supercars (APEX-V12, PHANTOM-X, KATANA-RS) + 5 AI profiles
+    │   ├── cars.ts                   # 5 playable supercars (3 GT3 + 2 S-Class Hypercars) + 5 fair AI profiles
     │   ├── tracks.ts                 # Master TRACK_CONFIGS registry (10 circuits total) + first 6 circuits
     │   ├── isleOfManTrack.ts         # 60.7 km 1:1 Isle of Man TT Snaefell Mountain Course
     │   ├── nujiangTrack.ts           # 7.32 km G318 Nujiang 72 Bends tight hairpin touge
@@ -63,8 +63,8 @@ neon-apex/
     │   └── SceneryBuilder.ts         # 9 biome worlds, dual-layer zero-clipping 60km terrain, buildings, flora, sky
     ├── vehicle/
     │   ├── CarPhysics.ts             # Decoupled slip-angle drift, brake-to-drift, S-bend switchback, overdrive & AI physics
-    │   ├── CarModel.ts               # Ferrari 458 GLB + procedural GT3 aero, lights, brake glow, dynamic aero wing
-    │   └── SupercarLoader.ts         # Local Draco + GLTFLoader using import.meta.env.BASE_URL
+    │   ├── CarModel.ts               # Multi-GLB normalizer, universal attach() wheel rig, clearcoat PBR, aero, lights & plasma/flame thrusters
+    │   └── SupercarLoader.ts         # Multi-GLB cached offline Draco + GLTFLoader with preloadAll() using import.meta.env.BASE_URL
     ├── ai/AIDriver.ts                # Curvature-aware apex hunting, overtaking, boost/ramp alignment & rubber-banding
     ├── camera/CameraController.ts    # Chase/Hood modes, ultrawide mobile FOV compensation, drift lookahead, draw distance
     ├── audio/AudioEngine.ts          # Zero-asset Web Audio 6-gear engine synth, screech, nitro, SFX & synthwave BGM

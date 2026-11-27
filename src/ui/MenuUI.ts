@@ -1,8 +1,11 @@
 import { CAR_SPECS } from '../config/cars';
 import { TRACK_CONFIGS } from '../config/tracks';
 import { i18n, t } from '../i18n/i18n';
+import { recordsManager, trophyIcon } from '../records/RecordsManager';
+import { AIDifficulty, settingsManager } from '../settings/SettingsManager';
 import { TrackConfig } from '../types';
 import { TrackSpline } from '../track/TrackSpline';
+import { formatTime } from '../utils/math';
 
 export interface MenuCallbacks {
   onSelectCar: (index: number) => void;
@@ -67,10 +70,14 @@ export class MenuUI {
   private readonly lapButtons = Array.from(
     document.querySelectorAll<HTMLButtonElement>('#lap-selector .lap-opt-btn')
   );
+  private readonly aiButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('#ai-diff-selector .ai-opt-btn')
+  );
 
   // Compact Active Circuit Hub & Scalable Catalog Modal elements
   private readonly openCatalogBtn = document.getElementById('btn-open-catalog')!;
   private readonly trackTotalCountEl = document.getElementById('track-total-count')!;
+  private readonly trackTrophyPillEl = document.getElementById('track-trophy-pill');
   private readonly prevTrackBtn = document.getElementById('btn-prev-track')!;
   private readonly nextTrackBtn = document.getElementById('btn-next-track')!;
   private readonly heroFavBtn = document.getElementById('btn-hero-fav')!;
@@ -160,6 +167,16 @@ export class MenuUI {
       });
     });
 
+    // AI Difficulty quick selection (synced two-way with SettingsManager!)
+    this.aiButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const diff = btn.dataset.ai as AIDifficulty;
+        if (diff === 'rookie' || diff === 'pro' || diff === 'apex') {
+          settingsManager.updateControls({ aiDifficulty: diff });
+        }
+      });
+    });
+
     // Quick Prev/Next & Favorite on Active Hero Card
     this.prevTrackBtn.addEventListener('click', () => this.stepSelectedTrack(-1));
     this.nextTrackBtn.addEventListener('click', () => this.stepSelectedTrack(1));
@@ -228,10 +245,31 @@ export class MenuUI {
     this.tabCarsBtn.addEventListener('click', () => setMobileTab('cars'));
     this.tabTracksBtn.addEventListener('click', () => setMobileTab('tracks'));
 
-    // React seamlessly whenever language toggles!
+    // React seamlessly whenever language, records, or AI difficulty change!
     i18n.subscribe(() => {
       this.renderAllLocalized();
     });
+    recordsManager.subscribe(() => {
+      this.renderTrackHub();
+      if (!this.catalogModal.classList.contains('hidden')) {
+        this.renderCatalogGrid();
+      }
+    });
+    settingsManager.subscribe((_, section) => {
+      if (section === 'controls' || section === 'all') {
+        this.syncAiButtons();
+        this.updateSelectionReadout();
+      }
+    });
+  }
+
+  public selectTrackExternal(idx: number): void {
+    if (idx < 0 || idx >= TRACK_CONFIGS.length) return;
+    this.selectedTrack = idx;
+    this.selectedLaps = TRACK_CONFIGS[idx].laps;
+    this.syncLapButtons();
+    this.renderTrackHub(true);
+    this.updateSelectionReadout();
   }
 
   public closeOpenModal(): boolean {
@@ -250,6 +288,7 @@ export class MenuUI {
     this.renderCars();
     this.renderTrackHub();
     this.syncLapButtons();
+    this.syncAiButtons();
     this.updateSelectionReadout();
     this.setMuted(this.currentMuted);
     this.setTouchEnabled(this.currentTouch);
@@ -409,13 +448,14 @@ export class MenuUI {
       btn.type = 'button';
       btn.className = `select-card ${idx === this.selectedCar ? 'selected' : ''}`;
       const paintHex = `#${car.primaryColor.toString(16).padStart(6, '0')}`;
+      const isSClass = car.bodyStyle === 'valkyrie' || car.bodyStyle === 'eclipse';
       btn.innerHTML = `
         <div class="card-top">
           <div class="card-title-row">
             <span class="color-swatch" style="background:${paintHex};color:${paintHex}"></span>
             <span class="card-name">${car.name}</span>
           </div>
-          <span class="card-badge">${i18n.getCarArchetype(car)}</span>
+          <span class="card-badge ${isSClass ? 's-class' : ''}">${i18n.getCarArchetype(car)}</span>
         </div>
         <div class="card-sub">${i18n.getCarSubtitle(car)}</div>
       `;
@@ -470,6 +510,14 @@ export class MenuUI {
     this.heroSvgEl.innerHTML = `<path d="${meta.svgPath}" fill="none" stroke="${tr.accentColorHex}" stroke-width="4.2" stroke-linejoin="round" stroke-linecap="round" />`;
     this.heroSvgEl.style.filter = `drop-shadow(0 0 8px ${tr.accentColorHex}88)`;
 
+    const rec = recordsManager.getTrackRecord(tr.id);
+    const medal = trophyIcon(recordsManager.getTrophy(tr.id));
+    const stats = recordsManager.getTrophyStats(TRACK_CONFIGS.map((c) => c.id));
+    if (this.trackTrophyPillEl) {
+      this.trackTrophyPillEl.textContent = t('pbTrophyCount', { gold: stats.gold, total: stats.total });
+      this.trackTrophyPillEl.classList.toggle('has-gold', stats.gold > 0);
+    }
+
     const lenLabel = this.formatLen(meta.lengthMeters);
     const lapWord = i18n.formatLapPill(this.selectedLaps);
     const hyperChip =
@@ -478,10 +526,17 @@ export class MenuUI {
         : '';
     const elevChip =
       meta.elevSpan >= 35 ? `<span class="hero-chip">⛰ ${t('elevShort', { m: meta.elevSpan })}</span>` : '';
+    const pbChip =
+      rec && rec.bestLapTime !== null
+        ? `<span class="hero-chip pb">${medal ? `${medal} ` : '⏱ '}${t('pbBestLap', { time: formatTime(rec.bestLapTime) })}</span>`
+        : medal
+          ? `<span class="hero-chip pb">${medal} #${rec?.bestRank}</span>`
+          : '';
 
     this.heroQuickChipsEl.innerHTML = `
       <span class="hero-chip accent">${lenLabel}</span>
       <span class="hero-chip">${t('bankShort', { deg: tr.maxBankDeg })}</span>
+      ${pbChip}
       ${elevChip}
       ${hyperChip}
     `;
@@ -551,6 +606,8 @@ export class MenuUI {
       const isSelected = meta.index === this.selectedTrack;
       const isFav = this.favorites.has(tCfg.id);
       const diffClass = this.diffClassFor(tCfg.difficulty);
+      const rowMedal = trophyIcon(recordsManager.getTrophy(tCfg.id));
+      const rowRec = recordsManager.getTrackRecord(tCfg.id);
 
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -563,14 +620,14 @@ export class MenuUI {
           </svg>
           <div class="track-row-text">
             <div class="track-row-top">
-              <span class="card-name">${i18n.getTrackName(tCfg)}</span>
+              <span class="card-name">${rowMedal ? `${rowMedal} ` : ''}${i18n.getTrackName(tCfg)}</span>
               <span class="card-badge ${diffClass}">${i18n.getDifficultyLabel(tCfg.difficulty)}</span>
             </div>
             <div class="track-row-meta">
               <span>${this.formatLen(meta.lengthMeters)}</span>
               <span>·</span>
               <span>${t('bankShort', { deg: tCfg.maxBankDeg })}</span>
-              ${meta.hyperZoneCount > 0 ? `<span>· ${t('hyperRowTag')}</span>` : ''}
+              ${rowRec?.bestLapTime ? `<span>· ⏱ ${formatTime(rowRec.bestLapTime)}</span>` : meta.hyperZoneCount > 0 ? `<span>· ${t('hyperRowTag')}</span>` : ''}
             </div>
           </div>
           <span class="row-fav-star ${isFav ? 'active' : ''}" role="button" tabindex="-1" title="${t('btnFavTrack')}">${isFav ? '★' : '☆'}</span>
@@ -669,6 +726,8 @@ export class MenuUI {
       const isSelected = meta.index === this.selectedTrack;
       const isFav = this.favorites.has(tr.id);
       const diffClass = this.diffClassFor(tr.difficulty);
+      const cardMedal = trophyIcon(recordsManager.getTrophy(tr.id));
+      const cardRec = recordsManager.getTrackRecord(tr.id);
 
       const card = document.createElement('div');
       card.className = `catalog-card ${isSelected ? 'selected' : ''}`;
@@ -681,6 +740,7 @@ export class MenuUI {
           <div class="catalog-bp-bar">
             <div class="catalog-card-top-badges">
               <span class="card-badge ${diffClass}">${i18n.getDifficultyLabel(tr.difficulty)}</span>
+              ${cardMedal ? `<span class="catalog-trophy-tag">${cardMedal}</span>` : ''}
               ${isSelected ? `<span class="catalog-selected-tag">${t('catalogSelected')}</span>` : ''}
             </div>
             <button type="button" class="catalog-fav-btn ${isFav ? 'active' : ''}" aria-label="${t('btnFavTrack')}" title="${t('btnFavTrack')}">${isFav ? '★' : '☆'}</button>
@@ -698,6 +758,7 @@ export class MenuUI {
           <div class="catalog-card-chips">
             <span class="meta-pill">📏 ${this.formatLen(meta.lengthMeters)}</span>
             <span class="meta-pill">📐 ${tr.maxBankDeg}°</span>
+            ${cardRec?.bestLapTime ? `<span class="meta-pill pb">⏱ ${formatTime(cardRec.bestLapTime)}</span>` : ''}
             ${meta.elevSpan >= 35 ? `<span class="meta-pill">⛰ ${meta.elevSpan}m</span>` : ''}
             ${tr.jumpRamps.length > 0 ? `<span class="meta-pill">🛫 ${t('catalogJumpChip', { n: tr.jumpRamps.length })}</span>` : ''}
             ${meta.hyperZoneCount > 0 ? `<span class="meta-pill hyper">⚡ ${t('catalogHyperChip', { n: meta.hyperZoneCount })}</span>` : ''}
@@ -739,6 +800,15 @@ export class MenuUI {
     });
   }
 
+  private syncAiButtons(): void {
+    const cur = settingsManager.settings.controls.aiDifficulty ?? 'pro';
+    this.aiButtons.forEach((btn) => {
+      const val = btn.dataset.ai as AIDifficulty;
+      btn.textContent = val === 'rookie' ? t('aiRookie') : val === 'apex' ? t('aiApex') : t('aiPro');
+      btn.classList.toggle('active', val === cur);
+    });
+  }
+
   private updateSelectionReadout(): void {
     const car = CAR_SPECS[this.selectedCar];
     const meta = this.trackMetas[this.selectedTrack];
@@ -747,19 +817,22 @@ export class MenuUI {
     const totalKm = ((rawLen * this.selectedLaps) / 1000).toFixed(1);
     const trackTitle = i18n.getTrackName(track);
 
+    const aiDiff = settingsManager.settings.controls.aiDifficulty ?? 'pro';
+    const aiLabel = aiDiff === 'rookie' ? t('aiRookie') : aiDiff === 'apex' ? t('aiApex') : t('aiPro');
+
     this.showcaseCarName.textContent = `${car.name} · ${i18n.getCarArchetype(car)}`;
     this.showcaseTrackName.textContent = trackTitle;
 
     if (rawLen >= 7000) {
-      this.launchSubEl.textContent = t('launchSubMega', {
+      this.launchSubEl.textContent = `${t('launchSubMega', {
         laps: this.selectedLaps,
         km: totalKm,
         tag: trackTitle,
-      });
+      })} · AI ${aiLabel}`;
     } else {
-      this.launchSubEl.textContent = t('launchSubStandard', {
+      this.launchSubEl.textContent = `${t('launchSubStandard', {
         laps: this.selectedLaps,
-      });
+      })} · AI ${aiLabel}`;
     }
   }
 }

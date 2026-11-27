@@ -7,12 +7,40 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#040714" />
+  <meta name="description" content="NEON APEX — 3D Photorealistic Arcade Racing Game with 10 handcrafted circuits, drift-to-boost physics, bilingual UI, and offline Android support." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="NEON APEX · 3D Arcade Racing" />
+  <meta property="og:description" content="10 handcrafted 3D circuits from Tokyo Bayshore to 60.7 km Isle of Man TT. Play instantly on Web or Android." />
+  <meta property="og:image" content="./icon-512.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="NEON APEX · 3D Arcade Racing" />
+  <meta name="twitter:description" content="3D Photorealistic Arcade Racing Game with 10 circuits, WebGL2 bloom & procedural synthwave audio." />
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
   <link rel="manifest" href="./manifest.json" />
   <title>NEON APEX · 3D 未来街机赛车</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
   <div id="app">
+    <!-- Initial Boot Splash Curtain (dismissed seamlessly once 3D engine & first track mount) -->
+    <div id="boot-splash" class="boot-splash" aria-live="polite">
+      <div class="boot-splash-inner">
+        <div class="boot-logo">NEON<span>APEX</span></div>
+        <div class="boot-bar"><div class="boot-bar-fill"></div></div>
+        <div class="boot-sub" data-i18n="bootLoading">正在初始化 3D 赛道与引擎...</div>
+      </div>
+    </div>
+
+    <!-- WebGL Context Loss Recovery Overlay -->
+    <div id="webgl-lost-overlay" class="modal hidden" role="alertdialog" aria-modal="true">
+      <div class="modal-card glass-panel webgl-lost-card">
+        <h2 class="webgl-lost-title" data-i18n="webglLostTitle">图形上下文已暂停</h2>
+        <p class="webgl-lost-desc" data-i18n="webglLostDesc">系统临时回收了 WebGL 显存，正在尝试自动恢复；如长时间未恢复请点击下方重载画面。</p>
+        <button id="btn-webgl-reload" class="cyber-btn primary" type="button" data-i18n="webglLostReload">重新加载画面</button>
+      </div>
+    </div>
+
     <canvas id="game-canvas"></canvas>
     <canvas id="speedlines-canvas"></canvas>
 
@@ -78,6 +106,8 @@
             <span id="showcase-car-name">APEX-V12</span>
             <span class="sep">|</span>
             <span id="showcase-track-name">东京湾岸高速</span>
+            <span class="sep">|</span>
+            <span id="track-trophy-pill" class="track-trophy-pill" title="Gold Trophies">🏆 0/10</span>
           </div>
           <div class="menu-race-opts">
             <button
@@ -121,6 +151,12 @@
               <button type="button" class="lap-opt-btn" data-laps="1">1 圈</button>
               <button type="button" class="lap-opt-btn" data-laps="2">2 圈</button>
               <button type="button" class="lap-opt-btn" data-laps="3">3 圈</button>
+            </div>
+            <div id="ai-diff-selector" class="lap-selector ai-diff-selector" role="group" data-i18n-aria="optAiDifficulty" aria-label="AI 难度">
+              <span class="lap-sel-label" data-i18n="aiDiffLabel">🤖 AI</span>
+              <button type="button" class="lap-opt-btn ai-opt-btn" data-ai="rookie" data-i18n="aiRookie">休闲</button>
+              <button type="button" class="lap-opt-btn ai-opt-btn" data-ai="pro" data-i18n="aiPro">标准</button>
+              <button type="button" class="lap-opt-btn ai-opt-btn" data-ai="apex" data-i18n="aiApex">车神</button>
             </div>
           </div>
           <button id="btn-start-race" class="launch-btn" type="button">
@@ -179,7 +215,7 @@
           <span data-i18n-html="keyNitro"><kbd>SHIFT</kbd> / <kbd>E</kbd> 氮气喷射</span>
           <span data-i18n-html="keyCam"><kbd>C</kbd> 视角</span>
           <span data-i18n-html="keyReset"><kbd>R</kbd> 复位</span>
-          <span class="credit-note" data-i18n="creditNote">3D 车型：Ferrari 458 (vicent091036, CC BY 4.0) + GT3 碳纤套件</span>
+          <span class="credit-note" data-i18n="creditNote">3D 车队：5 款开源实车（458 / P1 GTR / M4 / Aventador / Khronos EV）</span>
         </div>
       </footer>
     </div>
@@ -323,7 +359,7 @@
       <div id="countdown-banner" class="countdown-banner hidden">
         <div id="countdown-text" class="countdown-text">3</div>
         <div id="start-rpm-meter" class="start-rpm-meter">
-          <div class="start-rpm-label" data-i18n-html="hudStartRpmHint">按住 <kbd>W</kbd> 或 <kbd>油门</kbd> 在绿区触发「完美起步」</div>
+          <div class="start-rpm-label" data-i18n-html="hudStartRpmHint">按住 <kbd>W</kbd> / <kbd>油门</kbd> 或 <kbd>氮气</kbd> 在绿区触发「完美起步」</div>
           <div class="start-rpm-track">
             <div class="start-rpm-sweet"></div>
             <div id="start-rpm-fill" class="start-rpm-fill"></div>
@@ -420,6 +456,7 @@
             <div class="joystick-crosshair"></div>
             <span id="steer-left-vis" class="joy-dir left">◀</span>
             <span id="steer-right-vis" class="joy-dir right">▶</span>
+            <span id="touch-tilt-drift-hint" class="tilt-drift-label hidden" data-i18n="touchTiltDrift">按住漂移</span>
             <div id="joystick-stick" class="joystick-stick">
               <div class="joystick-cap"></div>
             </div>
@@ -439,7 +476,7 @@
         </div>
 
         <!-- Right Thumb: Ergonomic Thumb-Arc Action Pad -->
-        <div class="touch-action-arc">
+        <div id="touch-action-arc" class="touch-action-arc">
           <button id="touch-drift" class="touch-btn arc-btn drift-btn" type="button">
             <span class="tbtn-main" data-i18n="touchDriftMain">漂移</span>
             <span class="tbtn-sub" data-i18n="touchDriftSub">按住甩尾</span>
@@ -483,6 +520,7 @@
           <div>
             <div class="brand-tag" data-i18n="resultsTag">赛事数据报告</div>
             <h2 id="results-headline" class="results-headline">冠军冲线！</h2>
+            <div id="results-record-banner" class="results-record-banner hidden">★ 刷新最快单圈纪录！</div>
           </div>
           <div id="results-rank-badge" class="results-rank-badge">#1</div>
         </div>
@@ -523,7 +561,8 @@
 
         <div class="results-actions">
           <button id="btn-race-again" class="cyber-btn primary" type="button" data-i18n="btnRaceAgain">再来一局</button>
-          <button id="btn-back-menu" class="cyber-btn" type="button" data-i18n="btnBackMenu">返回车库</button>
+          <button id="btn-results-next-track" class="cyber-btn" type="button" data-i18n="btnNextCircuit">下一条赛道</button>
+          <button id="btn-back-menu" class="cyber-btn ghost" type="button" data-i18n="btnBackMenu">返回车库</button>
         </div>
       </div>
     </div>

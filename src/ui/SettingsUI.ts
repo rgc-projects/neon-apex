@@ -1,5 +1,6 @@
 import { i18n, Language, t } from '../i18n/i18n';
 import {
+  AIDifficulty,
   AntiAliasingMode,
   BloomMode,
   DrawDistanceMode,
@@ -332,6 +333,21 @@ export class SettingsUI {
       <div class="set-grid">
         <div class="set-row">
           <div class="set-row-info">
+            <span class="set-row-title">${t('optAiDifficulty')}</span>
+          </div>
+          ${this.segGroupHtml<AIDifficulty>(
+            'aiDiff',
+            [
+              { value: 'rookie', label: t('aiRookie') },
+              { value: 'pro', label: t('aiPro') },
+              { value: 'apex', label: t('aiApex') },
+            ],
+            c.aiDifficulty ?? 'pro'
+          )}
+        </div>
+
+        <div class="set-row">
+          <div class="set-row-info">
             <span class="set-row-title">${t('optSteerMode')}</span>
           </div>
           ${this.segGroupHtml<SteerMode>(
@@ -409,6 +425,7 @@ export class SettingsUI {
       </div>
     `;
 
+    this.bindSeg('aiDiff', (v) => settingsManager.updateControls({ aiDifficulty: v as AIDifficulty }));
     this.bindSeg('steerMode', (v) => settingsManager.updateControls({ steerMode: v as SteerMode }));
     this.bindSeg('cam', (v) => settingsManager.updateControls({ defaultCamera: v as CameraMode }));
 
@@ -431,7 +448,9 @@ export class SettingsUI {
       const val = Number(slSens.value);
       const lbl = this.bodyEl.querySelector('#val-sens');
       if (lbl) lbl.textContent = `${val}%`;
+      this.suppressRender = true;
       settingsManager.updateControls({ steerSensitivity: val / 100 });
+      this.suppressRender = false;
     });
 
     const slScale = this.bodyEl.querySelector<HTMLInputElement>('#sl-scale')!;
@@ -439,7 +458,9 @@ export class SettingsUI {
       const val = Number(slScale.value);
       const lbl = this.bodyEl.querySelector('#val-scale');
       if (lbl) lbl.textContent = `${val}%`;
+      this.suppressRender = true;
       settingsManager.updateControls({ buttonScale: val / 100 });
+      this.suppressRender = false;
     });
 
     const slOpacity = this.bodyEl.querySelector<HTMLInputElement>('#sl-opacity')!;
@@ -447,7 +468,9 @@ export class SettingsUI {
       const val = Number(slOpacity.value);
       const lbl = this.bodyEl.querySelector('#val-opacity');
       if (lbl) lbl.textContent = `${val}%`;
+      this.suppressRender = true;
       settingsManager.updateControls({ buttonOpacity: val / 100 });
+      this.suppressRender = false;
     });
   }
 
@@ -502,7 +525,9 @@ export class SettingsUI {
       const val = Number(slMaster.value);
       const lbl = this.bodyEl.querySelector('#val-master');
       if (lbl) lbl.textContent = `${val}%`;
+      this.suppressRender = true;
       settingsManager.updateAudio({ masterVolume: val / 100 });
+      this.suppressRender = false;
     });
 
     const slSfx = this.bodyEl.querySelector<HTMLInputElement>('#sl-sfx')!;
@@ -511,7 +536,9 @@ export class SettingsUI {
       const val = Number(slSfx.value);
       const lbl = this.bodyEl.querySelector('#val-sfx');
       if (lbl) lbl.textContent = `${val}%`;
+      this.suppressRender = true;
       settingsManager.updateAudio({ sfxVolume: val / 100 });
+      this.suppressRender = false;
     });
 
     const slMusic = this.bodyEl.querySelector<HTMLInputElement>('#sl-music')!;
@@ -520,7 +547,9 @@ export class SettingsUI {
       const val = Number(slMusic.value);
       const lbl = this.bodyEl.querySelector('#val-music');
       if (lbl) lbl.textContent = `${val}%`;
+      this.suppressRender = true;
       settingsManager.updateAudio({ musicVolume: val / 100 });
+      this.suppressRender = false;
     });
   }
 

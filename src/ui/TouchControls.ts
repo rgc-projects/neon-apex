@@ -8,13 +8,27 @@ interface DeviceOrientationEventIOS extends DeviceOrientationEvent {
   requestPermission?: () => Promise<'granted' | 'denied'>;
 }
 
+type RightActionKey = 'drift' | 'nitro' | 'brake' | 'gas';
+type SteerButtonKey = 'steerLeft' | 'steerRight';
+
+interface RightPointerState {
+  key: RightActionKey;
+  downTime: number;
+  slid: boolean;
+  consumedLatchCancel: boolean;
+}
+
 /**
  * Mobile-First Multi-Touch Arcade Controller:
- * - Supports 3 player-selectable steering modes:
+ * - Left-Hand 3 Steering Modes:
  *   1. Dynamic Floating Virtual Analog Joystick (zero-bias touchdown origin + anti-slip follow)
- *   2. Classic Left / Right Digital Steering Buttons (smooth analog ramp for crisp touge drifts)
- *   3. DeviceOrientation Gyroscope Tilt Steering (with customizable sensitivity)
- * - Customizable button scale, opacity, steering sensitivity, auto-throttle & native/web haptics.
+ *   2. Classic Left / Right Steering Buttons with Thumb Slide-Across Switching + Zero-Crossing Counter-Steer Snap
+ *   3. DeviceOrientation Gyroscope Tilt Steering (left pad transforms into an Asphalt-style Left-Thumb Drift zone!)
+ * - Right-Hand Ergonomic Thumb-Arc Pad:
+ *   - Countdown Rev merged directly onto NITRO in Auto-Gas mode (zero thumb travel from Perfect Start into Launch Boost)
+ *   - NITRO automatically engages full throttle in Manual Gas mode (never cuts gas when switching thumb)
+ *   - Dual-mode NITRO: Quick Tap (<240ms) latches continuous boost (Tap/Brake/Drift cancels) + Long Hold releases cleanly
+ *   - Thumb Slide-to-Engage across Drift / Nitro / Brake / Gas without lifting finger
  */
 export class TouchControls {
   private readonly container = document.getElementById('touch-controls')!;
@@ -23,9 +37,11 @@ export class TouchControls {
   private readonly joystickStick = document.getElementById('joystick-stick')!;
   private readonly steerLeftVis = document.getElementById('steer-left-vis')!;
   private readonly steerRightVis = document.getElementById('steer-right-vis')!;
+  private readonly tiltDriftHint = document.getElementById('touch-tilt-drift-hint')!;
   private readonly steerButtonsWrap = document.getElementById('touch-steer-buttons')!;
   private readonly steerLeftBtn = document.getElementById('touch-steer-left')!;
   private readonly steerRightBtn = document.getElementById('touch-steer-right')!;
+  private readonly actionArc = document.getElementById('touch-action-arc')!;
   private readonly driftBtn = document.getElementById('touch-drift')!;
   private readonly nitroBtn = document.getElementById('touch-nitro')!;
   private readonly brakeBtn = document.getElementById('touch-brake')!;
@@ -53,14 +69,26 @@ export class TouchControls {
   private tiltSteerAxis = 0;
   private buttonSteerAxis = 0;
 
+  // Smart right-hand Nitro tap-to-boost latch & state tracking
+  private nitroTapLatched = false;
+  private lastIsCountdown = false;
+  private lastNitroLocked = false;
+
+  // Pointer slide maps for zero-lift thumb transitions (left steer pad & right action arc)
+  private readonly steerPointerMap = new Map<string, SteerButtonKey>();
+  private readonly rightPointerMap = new Map<string, RightPointerState>();
+
   private readonly activeHold = {
     drift: new Set<string>(),
+    tiltDrift: new Set<string>(),
     nitro: new Set<string>(),
     brake: new Set<string>(),
     gas: new Set<string>(),
     steerLeft: new Set<string>(),
     steerRight: new Set<string>(),
   };
+
+  private readonly rightButtons: Record<RightActionKey, { el: HTMLElement; vibeMs: number }>;
 
   private onToggleChange?: (enabled: boolean) => void;
   private onFullscreenChange?: (isFullscreen: boolean) => void;
@@ -77,6 +105,13 @@ export class TouchControls {
     this.onFullscreenChange = opts?.onFullscreenChange;
     this.onAnyInteract = opts?.onAnyInteract;
     this.onStatusMessage = opts?.onStatusMessage;
+
+    this.rightButtons = {
+      drift: { el: this.driftBtn, vibeMs: 14 },
+      nitro: { el: this.nitroBtn, vibeMs: 18 },
+      brake: { el: this.brakeBtn, vibeMs: 10 },
+      gas: { el: this.gasBtn, vibeMs: 10 },
+    };
 
     const isTouchDevice =
       nativeBridge.isNative ||
@@ -111,12 +146,8 @@ export class TouchControls {
     );
 
     this.bindVirtualJoystick();
-    this.bindHoldButton(this.steerLeftBtn, 'steerLeft', 8);
-    this.bindHoldButton(this.steerRightBtn, 'steerRight', 8);
-    this.bindHoldButton(this.driftBtn, 'drift', 14);
-    this.bindHoldButton(this.nitroBtn, 'nitro', 18);
-    this.bindHoldButton(this.brakeBtn, 'brake', 10);
-    this.bindHoldButton(this.gasBtn, 'gas', 10);
+    this.bindSlideSteerButtons();
+    this.bindSlideRightActionArc();
 
     this.autoGasBtn.addEventListener('click', () => {
       this.onAnyInteract?.();
@@ -190,6 +221,7 @@ export class TouchControls {
     this.joystickZone.classList.toggle('hidden', showButtons);
     this.steerButtonsWrap.classList.toggle('hidden', !showButtons);
     this.joystickBase.classList.toggle('tilt-active', this.tiltEnabled);
+    this.tiltDriftHint.classList.toggle('hidden', !this.tiltEnabled);
   }
 
   public vibrate(pattern: number | number[]): void {
@@ -220,6 +252,7 @@ export class TouchControls {
     const doc = document as Document & {
       webkitFullscreenElement?: Element;
       mozFullScreenElement?: Element;
+      msExitFullscreen?: () => Promise<void>;
       msFullscreenElement?: Element;
     };
     const standalone =
@@ -304,11 +337,16 @@ export class TouchControls {
     this.steerMouseActive = false;
     this.touchSteerAxis = 0;
     this.buttonSteerAxis = 0;
-    this.joystickBase.classList.remove('dragging');
+    this.nitroTapLatched = false;
+    this.steerPointerMap.clear();
+    this.rightPointerMap.clear();
+
+    this.joystickBase.classList.remove('dragging', 'tilt-drifting');
     this.joystickBase.style.transform = 'translate3d(0px, 0px, 0px)';
     this.updateJoystickStickVisual(0, 0, 0);
 
     this.activeHold.drift.clear();
+    this.activeHold.tiltDrift.clear();
     this.activeHold.nitro.clear();
     this.activeHold.brake.clear();
     this.activeHold.gas.clear();
@@ -316,7 +354,7 @@ export class TouchControls {
     this.activeHold.steerRight.clear();
 
     this.driftBtn.classList.remove('pressed');
-    this.nitroBtn.classList.remove('pressed');
+    this.nitroBtn.classList.remove('pressed', 'latched', 'rev-pulse');
     this.brakeBtn.classList.remove('pressed');
     this.gasBtn.classList.remove('pressed');
     this.steerLeftBtn.classList.remove('pressed');
@@ -333,11 +371,14 @@ export class TouchControls {
     this.tiltBtn.textContent = this.tiltEnabled ? t('hudTiltOn') : t('hudTiltOff');
     this.tiltBtn.classList.toggle('active-pill', this.tiltEnabled);
     this.joystickBase.classList.toggle('tilt-active', this.tiltEnabled);
+    this.tiltDriftHint.classList.toggle('hidden', !this.tiltEnabled);
   }
 
   private disableTiltListener(): void {
     this.tiltEnabled = false;
     this.tiltSteerAxis = 0;
+    this.activeHold.tiltDrift.clear();
+    this.joystickBase.classList.remove('tilt-drifting');
     window.removeEventListener('deviceorientation', this.onDeviceOrientation, true);
     this.updateJoystickStickVisual(0, 0, 0);
   }
@@ -502,11 +543,32 @@ export class TouchControls {
   }
 
   private bindVirtualJoystick(): void {
+    const pressTiltDrift = (id: string) => {
+      const wasEmpty = this.activeHold.tiltDrift.size === 0;
+      this.activeHold.tiltDrift.add(id);
+      this.joystickBase.classList.add('tilt-drifting');
+      if (wasEmpty) this.vibrate(14);
+      if (this.lastNitroLocked) this.nitroTapLatched = false;
+    };
+    const releaseTiltDrift = (id: string) => {
+      this.activeHold.tiltDrift.delete(id);
+      if (this.activeHold.tiltDrift.size === 0) {
+        this.joystickBase.classList.remove('tilt-drifting');
+      }
+    };
+
     this.joystickZone.addEventListener(
       'touchstart',
       (e) => {
         e.preventDefault();
         this.onAnyInteract?.();
+        if (this.tiltEnabled) {
+          // Asphalt-style two-thumb ergonomics: in Tilt mode, left thumb pad becomes a huge DRIFT button!
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            pressTiltDrift(`td:${e.changedTouches[i].identifier}`);
+          }
+          return;
+        }
         if (this.steerTouchId === null && e.changedTouches.length > 0) {
           const touch = e.changedTouches[0];
           this.steerTouchId = touch.identifier;
@@ -521,7 +583,7 @@ export class TouchControls {
       'touchmove',
       (e) => {
         e.preventDefault();
-        if (this.steerTouchId === null) return;
+        if (this.tiltEnabled || this.steerTouchId === null) return;
         for (let i = 0; i < e.changedTouches.length; i++) {
           const touch = e.changedTouches[i];
           if (touch.identifier === this.steerTouchId) {
@@ -534,12 +596,12 @@ export class TouchControls {
     );
 
     const endTouchSteer = (e: TouchEvent) => {
-      if (this.steerTouchId === null) return;
       for (let i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === this.steerTouchId) {
+        const tid = e.changedTouches[i].identifier;
+        releaseTiltDrift(`td:${tid}`);
+        if (this.steerTouchId === tid) {
           this.steerTouchId = null;
           this.endJoystick();
-          break;
         }
       }
     };
@@ -550,23 +612,29 @@ export class TouchControls {
       if (e.pointerType === 'touch') return;
       e.preventDefault();
       this.onAnyInteract?.();
-      this.steerMouseActive = true;
       try {
         this.joystickZone.setPointerCapture(e.pointerId);
       } catch {
         // Ignore synthetic events
       }
+      if (this.tiltEnabled) {
+        pressTiltDrift(`pd:${e.pointerId}`);
+        return;
+      }
+      this.steerMouseActive = true;
       this.beginJoystickAt(e.clientX, e.clientY);
     });
 
     this.joystickZone.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'touch' || !this.steerMouseActive) return;
+      if (e.pointerType === 'touch' || this.tiltEnabled || !this.steerMouseActive) return;
       e.preventDefault();
       this.updateJoystickMove(e.clientX, e.clientY);
     });
 
     const endMouseSteer = (e: PointerEvent) => {
-      if (e.pointerType === 'touch' || !this.steerMouseActive) return;
+      if (e.pointerType === 'touch') return;
+      releaseTiltDrift(`pd:${e.pointerId}`);
+      if (!this.steerMouseActive) return;
       this.steerMouseActive = false;
       this.endJoystick();
     };
@@ -575,70 +643,278 @@ export class TouchControls {
     this.joystickZone.addEventListener('lostpointercapture', endMouseSteer);
   }
 
-  private bindHoldButton(
-    el: HTMLElement,
-    key: keyof TouchControls['activeHold'],
-    vibeMs: number
-  ): void {
-    const set = this.activeHold[key];
-
-    const press = (id: string) => {
-      const wasEmpty = set.size === 0;
-      set.add(id);
-      el.classList.add('pressed');
-      if (wasEmpty) this.vibrate(vibeMs);
+  /**
+   * Classic Left/Right Steering Buttons with ZERO-LIFT Thumb Slide-Across Switching:
+   * Players can smoothly slide their left thumb horizontally from ◀ to ▶ (or ▶ to ◀)
+   * across S-curves and drift counter-steers without lifting their finger.
+   */
+  private bindSlideSteerButtons(): void {
+    const setSteerKey = (id: string, key: SteerButtonKey) => {
+      const prev = this.steerPointerMap.get(id);
+      if (prev === key) return;
+      if (prev) {
+        this.activeHold[prev].delete(id);
+        const prevEl = prev === 'steerLeft' ? this.steerLeftBtn : this.steerRightBtn;
+        if (this.activeHold[prev].size === 0) prevEl.classList.remove('pressed');
+      }
+      this.steerPointerMap.set(id, key);
+      const wasEmpty = this.activeHold[key].size === 0;
+      this.activeHold[key].add(id);
+      const nextEl = key === 'steerLeft' ? this.steerLeftBtn : this.steerRightBtn;
+      nextEl.classList.add('pressed');
+      if (wasEmpty) this.vibrate(8);
     };
 
-    const release = (id: string) => {
-      set.delete(id);
-      if (set.size === 0) {
-        el.classList.remove('pressed');
+    const releaseSteerKey = (id: string) => {
+      const prev = this.steerPointerMap.get(id);
+      if (!prev) return;
+      this.steerPointerMap.delete(id);
+      this.activeHold[prev].delete(id);
+      const prevEl = prev === 'steerLeft' ? this.steerLeftBtn : this.steerRightBtn;
+      if (this.activeHold[prev].size === 0) prevEl.classList.remove('pressed');
+    };
+
+    const resolveSteerKeyAtX = (clientX: number): SteerButtonKey => {
+      const lRect = this.steerLeftBtn.getBoundingClientRect();
+      const rRect = this.steerRightBtn.getBoundingClientRect();
+      const splitX = (lRect.right + rRect.left) * 0.5;
+      return clientX < splitX ? 'steerLeft' : 'steerRight';
+    };
+
+    const bindBtn = (el: HTMLElement, initialKey: SteerButtonKey) => {
+      el.addEventListener(
+        'touchstart',
+        (e) => {
+          e.preventDefault();
+          this.onAnyInteract?.();
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            setSteerKey(`t:${e.changedTouches[i].identifier}`, initialKey);
+          }
+        },
+        { passive: false }
+      );
+
+      el.addEventListener(
+        'touchmove',
+        (e) => {
+          e.preventDefault();
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            const id = `t:${touch.identifier}`;
+            if (this.steerPointerMap.has(id)) {
+              setSteerKey(id, resolveSteerKeyAtX(touch.clientX));
+            }
+          }
+        },
+        { passive: false }
+      );
+
+      const onEnd = (e: TouchEvent) => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          releaseSteerKey(`t:${e.changedTouches[i].identifier}`);
+        }
+      };
+      el.addEventListener('touchend', onEnd, { passive: false });
+      el.addEventListener('touchcancel', onEnd, { passive: false });
+
+      el.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'touch') return;
+        e.preventDefault();
+        this.onAnyInteract?.();
+        setSteerKey(`p:${e.pointerId}`, initialKey);
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {
+          // Ignore synthetic events
+        }
+      });
+
+      el.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') return;
+        const id = `p:${e.pointerId}`;
+        if (this.steerPointerMap.has(id)) {
+          setSteerKey(id, resolveSteerKeyAtX(e.clientX));
+        }
+      });
+
+      const onPtrUp = (e: PointerEvent) => {
+        if (e.pointerType === 'touch') return;
+        releaseSteerKey(`p:${e.pointerId}`);
+      };
+      el.addEventListener('pointerup', onPtrUp);
+      el.addEventListener('pointercancel', onPtrUp);
+      el.addEventListener('lostpointercapture', onPtrUp);
+    };
+
+    bindBtn(this.steerLeftBtn, 'steerLeft');
+    bindBtn(this.steerRightBtn, 'steerRight');
+  }
+
+  /**
+   * Right-Hand Ergonomic Thumb-Arc Action Pad with:
+   * - Zero-lift Thumb Slide-to-Engage across DRIFT / NITRO / BRAKE / GAS
+   * - Dual-mode NITRO: Quick Tap (<240ms) latches continuous boost; Long Hold releases cleanly
+   */
+  private bindSlideRightActionArc(): void {
+    const resolveActionAt = (clientX: number, clientY: number): RightActionKey | null => {
+      const hit = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('.arc-btn');
+      if (!hit || hit.classList.contains('hidden')) return null;
+      if (hit === this.driftBtn) return 'drift';
+      if (hit === this.nitroBtn) return 'nitro';
+      if (hit === this.brakeBtn) return 'brake';
+      if (hit === this.gasBtn) return 'gas';
+      return null;
+    };
+
+    const activateKey = (id: string, key: RightActionKey, isSlide: boolean) => {
+      const btn = this.rightButtons[key];
+      const wasEmpty = this.activeHold[key].size === 0;
+      let consumedLatchCancel = false;
+
+      if (key === 'brake') {
+        this.nitroTapLatched = false;
+      } else if (key === 'drift' && this.lastNitroLocked) {
+        this.nitroTapLatched = false;
+      } else if (key === 'nitro' && !isSlide && !this.lastIsCountdown && this.nitroTapLatched) {
+        // Second tap on Nitro cancels latched continuous boost cleanly
+        this.nitroTapLatched = false;
+        consumedLatchCancel = true;
+      }
+
+      this.activeHold[key].add(id);
+      btn.el.classList.add('pressed');
+      if (wasEmpty) this.vibrate(btn.vibeMs);
+
+      this.rightPointerMap.set(id, {
+        key,
+        downTime: performance.now(),
+        slid: isSlide,
+        consumedLatchCancel,
+      });
+    };
+
+    const releaseKey = (id: string, isSlideTransition: boolean) => {
+      const st = this.rightPointerMap.get(id);
+      if (!st) return;
+      this.rightPointerMap.delete(id);
+
+      const { key, downTime, slid, consumedLatchCancel } = st;
+      this.activeHold[key].delete(id);
+      if (this.activeHold[key].size === 0) {
+        this.rightButtons[key].el.classList.remove('pressed');
+      }
+
+      // Quick Tap (<240ms) on NITRO during active racing latches continuous boost (Asphalt / QQ Speed style!)
+      if (
+        key === 'nitro' &&
+        !isSlideTransition &&
+        !slid &&
+        !consumedLatchCancel &&
+        !this.lastIsCountdown &&
+        !this.lastNitroLocked
+      ) {
+        const holdMs = performance.now() - downTime;
+        if (holdMs < 240) {
+          this.nitroTapLatched = true;
+        }
       }
     };
 
-    el.addEventListener(
-      'touchstart',
-      (e) => {
+    const handleSlideMove = (id: string, clientX: number, clientY: number) => {
+      const st = this.rightPointerMap.get(id);
+      if (!st) return;
+      const hitKey = resolveActionAt(clientX, clientY);
+      if (hitKey && hitKey !== st.key) {
+        st.slid = true;
+        releaseKey(id, true);
+        activateKey(id, hitKey, true);
+      }
+    };
+
+    const bindRightBtn = (key: RightActionKey) => {
+      const { el } = this.rightButtons[key];
+
+      el.addEventListener(
+        'touchstart',
+        (e) => {
+          e.preventDefault();
+          this.onAnyInteract?.();
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            activateKey(`t:${e.changedTouches[i].identifier}`, key, false);
+          }
+        },
+        { passive: false }
+      );
+
+      el.addEventListener(
+        'touchmove',
+        (e) => {
+          e.preventDefault();
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            handleSlideMove(`t:${touch.identifier}`, touch.clientX, touch.clientY);
+          }
+        },
+        { passive: false }
+      );
+
+      const onTouchEnd = (e: TouchEvent) => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          releaseKey(`t:${e.changedTouches[i].identifier}`, false);
+        }
+      };
+      el.addEventListener('touchend', onTouchEnd, { passive: false });
+      el.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+      el.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'touch') return;
         e.preventDefault();
         this.onAnyInteract?.();
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          press(`t:${e.changedTouches[i].identifier}`);
+        activateKey(`p:${e.pointerId}`, key, false);
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {
+          // Ignore synthetic events
         }
+      });
+
+      el.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') return;
+        handleSlideMove(`p:${e.pointerId}`, e.clientX, e.clientY);
+      });
+
+      const onPtrUp = (e: PointerEvent) => {
+        if (e.pointerType === 'touch') return;
+        releaseKey(`p:${e.pointerId}`, false);
+      };
+      el.addEventListener('pointerup', onPtrUp);
+      el.addEventListener('pointercancel', onPtrUp);
+      el.addEventListener('lostpointercapture', onPtrUp);
+    };
+
+    // Keep container touch-action guarded so rapid thumb slides never scroll or zoom WebView
+    this.actionArc.addEventListener(
+      'touchmove',
+      (e) => {
+        if (this.rightPointerMap.size > 0) e.preventDefault();
       },
       { passive: false }
     );
 
-    const onTouchEnd = (e: TouchEvent) => {
-      e.preventDefault();
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        release(`t:${e.changedTouches[i].identifier}`);
-      }
-    };
-    el.addEventListener('touchend', onTouchEnd, { passive: false });
-    el.addEventListener('touchcancel', onTouchEnd, { passive: false });
-
-    el.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'touch') return;
-      e.preventDefault();
-      this.onAnyInteract?.();
-      press(`p:${e.pointerId}`);
-      try {
-        el.setPointerCapture(e.pointerId);
-      } catch {
-        // Ignore
-      }
-    });
-
-    const onPtrUp = (e: PointerEvent) => {
-      if (e.pointerType === 'touch') return;
-      release(`p:${e.pointerId}`);
-    };
-    el.addEventListener('pointerup', onPtrUp);
-    el.addEventListener('pointercancel', onPtrUp);
-    el.addEventListener('lostpointercapture', onPtrUp);
+    bindRightBtn('drift');
+    bindRightBtn('nitro');
+    bindRightBtn('brake');
+    bindRightBtn('gas');
   }
 
   public getInput(isCountdown: boolean): InputState {
+    this.lastIsCountdown = isCountdown;
+    if (isCountdown) {
+      this.nitroTapLatched = false;
+    }
+
     if (!this.enabled) {
       return {
         throttle: false,
@@ -653,36 +929,47 @@ export class TouchControls {
 
     const brake = this.activeHold.brake.size > 0;
     const manualGas = this.activeHold.gas.size > 0;
-    const nitro = this.activeHold.nitro.size > 0;
-    const drift = this.activeHold.drift.size > 0;
+    const nitroHeld = this.activeHold.nitro.size > 0;
+    const drift = this.activeHold.drift.size > 0 || this.activeHold.tiltDrift.size > 0;
+
+    if (brake || (drift && this.lastNitroLocked)) {
+      this.nitroTapLatched = false;
+    }
+
+    const nitroActive = isCountdown ? false : nitroHeld || this.nitroTapLatched;
 
     let steerAxis = 0;
     if (this.steerMode === 'buttons') {
       const leftPressed = this.activeHold.steerLeft.size > 0;
       const rightPressed = this.activeHold.steerRight.size > 0;
       const target = (rightPressed ? 1 : 0) - (leftPressed ? 1 : 0);
-      const step = 0.24 * this.steerSensitivity;
+      const step = 0.26 * this.steerSensitivity;
       if (target === 0) {
-        this.buttonSteerAxis *= 0.55;
+        this.buttonSteerAxis *= 0.52;
         if (Math.abs(this.buttonSteerAxis) < 0.04) this.buttonSteerAxis = 0;
       } else {
-        this.buttonSteerAxis = clamp(this.buttonSteerAxis + target * step, -1, 1);
+        // Instant zero-crossing snap when counter-steering / switching direction across S-bends!
+        if (this.buttonSteerAxis !== 0 && Math.sign(this.buttonSteerAxis) !== target) {
+          this.buttonSteerAxis = target * Math.min(0.32, step);
+        } else {
+          this.buttonSteerAxis = clamp(this.buttonSteerAxis + target * step, -1, 1);
+        }
       }
       steerAxis = this.buttonSteerAxis;
+    } else if (this.tiltEnabled) {
+      steerAxis = this.tiltSteerAxis;
     } else {
       const hasTouchSteer = this.steerTouchId !== null || this.steerMouseActive;
-      steerAxis = hasTouchSteer
-        ? this.touchSteerAxis
-        : this.tiltEnabled
-          ? this.tiltSteerAxis
-          : 0;
+      steerAxis = hasTouchSteer ? this.touchSteerAxis : 0;
     }
 
+    // Countdown: both GAS and NITRO rev engine (so holding NITRO flows straight into launch boost!)
+    // Racing: Auto-Gas stays on unless braking; Manual Gas stays engaged whenever NITRO is firing!
     const throttle = isCountdown
-      ? manualGas || nitro
+      ? manualGas || nitroHeld
       : this.autoThrottle
         ? !brake
-        : manualGas;
+        : manualGas || nitroActive;
 
     return {
       throttle,
@@ -690,40 +977,65 @@ export class TouchControls {
       left: false,
       right: false,
       drift,
-      nitro: isCountdown ? false : nitro,
+      nitro: nitroActive,
       steerAxis,
     };
   }
 
   public updateVisuals(telemetry: RacerHUDTelemetry | null, isCountdown: boolean): void {
     if (!this.enabled) return;
+    this.lastIsCountdown = isCountdown;
 
-    const showGas = isCountdown || !this.autoThrottle;
+    // In Auto-Gas mode, countdown revving is merged directly onto the NITRO button (zero thumb travel on GO!).
+    // Separate GAS pedal only appears when Manual Gas mode is active.
+    const showGas = !this.autoThrottle;
     this.gasBtn.classList.toggle('hidden', !showGas);
     const gasLabel = this.gasBtn.querySelector('.tbtn-main');
     if (gasLabel) {
       gasLabel.textContent = isCountdown ? t('touchRevMain') : t('touchGasMain');
     }
-    this.gasBtn.classList.toggle('rev-pulse', isCountdown);
+    this.gasBtn.classList.toggle('rev-pulse', isCountdown && showGas);
+
+    const nMain = this.nitroBtn.querySelector('.tbtn-main');
+    const nSub = this.nitroBtn.querySelector('.tbtn-sub');
+
+    if (isCountdown) {
+      this.nitroTapLatched = false;
+      this.nitroBtn.classList.remove('locked', 'ready', 'super', 'latched');
+      this.nitroBtn.classList.add('rev-pulse');
+      if (nMain) nMain.textContent = t('touchRevMain');
+      if (nSub) nSub.textContent = t('touchNitroRevSub');
+      return;
+    }
+
+    this.nitroBtn.classList.remove('rev-pulse');
+    if (nMain) nMain.textContent = t('touchNitroMain');
 
     if (!telemetry) return;
 
     const locked = telemetry.nitroLockedByDrift;
+    this.lastNitroLocked = locked;
+    if (locked || telemetry.nitro <= 1) {
+      this.nitroTapLatched = false;
+    }
+
     const isInfZone = !locked && telemetry.inHyperZone;
     const superReady = !locked && (isInfZone || telemetry.isSuperNitro || telemetry.nitro >= 82);
     const ready = !locked && telemetry.nitro >= 14;
     this.nitroBtn.classList.toggle('locked', locked);
-    this.nitroBtn.classList.toggle('ready', ready && !superReady);
+    this.nitroBtn.classList.toggle('latched', this.nitroTapLatched && !locked);
+    this.nitroBtn.classList.toggle('ready', ready && !superReady && !this.nitroTapLatched);
     this.nitroBtn.classList.toggle('super', superReady);
-    const nSub = this.nitroBtn.querySelector('.tbtn-sub');
     if (nSub) {
       nSub.textContent = locked
         ? t('touchNitroLocked')
-        : isInfZone
-          ? t('touchNitroInf')
-          : superReady
-            ? t('touchNitroSuper')
-            : `${Math.round(telemetry.nitro)}%`;
+        : this.nitroTapLatched
+          ? t('touchNitroLatched')
+          : isInfZone
+            ? t('touchNitroInf')
+            : superReady
+              ? t('touchNitroSuper')
+              : `${Math.round(telemetry.nitro)}%`;
     }
 
     this.driftBtn.classList.remove('tier-1', 'tier-2', 'tier-3');

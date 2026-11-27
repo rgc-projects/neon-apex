@@ -6,7 +6,7 @@ export interface CarSpec {
   id: string;
   name: string;
   subtitle: string;
-  archetype: 'BALANCED' | 'TOP SPEED' | 'DRIFT MASTER';
+  archetype: 'BALANCED' | 'TOP SPEED' | 'DRIFT MASTER' | 'S-HYPER' | 'EV HYPER';
   archetypeZh: string;
   description: string;
   // Colors
@@ -15,7 +15,9 @@ export interface CarSpec {
   neonColor: number;
   neonHex: string;
   primaryHex: string;
-  bodyStyle: 'interceptor' | 'phantom' | 'katana';
+  bodyStyle: 'interceptor' | 'phantom' | 'katana' | 'valkyrie' | 'eclipse';
+  /** Bundled Draco-compressed GLB filename inside public/models/ */
+  modelFile: string;
   // Gameplay Physics Parameters
   maxSpeed: number;        // m/s (1 m/s = 3.6 km/h, e.g. 96 m/s = 345 km/h base, 430+ with nitro)
   acceleration: number;    // m/s^2
@@ -168,6 +170,7 @@ export interface RacerStanding {
 }
 
 export interface RaceResults {
+  trackId: string;
   rank: number;
   totalRacers: number;
   totalTime: number;
@@ -177,4 +180,7 @@ export interface RaceResults {
   totalAirTime: number;
   styleScore: number;
   standings: RacerStanding[];
+  isNewBestLap?: boolean;
+  isNewBestRace?: boolean;
+  previousBestLap?: number | null;
 }

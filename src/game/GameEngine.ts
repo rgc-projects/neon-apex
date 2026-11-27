@@ -28,6 +28,7 @@ import { SettingsUI } from '../ui/SettingsUI';
 import { TouchControls } from '../ui/TouchControls';
 import { i18n, t } from '../i18n/i18n';
 import { nativeBridge } from '../platform/NativeBridge';
+import { recordsManager } from '../records/RecordsManager';
 import {
   drawDistanceToFar,
   GraphicsSettings,
@@ -61,6 +62,14 @@ export class GameEngine {
   private readonly pauseDriftNitroBtn = document.getElementById('btn-pause-drift-nitro')!;
   private readonly pauseOverdriveBtn = document.getElementById('btn-pause-overdrive')!;
   private readonly pauseHyperNitroBtn = document.getElementById('btn-pause-hyper-nitro')!;
+  private readonly bootSplashEl = document.getElementById('boot-splash');
+  private readonly webglLostEl = document.getElementById('webgl-lost-overlay');
+  private readonly webglReloadBtn = document.getElementById('btn-webgl-reload');
+
+  private contextLost = false;
+  private gpPrevPause = false;
+  private gpPrevCam = false;
+  private gpNotified = false;
 
   // FPS cap & telemetry monitor
   private lastRenderAt = performance.now();
@@ -142,8 +151,42 @@ export class GameEngine {
       antialias: true,
       powerPreference: 'high-performance',
     });
+    this.renderer.debug.checkShaderErrors = !import.meta.env.PROD;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = this.baseExposure;
+
+    // Production WebGL context loss & automatic GPU recovery
+    canvas.addEventListener(
+      'webglcontextlost',
+      (e) => {
+        e.preventDefault();
+        this.contextLost = true;
+        this.keys.clear();
+        this.touchControls?.resetAllInputs();
+        this.audio.suspend();
+        if (this.state === 'RACING') {
+          this.togglePause();
+        }
+        this.webglLostEl?.classList.remove('hidden');
+      },
+      false
+    );
+    canvas.addEventListener(
+      'webglcontextrestored',
+      () => {
+        this.contextLost = false;
+        this.webglLostEl?.classList.add('hidden');
+        this.scene.environment = createProceduralEnvMap(this.renderer);
+        this.applyGraphicsSettings(settingsManager.settings.graphics, true);
+        this.precompileScene();
+        this.lastTime = performance.now();
+        this.audio.resumeIfAllowed();
+      },
+      false
+    );
+    this.webglReloadBtn?.addEventListener('click', () => {
+      window.location.reload();
+    });
 
     this.cameraController = new CameraController(initW / Math.max(initH, 1));
 
@@ -162,8 +205,8 @@ export class GameEngine {
     this.scene.add(this.particles.group, this.skidMarks.mesh, this.showcaseGroup);
     this.buildShowcasePedestal();
 
-    // Begin decoding local supercar.glb immediately on startup
-    void supercarAssets.loadTemplate();
+    // Begin decoding all locally bundled vehicle GLBs offline on startup
+    supercarAssets.preloadAll(CAR_SPECS.map((c) => c.modelFile));
 
     this.speedLines = new SpeedLinesOverlay(speedCanvas);
 
@@ -310,6 +353,15 @@ export class GameEngine {
         this.audio.unlock();
         this.startRace();
       },
+      onNextTrack: () => {
+        this.audio.unlock();
+        const nextIdx = (this.selectedTrackIndex + 1) % TRACK_CONFIGS.length;
+        this.selectedTrackIndex = nextIdx;
+        this.selectedLaps = TRACK_CONFIGS[nextIdx].laps;
+        this.loadTrack(nextIdx);
+        this.menuUI.selectTrackExternal(nextIdx);
+        this.enterMenu();
+      },
       onBackToMenu: () => {
         this.audio.unlock();
         this.enterMenu();
@@ -369,12 +421,21 @@ export class GameEngine {
       this.enterMenu();
     });
 
-    // Native Android Back button & background auto-pause hooks
+    // Native Android Back button & Web/Native background auto-pause + audio suspend hooks
     nativeBridge.onBackButton(() => this.handleBackAction());
     nativeBridge.onAppBackground(() => {
-      this.touchControls.resetAllInputs();
-      if (this.state === 'RACING') {
-        this.togglePause();
+      this.handleVisibilityPause();
+    });
+    nativeBridge.onAppForeground(() => {
+      this.lastTime = performance.now();
+      this.audio.resumeIfAllowed();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.handleVisibilityPause();
+      } else {
+        this.lastTime = performance.now();
+        this.audio.resumeIfAllowed();
       }
     });
 
@@ -389,6 +450,15 @@ export class GameEngine {
     this.loadTrack(0);
     this.rebuildShowcaseCar();
     this.enterMenu();
+    this.precompileScene();
+
+    // Smoothly dismiss initial boot splash curtain after first frame setup
+    if (this.bootSplashEl) {
+      requestAnimationFrame(() => {
+        this.bootSplashEl?.classList.add('fade-out');
+        setTimeout(() => this.bootSplashEl?.remove(), 420);
+      });
+    }
 
     this.lastTime = performance.now();
     this.lastRenderAt = this.lastTime;
@@ -527,7 +597,26 @@ export class GameEngine {
     }
   }
 
+  private handleVisibilityPause(): void {
+    this.keys.clear();
+    this.touchControls.resetAllInputs();
+    this.audio.suspend();
+    if (this.state === 'RACING') {
+      this.togglePause();
+    }
+  }
+
+  private precompileScene(): void {
+    if (this.contextLost) return;
+    try {
+      this.renderer.compile(this.scene, this.cameraController.camera);
+    } catch {
+      // Ignore compile failures on restricted drivers
+    }
+  }
+
   private renderScene(): void {
+    if (this.contextLost) return;
     if (this.useDirectRender || !this.composer) {
       this.renderer.render(this.scene, this.cameraController.camera);
     } else {
@@ -738,6 +827,7 @@ export class GameEngine {
     this.hud.configureTrack(this.spline);
     this.hud.setHyperZonesVisible(this.enableHyperNitro);
     this.positionShowcaseOnTrack();
+    this.precompileScene();
   }
 
   private clearRacers(): void {
@@ -844,6 +934,7 @@ export class GameEngine {
     this.hud.setCameraLabel(this.cameraController.mode);
     this.cameraController.resetSnap();
     this.audio.setEngineActive(true, true);
+    this.precompileScene();
   }
 
   private syncPauseDriftNitroLabel(): void {
@@ -1030,18 +1121,66 @@ export class GameEngine {
 
   private pollPlayerInput(isCountdown = false): InputState {
     const touch = this.touchControls.getInput(isCountdown);
-    this.input.throttle = this.keys.has('KeyW') || this.keys.has('ArrowUp') || touch.throttle;
-    this.input.brake = this.keys.has('KeyS') || this.keys.has('ArrowDown') || touch.brake;
-    this.input.left = this.keys.has('KeyA') || this.keys.has('ArrowLeft') || touch.left;
-    this.input.right = this.keys.has('KeyD') || this.keys.has('ArrowRight') || touch.right;
-    this.input.drift = this.keys.has('Space') || touch.drift;
+    let gpThrottle = false;
+    let gpBrake = false;
+    let gpLeft = false;
+    let gpRight = false;
+    let gpDrift = false;
+    let gpNitro = false;
+    let gpSteer = 0;
+
+    // Standard HTML5 Gamepad API polling (Xbox / PlayStation / Bluetooth mobile controllers, zero GC)
+    const pads = navigator.getGamepads ? navigator.getGamepads() : null;
+    if (pads) {
+      for (let i = 0; i < pads.length; i++) {
+        const gp = pads[i];
+        if (!gp || !gp.connected) continue;
+        if (!this.gpNotified) {
+          this.gpNotified = true;
+          this.hud.pushCallout(t('msgGamepadConnected'), 'cyan');
+        }
+        const ax = gp.axes[0] ?? 0;
+        if (Math.abs(ax) > 0.14) {
+          gpSteer = clamp((Math.abs(ax) - 0.14) / 0.86, 0, 1) * Math.sign(ax);
+        }
+        gpLeft = gpSteer < -0.18 || !!gp.buttons[14]?.pressed;
+        gpRight = gpSteer > 0.18 || !!gp.buttons[15]?.pressed;
+        gpThrottle = (gp.buttons[7]?.value ?? 0) > 0.18 || !!gp.buttons[0]?.pressed;
+        gpBrake = (gp.buttons[6]?.value ?? 0) > 0.18 || !!gp.buttons[1]?.pressed;
+        gpDrift = !!gp.buttons[2]?.pressed || !!gp.buttons[4]?.pressed;
+        gpNitro = !!gp.buttons[5]?.pressed || !!gp.buttons[3]?.pressed;
+
+        const pausePressed = !!gp.buttons[9]?.pressed;
+        if (pausePressed && !this.gpPrevPause && (this.state === 'RACING' || this.state === 'PAUSED')) {
+          this.togglePause();
+        }
+        this.gpPrevPause = pausePressed;
+
+        const camPressed = !!gp.buttons[8]?.pressed;
+        if (camPressed && !this.gpPrevCam && (this.state === 'RACING' || this.state === 'COUNTDOWN')) {
+          const m = this.cameraController.toggleMode();
+          this.hud.setCameraLabel(m);
+          this.hud.pushCallout(m === 'HOOD' ? t('msgCamHood') : t('msgCamChase'), 'cyan');
+        }
+        this.gpPrevCam = camPressed;
+        break;
+      }
+    }
+
+    this.input.throttle = this.keys.has('KeyW') || this.keys.has('ArrowUp') || touch.throttle || gpThrottle;
+    this.input.brake = this.keys.has('KeyS') || this.keys.has('ArrowDown') || touch.brake || gpBrake;
+    this.input.left = this.keys.has('KeyA') || this.keys.has('ArrowLeft') || touch.left || gpLeft;
+    this.input.right = this.keys.has('KeyD') || this.keys.has('ArrowRight') || touch.right || gpRight;
+    this.input.drift = this.keys.has('Space') || touch.drift || gpDrift;
     this.input.nitro =
       this.keys.has('ShiftLeft') ||
       this.keys.has('ShiftRight') ||
       this.keys.has('KeyE') ||
       this.keys.has('KeyN') ||
-      touch.nitro;
-    this.input.steerAxis = touch.steerAxis ?? 0;
+      touch.nitro ||
+      gpNitro;
+    const touchAxis = touch.steerAxis ?? 0;
+    this.input.steerAxis = Math.abs(gpSteer) > Math.abs(touchAxis) ? gpSteer : touchAxis;
     return this.input;
   }
 
@@ -1287,7 +1426,8 @@ export class GameEngine {
         r.step(simDt, effectiveInput, this.spline, 1.0, this.state === 'RACING' ? playerEvents : undefined);
       } else {
         const ai = this.aiDrivers.get(r.id)!;
-        const { input, paceScale } = ai.computeInput(simDt, r, this.racers, player, this.spline);
+        const aiDiff = settingsManager.settings.controls.aiDifficulty ?? 'pro';
+        const { input, paceScale } = ai.computeInput(simDt, r, this.racers, player, this.spline, aiDiff);
         r.step(simDt, input, this.spline, paceScale);
       }
 
@@ -1454,16 +1594,30 @@ export class GameEngine {
       };
     });
 
+    const trackCfg = TRACK_CONFIGS[this.selectedTrackIndex];
+    const bestLap = p.bestLapTime ?? playerFinish / p.totalLaps;
+    const recordRes = recordsManager.submitResult(trackCfg.id, {
+      rank: p.rank,
+      totalTime: playerFinish,
+      bestLapTime: bestLap,
+      topSpeedKmh: p.topSpeedKmh,
+      laps: p.totalLaps,
+    });
+
     const results: RaceResults = {
+      trackId: trackCfg.id,
       rank: p.rank,
       totalRacers: this.racers.length,
       totalTime: playerFinish,
-      bestLapTime: p.bestLapTime ?? playerFinish / p.totalLaps,
+      bestLapTime: bestLap,
       topSpeedKmh: p.topSpeedKmh,
       longestDriftMeters: p.longestDriftMeters,
       totalAirTime: p.totalAirTime,
       styleScore: p.styleScore,
       standings,
+      isNewBestLap: recordRes.isNewBestLap,
+      isNewBestRace: recordRes.isNewBestRace,
+      previousBestLap: recordRes.previousBestLap,
     };
 
     this.resultsUI.show(results);

@@ -166,6 +166,7 @@ export class RacerPhysics {
   private readonly _upAxis = new THREE.Vector3(0, 1, 0);
   private readonly _rightAxis = new THREE.Vector3(1, 0, 0);
   private wallCooldown = 0;
+  private padHitDuringDrift = false;
 
   constructor(opts: {
     id: string;
@@ -248,6 +249,7 @@ export class RacerPhysics {
     this.styleScore = 0;
     this.isWrongWay = false;
     this.upcomingCorner = null;
+    this.padHitDuringDrift = false;
 
     this.syncWorldTransform(spline, 0.016, false);
   }
@@ -277,6 +279,7 @@ export class RacerPhysics {
     this.isAirborne = false;
     this.currentAirTime = 0;
     this.isWrongWay = false;
+    this.padHitDuringDrift = false;
     this.syncWorldTransform(spline, 0.016, false);
   }
 
@@ -370,6 +373,7 @@ export class RacerPhysics {
           this.driftCharge = 0;
           this.driftTier = 0;
           this.exitStraightenTimer = 0;
+          this.padHitDuringDrift = false;
           if (brakeTapInitiates && !input.drift) {
             this.brakeDriftLatch = true;
           }
@@ -438,6 +442,12 @@ export class RacerPhysics {
         const totalPts = points[tier] + distPoints;
         this.styleScore += totalPts;
         events?.onDriftBoost?.(tier, this.driftDistance, totalPts);
+      }
+      if (this.padHitDuringDrift) {
+        // Carry stored corner boost-pad energy into a crisp exit slingshot as the car straightens!
+        this.boostPadTimer = Math.max(this.boostPadTimer, 0.85);
+        this.speed = Math.max(this.speed, Math.min(this.spec.maxSpeed * paceScale + 34, this.speed + 6.5));
+        this.padHitDuringDrift = false;
       }
       this.isDrifting = false;
       this.brakeDriftLatch = false;
@@ -583,7 +593,8 @@ export class RacerPhysics {
       this.isSuperNitro = false;
       this.miniBoostTimer = 0;
       this.miniBoostPower = 0;
-      this.boostPadTimer = 0;
+      // NOTE: Do NOT wipe boostPadTimer here — track boost pads are external road features
+      // that reward nailing the apex line even when manual Drift-Nitro is turned OFF!
       this.straightOverdriveTimer = 0;
       this.overdriveStage = 0;
       this.momentumFloor = 0;
@@ -674,7 +685,11 @@ export class RacerPhysics {
     if (this.isDrifting) {
       const flatCornerCap = lerp(baseMax * 0.92, baseMax * 0.62, cornerSharpness);
       const bankedCornerCap = lerp(baseMax * 0.97, baseMax * 0.87, cornerSharpness);
-      const nitroAllowance = this.isNitroActive ? boostMaxAdd * 0.58 : boostMaxAdd * 0.3;
+      const nitroAllowance = this.isNitroActive
+        ? boostMaxAdd * 0.58
+        : this.boostPadTimer > 0
+          ? boostMaxAdd * 0.52
+          : boostMaxAdd * 0.3;
       const driftCap = lerp(flatCornerCap, bankedCornerCap, clamp(bankNorm, 0, 1)) + nitroAllowance;
       effectiveMaxSpeed = Math.min(effectiveMaxSpeed, driftCap);
     }
@@ -894,7 +909,10 @@ export class RacerPhysics {
       }
     }
 
-    // 10. Boost Pad Detection (still awards nitro + score, and skips flame burst if currently locked in drift!)
+    // 10. Boost Pad Detection
+    // Even with manual Drift-Nitro OFF, nailing a corner boost pad mid-drift grants:
+    // (a) controllable apex-safe speed boost, (b) fast drift-charge & +22% nitro surge,
+    // and (c) stored exit slingshot carryover the moment the car straightens out of the bend!
     if (!this.isAirborne && this.boostPadCooldown <= 0) {
       const pad = spline.getBoostPadAt(this.s, this.d);
       if (pad) {
@@ -903,9 +921,19 @@ export class RacerPhysics {
           this.boostPadTimer = 1.15;
           // Boost pads must NEVER slow down a car already running in Overdrive II / Hyper Zone!
           this.speed = Math.max(this.speed, Math.min(baseMax + 46, Math.max(this.speed + 10, baseMax + 22)));
+          this.nitro = Math.min(100, this.nitro + 14);
+          this.styleScore += 120;
+        } else {
+          this.boostPadTimer = 1.05;
+          this.speed = Math.max(this.speed, Math.min(baseMax * 1.04, this.speed + 8.5));
+          this.driftCharge += 0.68;
+          if (this.driftCharge >= 2.35) this.driftTier = 3;
+          else if (this.driftCharge >= 1.28) this.driftTier = 2;
+          else if (this.driftCharge >= 0.42) this.driftTier = 1;
+          this.nitro = Math.min(100, this.nitro + 22);
+          this.styleScore += 180;
+          this.padHitDuringDrift = true;
         }
-        this.nitro = Math.min(100, this.nitro + 14);
-        this.styleScore += 120;
         events?.onBoostPad?.();
       }
     }

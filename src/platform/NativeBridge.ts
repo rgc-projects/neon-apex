@@ -12,6 +12,7 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 class NativeBridgeImpl {
   private backHandlers: (() => boolean)[] = [];
   private pauseHandlers: (() => void)[] = [];
+  private resumeHandlers: (() => void)[] = [];
   private initialized = false;
 
   public get isNative(): boolean {
@@ -61,8 +62,9 @@ class NativeBridgeImpl {
       if (!state.isActive) {
         for (const cb of this.pauseHandlers) cb();
       } else {
-        // Re-assert immersive status bar hide on resume
+        // Re-assert immersive status bar hide on resume & notify foreground listeners
         void StatusBar.hide().catch(() => {});
+        for (const cb of this.resumeHandlers) cb();
       }
     }).catch(() => {});
   }
@@ -80,6 +82,14 @@ class NativeBridgeImpl {
     return () => {
       const idx = this.pauseHandlers.indexOf(handler);
       if (idx >= 0) this.pauseHandlers.splice(idx, 1);
+    };
+  }
+
+  public onAppForeground(handler: () => void): () => void {
+    this.resumeHandlers.push(handler);
+    return () => {
+      const idx = this.resumeHandlers.indexOf(handler);
+      if (idx >= 0) this.resumeHandlers.splice(idx, 1);
     };
   }
 

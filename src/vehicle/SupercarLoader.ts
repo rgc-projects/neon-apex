@@ -3,52 +3,81 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 /**
- * Loads the locally bundled open-source supercar mesh (Ferrari 458 Italia by vicent091036, CC BY 4.0)
- * using local Draco WASM decoders in /draco/ (zero external runtime network requests).
+ * Multi-GLB offline vehicle asset manager.
+ * Loads locally bundled Draco-compressed supercar meshes from public/models/
+ * using local Draco WASM decoders in public/draco/ (zero external runtime network requests).
  */
 class SupercarAssetManager {
-  private templatePromise: Promise<THREE.Group> | null = null;
-  private cachedTemplate: THREE.Group | null = null;
+  private readonly templatePromises = new Map<string, Promise<THREE.Group>>();
+  private readonly cachedTemplates = new Map<string, THREE.Group>();
+  private dracoLoader: DRACOLoader | null = null;
+  private gltfLoader: GLTFLoader | null = null;
 
-  public loadTemplate(): Promise<THREE.Group> {
-    if (this.cachedTemplate) {
-      return Promise.resolve(this.cachedTemplate);
-    }
-    if (this.templatePromise) {
-      return this.templatePromise;
-    }
-
-    this.templatePromise = new Promise((resolve, reject) => {
+  private ensureLoaders(): GLTFLoader {
+    if (!this.gltfLoader) {
       const base = import.meta.env.BASE_URL || './';
-      const dracoLoader = new DRACOLoader();
-      dracoLoader.setDecoderPath(`${base}draco/`);
+      this.dracoLoader = new DRACOLoader();
+      this.dracoLoader.setDecoderPath(`${base}draco/`);
+      this.gltfLoader = new GLTFLoader();
+      this.gltfLoader.setDRACOLoader(this.dracoLoader);
+    }
+    return this.gltfLoader;
+  }
 
-      const gltfLoader = new GLTFLoader();
-      gltfLoader.setDRACOLoader(dracoLoader);
+  public loadModel(modelFile = 'supercar.glb'): Promise<THREE.Group> {
+    const cached = this.cachedTemplates.get(modelFile);
+    if (cached) {
+      return Promise.resolve(cached);
+    }
+    const pending = this.templatePromises.get(modelFile);
+    if (pending) {
+      return pending;
+    }
 
-      gltfLoader.load(
-        `${base}models/supercar.glb`,
+    const base = import.meta.env.BASE_URL || './';
+    const loader = this.ensureLoaders();
+
+    const promise = new Promise<THREE.Group>((resolve, reject) => {
+      loader.load(
+        `${base}models/${modelFile}`,
         (gltf) => {
           const root = gltf.scene;
           root.updateMatrixWorld(true);
-          this.cachedTemplate = root;
-          dracoLoader.dispose();
+          this.cachedTemplates.set(modelFile, root);
           resolve(root);
         },
         undefined,
         (err) => {
-          dracoLoader.dispose();
-          this.templatePromise = null;
+          this.templatePromises.delete(modelFile);
           reject(err);
         }
       );
     });
 
-    return this.templatePromise;
+    this.templatePromises.set(modelFile, promise);
+    return promise;
   }
 
-  public getCachedSync(): THREE.Group | null {
-    return this.cachedTemplate;
+  public getCachedSync(modelFile = 'supercar.glb'): THREE.Group | null {
+    return this.cachedTemplates.get(modelFile) ?? null;
+  }
+
+  /**
+   * Warm-loads all distinct vehicle models offline in order so garage switching
+   * and AI race grids render immediately without fallback flashes.
+   */
+  public preloadAll(modelFiles: string[]): void {
+    const unique = Array.from(new Set(modelFiles));
+    if (unique.length === 0) return;
+    // Load the primary showcase car immediately, then stagger the remaining fleet
+    const [first, ...rest] = unique;
+    void this.loadModel(first).finally(() => {
+      for (const file of rest) {
+        void this.loadModel(file).catch(() => {
+          // Individual fallback handled per CarModel instance
+        });
+      }
+    });
   }
 }
 

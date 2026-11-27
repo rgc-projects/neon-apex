@@ -1,8 +1,8 @@
 # NEON APEX — 项目交接与运维手册（Project Handoff）
 
 > **交接日期**：2026-11-27  
-> **当前生产版本**：`v2.0.1`（Android `versionCode = 3` / `versionName = "2.0.1"`）  
-> **主分支**：`main`（本地已完成全局 PBR 光照校准与实时「画面亮度」功能提交）
+> **当前生产版本**：`v2.1.0`（Android `versionCode = 4` / `versionName = "2.1.0"`）  
+> **主分支**：`main`（已完成 v2.1.0 正式上线打磨包）
 
 ---
 
@@ -15,7 +15,7 @@
 | **Android 包名** | `top.gcrdev.neonapex`（Capacitor 7，`minSdk = 23`，`compileSdk / targetSdk = 35`） |
 | **本地最新安装包** | `releases/NEON-APEX-v2.0.0-android.apk`（`5.0 MB`，gitignored，由 CI Run `#45813287500` 下载并已实机验收） |
 | **Git 分支状态** | `main` 与 `origin/main` 同步（`feat/mobile-android-i18n` 已快进合并回 `main`） |
-| **核心规模** | 34 个 TypeScript/CSS 源码文件、10 条 3D 赛道（3.4 km – 60.7 km）、3 台 GT 超跑、5 名 AI 对手、100% 离线资产 |
+| **核心规模** | 35 个 TypeScript/CSS 源码文件、10 条 3D 赛道（3.4 km – 60.7 km）、5 台 GT/S 级超跑、5 名公平 AI 对手、100% 离线资产 |
 
 ---
 
@@ -35,6 +35,10 @@
 6. **全图光照与 PBR 可读性精调 + 实时「画面亮度」校准（`2026-11-27`）**
    - 在保留 `ACESFilmicToneMapping` 高对比夜景/日落氛围的前提下，逐图实景截屏校准全部 10 条赛道的柏油反照率（`#212835`–`#282c36`）、9 套主题阴影面半球补光与基准曝光（`1.19–1.27`）；抬高 `dirRimLight` 仰角并优化东京湾水面粗糙度消除左侧低角度高光发白；柔化玩家头灯光束边缘并微调松林/混凝土暗部材质；在 `⚙ 设置 → 🎨 画质` 新增独立于画质预设的中英双语 **`画面亮度 / Scene Brightness`（`80%–140%`）** 实时滑块。
    - 完成 Android 16 真机（`23113RKC6C` / `vermeer`，`1440×3200`）USB 实装验证（冷启动 `588 ms`）。
+7. **v2.1.0 正式上线打磨包（`2026-11-27`）**
+   - **P0 稳定性、门面与发布规范**：接入 `webglcontextlost / webglcontextrestored` 自动恢复与重载提示、`document.visibilitychange` + Native 前后台切换自动暂停与 `AudioContext.suspend()/resume()`、生产环境 `checkShaderErrors = false` 与 `renderer.compile()` 着色器预编译、首屏启动过渡遮罩；补齐 `favicon.svg`、`icon-192.png`、`icon-512.png`、PWA `manifest.json` 完整图标与 OpenGraph/Twitter 分享标签；统一三端版本至 `2.1.0`（`versionCode 4`），升级 GitHub Actions 至 `v5` 并支持可选正式 Keystore Secrets 签名与 `.apk + .aab` 双产物编译；修复 `390×844` 竖屏顶栏与 2×2 设置标签及 `915×412` 横屏 FPS 浮窗与标题排版。
+   - **P1 留存、操控与公平平衡增强**：新增 `RecordsManager` 持久化全部 10 条赛道的个人最快圈速、最佳完赛时间与金/银/铜奖杯（赛道卡片/图库/展示徽章同步显示，破纪录触发 `★ NEW BEST LAP` 徽章）；新增 3 档 AI 对手难度（休闲 / 标准 / 车神，支持主菜单与设置页双向直选）并彻底重构 AI 防弹射追赶、领跑控速与跨车级公平对齐逻辑；新增 2 台 S 级旗舰超跑 **`VALKYRIE-GT`** 与 **`ECLIPSE-EVO`**（车库升级为 5 车自适应滚动列表）；结算页新增「下一条赛道」自动切换至下张图赛前车库预览；新增零 GC 开销的 HTML5 Gamepad API 手柄支持。
+   - **一车一模 · 5 款离线 Draco 实车 `.glb` 车队升级**：升级 `SupercarLoader` 为多模型缓存 + 后台预加载架构，在 `CarModel.ts` 构建脱离世界变换的纯局部空间边界框贴地居中与 `Object3D.attach()` 车轴中心化转向/滚动车轮装配管线；为 5 台车分别装配 5 款高精开源 Draco 压缩实车模型（总计约 `5.5 MB`，100% 离线）：`APEX-V12`（Ferrari 458 Spider）、`PHANTOM-X`（McLaren P1 GTR）、`KATANA-RS`（BMW M4 Competition，CC BY 4.0，四轮象限独立切分）、`VALKYRIE-GT`（Lamborghini Aventador）、`ECLIPSE-EVO`（Khronos Concept EV + 前轮初始转向角归零 + 电驱青蓝等离子氮气尾焰）。
 
 ---
 
@@ -84,8 +88,7 @@
 
 | 优先级 | 项目 | 说明与落地方式 |
 | :---: | :--- | :--- |
-| **P1** | **正式固定 Release 签名（Keystore）** | 当前 CI 使用临时 `debug.keystore` 签名，真机跨次覆盖安装新版 APK 时需先卸载旧版；建议生成固定 `.jks` 存入 GitHub Secrets（`ANDROID_KEYSTORE_BASE64` 等），并在 `android/app/build.gradle` 配置正式 `signingConfigs.release`，即可支持无缝覆盖升级与上架应用商店。 |
-| **P1** | **升级 GitHub Actions 节点版本** | `.github/workflows/build-android.yml` 中 `actions/setup-java@v4` 等已收到 Node 24 弃用提示，后续升级至 `actions/checkout@v5`、`actions/setup-java@v5`、`actions/setup-node@v5` 与最新 `gradle/actions/setup-gradle` 即可消除告警。 |
-| **P2** | **移动端 3D LOD 与真机深度调优** | 当前在 Android 16 模拟器已提速 +35%~45%；后续可针对中低端安卓真机进一步做远景树木/建筑分档实例数缩放（Low 档减半）、动态关闭非关键 AI 车尾焰粒子，以及在发车加载期增加预编译提示避免首帧掉帧。 |
-| **P2** | **新增可游玩玩法扩展** | 计时幽灵车（Ghost Replay，持久化最佳圈速轨迹）、本地单圈排行榜、自定义车漆涂装编辑器、蓝牙手柄（Gamepad API）支持，以及 iOS Capacitor 打包支持（需 macOS / Xcode）。 |
+| **P1** | **正式固定 Release 签名（Keystore）** | `android/app/build.gradle` 与 `.github/workflows/build-android.yml` 已支持读取 GitHub Secrets（`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`）并同时产出 `.apk` 与 `.aab`；上线前只需生成固定 `.jks` 并填入仓库 Secrets 即可自动切换正式签名（未配置时安全回退 debug 签名）。 |
+| **P2** | **移动端 3D LOD 与真机深度调优** | 当前在 Android 16 模拟器已提速 +35%~45%，并已接入着色器预编译；后续可针对中低端安卓真机进一步做远景树木/建筑分档实例数缩放（Low 档减半）与动态关闭非关键 AI 车尾焰粒子。 |
+| **P2** | **新增可游玩玩法扩展** | 计时幽灵车（Ghost Replay，持久化最佳圈速轨迹）、Cloudflare Workers + D1 全服排行榜、自定义车漆涂装编辑器，以及 iOS Capacitor 打包支持（需 macOS / Xcode）。 |
 | **P3** | **清理已合并的旧功能分支** | `feat/mobile-android-i18n` 已快进合并至 `main`，确认无需回溯后可按需删除本地与远端该分支。 |

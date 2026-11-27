@@ -88,7 +88,7 @@ const ZH = {
   keyNitro: '<kbd>SHIFT</kbd> / <kbd>E</kbd> 氮气喷射',
   keyCam: '<kbd>C</kbd> 视角',
   keyReset: '<kbd>R</kbd> 复位',
-  creditNote: '3D 车型：Ferrari 458 (vicent091036, CC BY 4.0) + GT3 碳纤套件',
+  creditNote: '3D 车队：5 款开源实车（458 / P1 GTR / M4 / Aventador / Khronos EV）',
 
   // Catalog Modal
   catalogTitle: '全球赛道图库',
@@ -169,6 +169,11 @@ const ZH = {
   steerJoystick: '浮动摇杆',
   steerButtons: '左右按键',
   steerTilt: '重力感应',
+  optAiDifficulty: 'AI 对手难度',
+  aiDiffLabel: '🤖 难度',
+  aiRookie: '休闲',
+  aiPro: '标准',
+  aiApex: '车神',
   optAutoThrottle: '手机自动油门',
   optAutoThrottleDesc: '开启后自动持续加速，专注转向、漂移与氮气释放',
   optSteerSens: '触屏转向灵敏度',
@@ -211,7 +216,7 @@ const ZH = {
   hudTiltOff: '重力',
   hudCamChase: '追尾',
   hudCamHood: '车头',
-  hudStartRpmHint: '按住 <kbd>W</kbd> 或 <kbd>油门</kbd> 在绿区触发「完美起步」',
+  hudStartRpmHint: '按住 <kbd>W</kbd> / <kbd>油门</kbd> 或 <kbd>氮气</kbd> 在绿区触发「完美起步」',
   hudWrongWay: '⚠ 逆行警告（按 R 复位）',
   hudSlipstream: '⚡ 尾流加速',
   hudKeyDrift: '<kbd>SPACE</kbd> / <kbd>点刹S</kbd> 漂移',
@@ -246,9 +251,12 @@ const ZH = {
   touchDriftMain: '漂移',
   touchDriftSub: '按住甩尾',
   touchNitroMain: '氮气',
+  touchNitroRevSub: '按住起喷',
+  touchNitroLatched: '锁喷中',
   touchNitroLocked: '漂移禁用',
   touchNitroInf: '∞ 满氮!',
   touchNitroSuper: '超喷!',
+  touchTiltDrift: '按住漂移',
   touchBrakeMain: '刹车',
   touchBrakeSub: '点刹',
   touchGasMain: '油门',
@@ -293,7 +301,14 @@ const ZH = {
   msgHyperNitroOff: '🔒 长道满氮：已关闭',
   msgSettingsReset: '已恢复默认设置',
   msgAutoQuality: '已匹配「{preset}」画质',
+  msgGamepadConnected: '🎮 已接入游戏手柄',
   countdownGo: '出发!',
+  bootLoading: '正在初始化 3D 赛道与引擎...',
+  webglLostTitle: '图形上下文已暂停',
+  webglLostDesc: '系统临时回收了 WebGL 显存，正在尝试自动恢复；如长时间未恢复请点击下方重载画面。',
+  webglLostReload: '重新加载画面',
+  pbBestLap: '最快 {time}',
+  pbTrophyCount: '🏆 {gold}/{total}',
 
   // Pause Modal
   pauseTitle: '比赛已暂停',
@@ -323,7 +338,10 @@ const ZH = {
   resRacing: '完赛中...',
   resYou: ' (你)',
   resPlayerName: '车手',
+  resNewRecord: '★ 刷新赛道个人纪录！',
+  resNewBestLap: '★ 刷新最快单圈纪录！',
   btnRaceAgain: '再来一局',
+  btnNextCircuit: '下一条赛道',
   btnBackMenu: '返回车库',
 
   // Difficulty Badges
@@ -419,7 +437,7 @@ const EN: Record<I18nKey, string> = {
   keyNitro: '<kbd>SHIFT</kbd> / <kbd>E</kbd> Nitro',
   keyCam: '<kbd>C</kbd> Camera',
   keyReset: '<kbd>R</kbd> Reset',
-  creditNote: '3D Car: Ferrari 458 (vicent091036, CC BY 4.0) + GT3 Carbon Aero',
+  creditNote: '3D Fleet: 5 Open-Source Cars (458 / P1 GTR / M4 / Aventador / Khronos EV)',
 
   // Catalog Modal
   catalogTitle: 'CIRCUIT CATALOG',
@@ -500,6 +518,11 @@ const EN: Record<I18nKey, string> = {
   steerJoystick: 'JOYSTICK',
   steerButtons: 'BUTTONS',
   steerTilt: 'TILT GYRO',
+  optAiDifficulty: 'AI Rival Difficulty',
+  aiDiffLabel: '🤖 AI',
+  aiRookie: 'ROOKIE',
+  aiPro: 'PRO',
+  aiApex: 'APEX',
   optAutoThrottle: 'Mobile Auto-Accelerate',
   optAutoThrottleDesc: 'Automatically holds full gas so you focus on steering, drifting & nitro',
   optSteerSens: 'Touch Steering Sensitivity',
@@ -542,7 +565,7 @@ const EN: Record<I18nKey, string> = {
   hudTiltOff: 'TILT',
   hudCamChase: 'CHASE',
   hudCamHood: 'HOOD',
-  hudStartRpmHint: 'HOLD <kbd>W</kbd> OR <kbd>REV</kbd> IN GREEN ZONE FOR PERFECT START',
+  hudStartRpmHint: 'HOLD <kbd>W</kbd>, <kbd>GAS</kbd> OR <kbd>NITRO</kbd> IN GREEN ZONE FOR PERFECT START',
   hudWrongWay: '⚠ WRONG WAY (PRESS R TO RESET)',
   hudSlipstream: '⚡ SLIPSTREAM BOOST',
   hudKeyDrift: '<kbd>SPACE</kbd> / <kbd>Tap S</kbd> Drift',
@@ -577,9 +600,12 @@ const EN: Record<I18nKey, string> = {
   touchDriftMain: 'DRIFT',
   touchDriftSub: 'HOLD',
   touchNitroMain: 'NITRO',
+  touchNitroRevSub: 'HOLD→GO',
+  touchNitroLatched: 'AUTO ON',
   touchNitroLocked: 'LOCKED',
   touchNitroInf: '∞ MAX!',
   touchNitroSuper: 'SUPER!',
+  touchTiltDrift: 'HOLD DRIFT',
   touchBrakeMain: 'BRAKE',
   touchBrakeSub: 'TAP',
   touchGasMain: 'GAS',
@@ -624,7 +650,14 @@ const EN: Record<I18nKey, string> = {
   msgHyperNitroOff: '🔒 HYPER STRAIGHT NITRO: OFF',
   msgSettingsReset: 'Settings Reset to Defaults',
   msgAutoQuality: 'Auto Quality: {preset}',
+  msgGamepadConnected: '🎮 GAMEPAD CONNECTED',
   countdownGo: 'GO!',
+  bootLoading: 'INITIALIZING 3D CIRCUIT & ENGINE...',
+  webglLostTitle: 'GRAPHICS CONTEXT PAUSED',
+  webglLostDesc: 'WebGL memory was paused by the system. Attempting automatic recovery — or tap below to reload.',
+  webglLostReload: 'RELOAD GAME',
+  pbBestLap: 'PB {time}',
+  pbTrophyCount: '🏆 {gold}/{total}',
 
   // Pause Modal
   pauseTitle: 'RACE PAUSED',
@@ -654,7 +687,10 @@ const EN: Record<I18nKey, string> = {
   resRacing: 'RACING...',
   resYou: ' (YOU)',
   resPlayerName: 'PLAYER',
+  resNewRecord: '★ NEW PERSONAL BEST!',
+  resNewBestLap: '★ NEW BEST LAP RECORD!',
   btnRaceAgain: 'RACE AGAIN',
+  btnNextCircuit: 'NEXT CIRCUIT',
   btnBackMenu: 'GARAGE & TRACKS',
 
   // Difficulty Badges
@@ -677,12 +713,22 @@ const CAR_EN_DESC: Record<string, { subtitle: string; desc: string }> = {
     subtitle: 'TOUGE DRIFT GT · DRIFT MASTER',
     desc: 'Lightweight mountain drift weapon with massive swan-neck wing, snap rotation and rapid nitro charge.',
   },
+  'valkyrie-gt': {
+    subtitle: 'APEX S-CLASS · HYPER SPEC',
+    desc: 'Flagship S-Class hypercar engineered for Apex rivals and 60 km endurance runs—uniting blistering top speed with razor-sharp aero stability.',
+  },
+  'eclipse-evo': {
+    subtitle: 'CYBER EV HYPER · INSTANT TORQUE',
+    desc: 'Quad-motor electric hypercar with maximum corner-exit acceleration and lightning drift-to-nitro charge for tight hairpins.',
+  },
 };
 
 const CAR_ZH_SUB: Record<string, string> = {
   'apex-v12': 'GT3 赛道版 · 全能均衡',
   'phantom-x': '勒芒耐力版 · 极速猛兽',
   'drift-k': '山道漂移版 · 甩尾大师',
+  'valkyrie-gt': 'S级旗舰超跑 · 全能统治',
+  'eclipse-evo': 'S级四驱电兽 · 瞬时爆发',
 };
 
 const TRACK_EN_DESC: Record<string, { title: string; sub: string; desc: string }> = {

@@ -1,4 +1,5 @@
 import { AIRacerProfile } from '../config/cars';
+import { AIDifficulty } from '../settings/SettingsManager';
 import { InputState } from '../types';
 import { TrackSpline } from '../track/TrackSpline';
 import { clamp, signedTrackDelta } from '../utils/math';
@@ -20,7 +21,8 @@ export class AIDriver {
     self: RacerPhysics,
     allRacers: RacerPhysics[],
     player: RacerPhysics,
-    spline: TrackSpline
+    spline: TrackSpline,
+    difficulty: AIDifficulty = 'pro'
   ): { input: InputState; paceScale: number } {
     this.laneOffsetTimer -= dt;
     this.nitroCooldown = Math.max(0, this.nitroCooldown - dt);
@@ -95,35 +97,71 @@ export class AIDriver {
     // With corner-flow drift physics, AI smoothly glides through hairpins without harsh braking
     const needsEntryBrake = false;
 
-    // 6. Smart Nitro deployment on straightaways, Hyper Straight Infinite Zones, or chasing player
+    // 6. Fair Nitro deployment: never spam nitro to run away once comfortably ahead of the player!
     const straightAhead = Math.abs(fNear.curvature) < 0.004 && Math.abs(fMid.curvature) < 0.004 && Math.abs(fFar.curvature) < 0.0045;
     const progressGap = self.totalProgress - player.totalProgress;
     let nitro = false;
-    if (self.inHyperZone && straightAhead && self.speed > 55 && (progressGap < 120 || this.profile.aggression > 0.65)) {
+    const maxLeadForNitro = difficulty === 'rookie' ? 22 : difficulty === 'apex' ? 85 : 48;
+    const nitroThreshold =
+      difficulty === 'rookie'
+        ? 86
+        : difficulty === 'apex'
+          ? (this.profile.aggression > 0.65 ? 48 : 66)
+          : (this.profile.aggression > 0.7 ? 58 : 78);
+
+    if (
+      self.inHyperZone &&
+      straightAhead &&
+      self.speed > 55 &&
+      progressGap < maxLeadForNitro + 35 &&
+      (difficulty !== 'rookie' || progressGap < 20)
+    ) {
       nitro = true;
-    } else if (self.isNitroActive && self.nitro > 14 && straightAhead) {
+    } else if (self.isNitroActive && self.nitro > 16 && straightAhead && progressGap < maxLeadForNitro + 20) {
       nitro = true;
     } else if (
       this.nitroCooldown <= 0 &&
       straightAhead &&
       self.speed > 52 &&
-      self.nitro >= (this.profile.aggression > 0.7 ? 52 : 76)
+      progressGap < maxLeadForNitro &&
+      self.nitro >= nitroThreshold
     ) {
       nitro = true;
-      this.nitroCooldown = 4.2 + Math.random() * 3.2;
+      const cdBase = difficulty === 'rookie' ? 6.8 : difficulty === 'apex' ? 3.6 : 4.8;
+      this.nitroCooldown = cdBase + Math.random() * 3.0;
     }
 
-    // 7. Gentle, Fun Rubber-Banding so races stay intense without ever feeling unfair!
+    // 7. Fair, Anti-Slingshot Rubber-Banding:
+    //    - Catch-up ONLY engages far behind (-105m+) and tapers to ZERO before reaching the player (no unfair slingshot!)
+    //    - Once ahead (+28m+ in Pro, +50m+ in Apex), AI eases smoothly so the player can always fight back cleanly!
     let rubberBand = 0;
     if (!player.finished) {
-      if (progressGap > 65) {
-        rubberBand = -clamp((progressGap - 65) / 280, 0, 0.085);
-      } else if (progressGap < -65) {
-        rubberBand = clamp((-progressGap - 65) / 260, 0, 0.095);
+      const leadStart = difficulty === 'rookie' ? 18 : difficulty === 'apex' ? 50 : 28;
+      const leadSpan = difficulty === 'rookie' ? 140 : difficulty === 'apex' ? 220 : 170;
+      const slowCap = difficulty === 'rookie' ? 0.13 : difficulty === 'apex' ? 0.065 : 0.095;
+      const catchStart = 105; // Zero catch-up within 105m behind player -> prevents slingshot overtakes!
+      const catchCap = difficulty === 'rookie' ? 0.025 : difficulty === 'apex' ? 0.06 : 0.045;
+
+      if (progressGap > leadStart) {
+        rubberBand = -clamp((progressGap - leadStart) / leadSpan, 0, slowCap);
+      } else if (progressGap < -catchStart) {
+        rubberBand = clamp((-progressGap - catchStart) / 240, 0, catchCap);
       }
     }
 
-    const paceScale = clamp(this.profile.skill + rubberBand, 0.85, 1.08);
+    const diffBias = difficulty === 'rookie' ? -0.07 : difficulty === 'apex' ? 0.025 : 0;
+    const minPace = difficulty === 'rookie' ? 0.76 : difficulty === 'apex' ? 0.91 : 0.84;
+    const maxPace = difficulty === 'rookie' ? 0.94 : difficulty === 'apex' ? 1.055 : 1.02;
+    let paceScale = clamp(this.profile.skill + diffBias + rubberBand, minPace, maxPace);
+
+    // 8. Player Car-Class Fairness Guard: prevent faster-chassis AI (e.g. VEX-01 in PHANTOM-X) from unfairly
+    //    out-dragging a player in a drift/balanced car once close or ahead!
+    if (self.spec.maxSpeed > player.spec.maxSpeed && progressGap > -25) {
+      const classRatio = player.spec.maxSpeed / self.spec.maxSpeed;
+      const maxFairSpeedRatio =
+        difficulty === 'rookie' ? classRatio * 0.96 : difficulty === 'apex' ? Math.min(1.045, classRatio * 1.045) : Math.min(1.01, classRatio * 1.015);
+      paceScale = Math.min(paceScale, Math.max(minPace, maxFairSpeedRatio));
+    }
 
     return {
       input: {
