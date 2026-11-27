@@ -59,6 +59,10 @@ export class MenuUI {
   private readonly overdriveStateEl = document.getElementById('overdrive-state')!;
   private readonly hyperNitroBtn = document.getElementById('btn-menu-hyper-nitro')!;
   private readonly hyperNitroStateEl = document.getElementById('hyper-nitro-state')!;
+  private readonly modsTriggerBtn = document.getElementById('btn-menu-mods');
+  private readonly modsPopover = document.getElementById('race-mods-popover');
+  private readonly modsCloseBtn = document.getElementById('btn-close-mods');
+  private readonly modsCountEl = document.getElementById('mods-active-count');
   private readonly controlsBtn = document.getElementById('btn-menu-controls')!;
   private readonly controlsModal = document.getElementById('controls-modal')!;
   private readonly closeControlsBtn = document.getElementById('btn-close-controls')!;
@@ -106,6 +110,11 @@ export class MenuUI {
   private catalogQuery = '';
   private readonly favorites = new Set<string>();
   private readonly trackMetas: TrackMeta[] = [];
+  private carCardButtons: HTMLButtonElement[] = [];
+  private specDescEl: HTMLParagraphElement | null = null;
+  private specStatFills: HTMLElement[] = [];
+  private specStatVals: HTMLElement[] = [];
+  private specStatLabels: HTMLElement[] = [];
 
   private currentMuted = false;
   private currentTouch = false;
@@ -225,7 +234,23 @@ export class MenuUI {
       const on = this.callbacks.onToggleHyperNitro();
       this.setHyperNitroEnabled(on);
     });
+    this.modsTriggerBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleModsPopover();
+    });
+    this.modsCloseBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.setModsPopoverOpen(false);
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (!this.modsPopover || this.modsPopover.classList.contains('hidden')) return;
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (this.modsPopover.contains(target) || this.modsTriggerBtn?.contains(target)) return;
+      this.setModsPopoverOpen(false);
+    });
     this.controlsBtn.addEventListener('click', () => {
+      this.setModsPopoverOpen(false);
       this.controlsModal.classList.remove('hidden');
     });
     this.closeControlsBtn.addEventListener('click', () => {
@@ -273,6 +298,10 @@ export class MenuUI {
   }
 
   public closeOpenModal(): boolean {
+    if (this.modsPopover && !this.modsPopover.classList.contains('hidden')) {
+      this.setModsPopoverOpen(false);
+      return true;
+    }
     if (!this.catalogModal.classList.contains('hidden')) {
       this.closeCatalog();
       return true;
@@ -282,6 +311,33 @@ export class MenuUI {
       return true;
     }
     return false;
+  }
+
+  private setModsPopoverOpen(open: boolean): void {
+    if (!this.modsPopover || !this.modsTriggerBtn) return;
+    this.modsPopover.classList.toggle('hidden', !open);
+    this.modsTriggerBtn.classList.toggle('open', open);
+    this.modsTriggerBtn.setAttribute('aria-expanded', String(open));
+  }
+
+  private toggleModsPopover(): void {
+    if (!this.modsPopover) return;
+    const isHidden = this.modsPopover.classList.contains('hidden');
+    this.setModsPopoverOpen(isHidden);
+  }
+
+  private syncModsTriggerBadge(): void {
+    const activeCount =
+      (this.currentDriftNitro ? 1 : 0) +
+      (this.currentOverdrive ? 1 : 0) +
+      (this.currentHyperNitro ? 1 : 0);
+    if (this.modsTriggerBtn) {
+      this.modsTriggerBtn.classList.toggle('has-active', activeCount > 0);
+    }
+    if (this.modsCountEl) {
+      this.modsCountEl.textContent = String(activeCount);
+      this.modsCountEl.classList.toggle('hidden', activeCount === 0);
+    }
   }
 
   private renderAllLocalized(): void {
@@ -389,6 +445,7 @@ export class MenuUI {
   public setVisible(visible: boolean): void {
     this.root.classList.toggle('active', visible);
     if (!visible) {
+      this.setModsPopoverOpen(false);
       this.controlsModal.classList.add('hidden');
       this.catalogModal.classList.add('hidden');
     }
@@ -425,6 +482,7 @@ export class MenuUI {
     this.driftNitroBtn.classList.toggle('active', enabled);
     this.driftNitroBtn.setAttribute('aria-checked', String(enabled));
     this.driftNitroStateEl.textContent = enabled ? t('stateOn') : t('stateOff');
+    this.syncModsTriggerBadge();
   }
 
   public setOverdriveEnabled(enabled: boolean): void {
@@ -432,6 +490,7 @@ export class MenuUI {
     this.overdriveBtn.classList.toggle('active', enabled);
     this.overdriveBtn.setAttribute('aria-checked', String(enabled));
     this.overdriveStateEl.textContent = enabled ? t('stateOn') : t('stateOff');
+    this.syncModsTriggerBadge();
   }
 
   public setHyperNitroEnabled(enabled: boolean): void {
@@ -439,51 +498,137 @@ export class MenuUI {
     this.hyperNitroBtn.classList.toggle('active', enabled);
     this.hyperNitroBtn.setAttribute('aria-checked', String(enabled));
     this.hyperNitroStateEl.textContent = enabled ? t('stateOn') : t('stateOff');
+    this.syncModsTriggerBadge();
+  }
+
+  private selectCarByIndex(idx: number): void {
+    if (idx < 0 || idx >= CAR_SPECS.length) return;
+    if (this.selectedCar === idx) return;
+    this.selectedCar = idx;
+    this.syncCarSelectionUI();
+    this.updateSelectionReadout();
+    this.callbacks.onSelectCar(idx);
   }
 
   private renderCars(): void {
-    this.carListEl.innerHTML = '';
-    CAR_SPECS.forEach((car, idx) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `select-card ${idx === this.selectedCar ? 'selected' : ''}`;
-      const paintHex = `#${car.primaryColor.toString(16).padStart(6, '0')}`;
-      const isSClass = car.bodyStyle === 'valkyrie' || car.bodyStyle === 'eclipse';
-      btn.innerHTML = `
-        <div class="card-top">
-          <div class="card-title-row">
-            <span class="color-swatch" style="background:${paintHex};color:${paintHex}"></span>
-            <span class="card-name">${car.name}</span>
+    // Build persistent DOM nodes once so tapping a car NEVER destroys the active button mid-gesture!
+    if (this.carCardButtons.length !== CAR_SPECS.length) {
+      this.carListEl.innerHTML = '';
+      this.carCardButtons = [];
+
+      CAR_SPECS.forEach((car, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'select-card car-select-card';
+        btn.dataset.carIdx = String(idx);
+        const paintHex = `#${car.primaryColor.toString(16).padStart(6, '0')}`;
+        const isSClass = car.bodyStyle === 'valkyrie' || car.bodyStyle === 'eclipse';
+        btn.style.setProperty('--car-accent', paintHex);
+        btn.innerHTML = `
+          <div class="card-top">
+            <div class="card-title-row">
+              <span class="color-swatch" style="background:${paintHex};color:${paintHex}"></span>
+              <span class="card-name">${car.name}</span>
+            </div>
+            <span class="card-badge ${isSClass ? 's-class' : ''}"></span>
           </div>
-          <span class="card-badge ${isSClass ? 's-class' : ''}">${i18n.getCarArchetype(car)}</span>
-        </div>
-        <div class="card-sub">${i18n.getCarSubtitle(car)}</div>
-      `;
-      btn.addEventListener('click', () => {
-        this.selectedCar = idx;
-        this.renderCars();
-        this.updateSelectionReadout();
-        this.callbacks.onSelectCar(idx);
+          <div class="card-sub"></div>
+        `;
+
+        // Bulletproof touch/pointer tap handler: tolerates 18px mobile thumb jitter without scroll-cancel!
+        let downX = 0;
+        let downY = 0;
+        let activePointerId = -1;
+        let lastPointerSelectAt = 0;
+
+        btn.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0 && e.pointerType === 'mouse') return;
+          activePointerId = e.pointerId;
+          downX = e.clientX;
+          downY = e.clientY;
+        });
+
+        btn.addEventListener('pointerup', (e) => {
+          if (e.pointerId !== activePointerId) return;
+          activePointerId = -1;
+          const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
+          if (dist <= 20) {
+            lastPointerSelectAt = performance.now();
+            this.selectCarByIndex(idx);
+          }
+        });
+
+        btn.addEventListener('pointercancel', () => {
+          activePointerId = -1;
+        });
+
+        btn.addEventListener('click', () => {
+          if (performance.now() - lastPointerSelectAt < 380) return;
+          this.selectCarByIndex(idx);
+        });
+
+        this.carListEl.appendChild(btn);
+        this.carCardButtons.push(btn);
       });
-      this.carListEl.appendChild(btn);
+    }
+
+    // Update localized car labels in-place without recreating DOM nodes
+    CAR_SPECS.forEach((car, idx) => {
+      const btn = this.carCardButtons[idx];
+      if (!btn) return;
+      const badgeEl = btn.querySelector('.card-badge');
+      const subEl = btn.querySelector('.card-sub');
+      if (badgeEl) badgeEl.textContent = i18n.getCarArchetype(car);
+      if (subEl) subEl.textContent = i18n.getCarSubtitle(car);
+    });
+
+    // Build persistent stat bar elements once so CSS width transitions animate smoothly!
+    if (this.specStatFills.length !== 4) {
+      this.carSpecsEl.innerHTML = `
+        <p class="spec-desc"></p>
+        ${this.statBarHtml(t('statSpeed'), 0)}
+        ${this.statBarHtml(t('statAccel'), 0)}
+        ${this.statBarHtml(t('statDrift'), 0)}
+        ${this.statBarHtml(t('statNitro'), 0)}
+      `;
+      this.specDescEl = this.carSpecsEl.querySelector<HTMLParagraphElement>('.spec-desc');
+      this.specStatLabels = Array.from(this.carSpecsEl.querySelectorAll<HTMLElement>('.stat-label'));
+      this.specStatFills = Array.from(this.carSpecsEl.querySelectorAll<HTMLElement>('.stat-fill'));
+      this.specStatVals = Array.from(this.carSpecsEl.querySelectorAll<HTMLElement>('.stat-val'));
+    } else {
+      const labels = [t('statSpeed'), t('statAccel'), t('statDrift'), t('statNitro')];
+      this.specStatLabels.forEach((el, i) => {
+        el.textContent = labels[i];
+      });
+    }
+
+    this.syncCarSelectionUI();
+  }
+
+  private syncCarSelectionUI(): void {
+    this.carCardButtons.forEach((btn, idx) => {
+      const isSelected = idx === this.selectedCar;
+      btn.classList.toggle('selected', isSelected);
+      btn.setAttribute('aria-pressed', String(isSelected));
     });
 
     const c = CAR_SPECS[this.selectedCar];
-    this.carSpecsEl.innerHTML = `
-      <p class="spec-desc">${i18n.getCarDesc(c)}</p>
-      ${this.statBarHtml(t('statSpeed'), c.stats.speed)}
-      ${this.statBarHtml(t('statAccel'), c.stats.accel)}
-      ${this.statBarHtml(t('statDrift'), c.stats.drift)}
-      ${this.statBarHtml(t('statNitro'), c.stats.nitro)}
-    `;
+    if (this.specDescEl) {
+      this.specDescEl.textContent = i18n.getCarDesc(c);
+    }
+    const vals = [c.stats.speed, c.stats.accel, c.stats.drift, c.stats.nitro];
+    vals.forEach((val, i) => {
+      if (this.specStatFills[i]) this.specStatFills[i].style.width = `${val}%`;
+      if (this.specStatVals[i]) this.specStatVals[i].textContent = String(val);
+    });
   }
 
   private statBarHtml(label: string, val: number): string {
     return `
       <div class="stat-row">
-        <span>${label}</span>
+        <span class="stat-label">${label}</span>
         <div class="stat-track"><div class="stat-fill" style="width:${val}%"></div></div>
-        <span class="mono" style="color:#fff;text-align:right">${val}</span>
+        <span class="stat-val mono" style="color:#fff;text-align:right">${val}</span>
       </div>
     `;
   }
@@ -624,10 +769,10 @@ export class MenuUI {
               <span class="card-badge ${diffClass}">${i18n.getDifficultyLabel(tCfg.difficulty)}</span>
             </div>
             <div class="track-row-meta">
-              <span>${this.formatLen(meta.lengthMeters)}</span>
-              <span>·</span>
-              <span>${t('bankShort', { deg: tCfg.maxBankDeg })}</span>
-              ${rowRec?.bestLapTime ? `<span>· ⏱ ${formatTime(rowRec.bestLapTime)}</span>` : meta.hyperZoneCount > 0 ? `<span>· ${t('hyperRowTag')}</span>` : ''}
+              <span class="meta-dist">${this.formatLen(meta.lengthMeters)}</span>
+              <span class="meta-sep">·</span>
+              <span class="meta-bank">${tCfg.maxBankDeg}°</span>
+              ${rowRec?.bestLapTime ? `<span class="track-row-pb mono">⏱ ${formatTime(rowRec.bestLapTime)}</span>` : meta.hyperZoneCount > 0 ? `<span class="meta-hyper">${t('hyperRowTag')}</span>` : ''}
             </div>
           </div>
           <span class="row-fav-star ${isFav ? 'active' : ''}" role="button" tabindex="-1" title="${t('btnFavTrack')}">${isFav ? '★' : '☆'}</span>

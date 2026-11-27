@@ -51,7 +51,10 @@
     <div id="menu-overlay" class="overlay active">
       <header class="menu-header">
         <div class="brand-lockup">
-          <div class="brand-tag" data-i18n="brandTag">未来街机大奖赛 · 2099</div>
+          <div class="brand-tag-row">
+            <div class="brand-tag" data-i18n="brandTag">未来街机大奖赛 · 2099</div>
+            <span id="track-trophy-pill" class="track-trophy-pill" title="Gold Trophies">🏆 0/10</span>
+          </div>
           <h1 class="brand-title">NEON<span>APEX</span></h1>
         </div>
         <div class="header-actions">
@@ -99,53 +102,68 @@
           <div id="car-specs" class="specs-box"></div>
         </section>
 
-        <!-- Center Bottom: Launch & Preview Hints -->
+        <!-- Center Bottom: Low-Profile 3A Showroom Command Dock -->
         <section class="menu-center-bottom">
           <div class="showcase-badge">
             <span class="pulse-dot"></span>
             <span id="showcase-car-name">APEX-V12</span>
             <span class="sep">|</span>
             <span id="showcase-track-name">东京湾岸高速</span>
-            <span class="sep">|</span>
-            <span id="track-trophy-pill" class="track-trophy-pill" title="Gold Trophies">🏆 0/10</span>
           </div>
+
+          <!-- Floating Advanced Race Rules Popover (opened on demand via #btn-menu-mods) -->
+          <div id="race-mods-popover" class="race-mods-popover hidden" role="dialog" aria-modal="false">
+            <div class="mods-popover-header">
+              <span class="mods-popover-title" data-i18n="raceModsTitle">⚡ 进阶赛事规则</span>
+              <button id="btn-close-mods" class="mods-close-btn" type="button" aria-label="Close">✕</button>
+            </div>
+            <div class="mods-popover-list">
+              <button
+                id="btn-menu-drift-nitro"
+                class="drift-nitro-toggle"
+                type="button"
+                role="switch"
+                aria-checked="false"
+                data-i18n-title="optDriftNitroTitle"
+              >
+                <span class="dnt-label" data-i18n="optDriftNitro">🔥 漂移同喷</span>
+                <span class="dnt-right">
+                  <span class="dnt-track"><span class="dnt-thumb"></span></span>
+                  <span id="drift-nitro-state" class="dnt-state" data-i18n="stateOff">关</span>
+                </span>
+              </button>
+              <button
+                id="btn-menu-overdrive"
+                class="drift-nitro-toggle overdrive-toggle"
+                type="button"
+                role="switch"
+                aria-checked="false"
+                data-i18n-title="optOverdriveTitle"
+              >
+                <span class="dnt-label" data-i18n="optOverdrive">🚀 长道超频</span>
+                <span class="dnt-right">
+                  <span class="dnt-track"><span class="dnt-thumb"></span></span>
+                  <span id="overdrive-state" class="dnt-state" data-i18n="stateOff">关</span>
+                </span>
+              </button>
+              <button
+                id="btn-menu-hyper-nitro"
+                class="drift-nitro-toggle hyper-toggle"
+                type="button"
+                role="switch"
+                aria-checked="false"
+                data-i18n-title="optHyperNitroTitle"
+              >
+                <span class="dnt-label" data-i18n="optHyperNitro">⚡ 长道满氮</span>
+                <span class="dnt-right">
+                  <span class="dnt-track"><span class="dnt-thumb"></span></span>
+                  <span id="hyper-nitro-state" class="dnt-state" data-i18n="stateOff">关</span>
+                </span>
+              </button>
+            </div>
+          </div>
+
           <div class="menu-race-opts">
-            <button
-              id="btn-menu-drift-nitro"
-              class="drift-nitro-toggle"
-              type="button"
-              role="switch"
-              aria-checked="false"
-              data-i18n-title="optDriftNitroTitle"
-            >
-              <span class="dnt-label" data-i18n="optDriftNitro">🔥 漂移同喷</span>
-              <span class="dnt-track"><span class="dnt-thumb"></span></span>
-              <span id="drift-nitro-state" class="dnt-state" data-i18n="stateOff">关</span>
-            </button>
-            <button
-              id="btn-menu-overdrive"
-              class="drift-nitro-toggle overdrive-toggle"
-              type="button"
-              role="switch"
-              aria-checked="false"
-              data-i18n-title="optOverdriveTitle"
-            >
-              <span class="dnt-label" data-i18n="optOverdrive">🚀 长道超频</span>
-              <span class="dnt-track"><span class="dnt-thumb"></span></span>
-              <span id="overdrive-state" class="dnt-state" data-i18n="stateOff">关</span>
-            </button>
-            <button
-              id="btn-menu-hyper-nitro"
-              class="drift-nitro-toggle hyper-toggle"
-              type="button"
-              role="switch"
-              aria-checked="false"
-              data-i18n-title="optHyperNitroTitle"
-            >
-              <span class="dnt-label" data-i18n="optHyperNitro">⚡ 长道满氮</span>
-              <span class="dnt-track"><span class="dnt-thumb"></span></span>
-              <span id="hyper-nitro-state" class="dnt-state" data-i18n="stateOff">关</span>
-            </button>
             <div id="lap-selector" class="lap-selector" role="group" data-i18n-aria="lapsLabel" aria-label="圈数">
               <span class="lap-sel-label" data-i18n="lapsLabel">🏁 圈数</span>
               <button type="button" class="lap-opt-btn" data-laps="1">1 圈</button>
@@ -158,6 +176,19 @@
               <button type="button" class="lap-opt-btn ai-opt-btn" data-ai="pro" data-i18n="aiPro">标准</button>
               <button type="button" class="lap-opt-btn ai-opt-btn" data-ai="apex" data-i18n="aiApex">车神</button>
             </div>
+            <button
+              id="btn-menu-mods"
+              class="mods-trigger-btn"
+              type="button"
+              aria-expanded="false"
+              aria-controls="race-mods-popover"
+              data-i18n-title="btnRaceModsTitle"
+              title="配置漂移同喷、长道超频与长道满氮规则"
+            >
+              <span class="mods-ico">⚡</span>
+              <span data-i18n="btnRaceMods">规则</span>
+              <span id="mods-active-count" class="mods-count hidden">0</span>
+            </button>
           </div>
           <button id="btn-start-race" class="launch-btn" type="button">
             <span class="launch-bg"></span>

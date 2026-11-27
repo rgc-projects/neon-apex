@@ -69,6 +69,9 @@ const ZH = {
   btnViewAll: '查看全部',
 
   // Race Options & Launch
+  btnRaceMods: '规则',
+  btnRaceModsTitle: '配置漂移同喷、长道超频与长道满氮规则',
+  raceModsTitle: '⚡ 进阶赛事规则',
   optDriftNitro: '🔥 漂移同喷',
   optDriftNitroTitle: '默认关闭：漂移时禁止同时使用氮气；开启后可漂移与氮气同时触发',
   optOverdrive: '🚀 长道超频',
@@ -418,6 +421,9 @@ const EN: Record<I18nKey, string> = {
   btnViewAll: 'SHOW ALL',
 
   // Race Options & Launch
+  btnRaceMods: 'RULES',
+  btnRaceModsTitle: 'Configure Drift Nitro, Straight Overdrive & Hyper Nitro modifiers',
+  raceModsTitle: '⚡ RACE MODIFIERS',
   optDriftNitro: '🔥 DRIFT NITRO',
   optDriftNitroTitle: 'Default OFF: blocks nitro while drifting. Turn ON to boost mid-drift.',
   optOverdrive: '🚀 OVERDRIVE',
