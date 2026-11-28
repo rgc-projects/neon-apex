@@ -52,12 +52,12 @@ function makeHairpin(
  */
 export const NUJIANG_72_TRACK: TrackConfig = {
   id: 'nujiang-72',
-  name: 'NUJIANG 72 BENDS // G318',
-  nameZh: '怒江 72 拐盘山天路',
+  name: 'CRIMSON 72 BENDS // SKYWAY',
+  nameZh: '赤崖 72 拐云端天路',
   theme: 'nujiang',
   difficulty: 'EXTREME',
   description:
-    '致敬川藏线 G318 传奇业拉山怒江 72 拐！专为极致连续漂移打造的 24m 高原悬崖天路：154m 垂直落差、6 连层叠“之”字下坡发卡弯、怒江峡谷大桥与穿山石洞、5 连上坡回头弯，全程 15 组紧密急弯几乎无长直道！',
+    '专为极致连续漂移打造的 24m 高原悬崖天路！154m 垂直落差、6 连层叠“之”字下坡发卡弯、赤崖碧渊铁桥与穿山石洞、5 连上坡回头弯，全程 15 组紧密急弯几乎无长直道！',
   roadWidth: 24,
   maxBankDeg: 18,
   laps: 2,

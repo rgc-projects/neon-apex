@@ -91,11 +91,11 @@ const ZH = {
   keyNitro: '<kbd>SHIFT</kbd> / <kbd>E</kbd> 氮气喷射',
   keyCam: '<kbd>C</kbd> 视角',
   keyReset: '<kbd>R</kbd> 复位',
-  creditNote: '3D 车队：5 款开源实车（458 / P1 GTR / M4 / Aventador / Khronos EV）',
+  creditNote: '3D 车队：5 款高精度赛车（APEX-V12 / PHANTOM-X / KATANA-RS / VALKYRIE-GT / ECLIPSE-EVO）',
 
   // Catalog Modal
   catalogTitle: '全球赛道图库',
-  catalogSearchPlaceholder: '搜索赛道名、特点（如 秋名山 / 漂移 / 60km）...',
+  catalogSearchPlaceholder: '搜索赛道名、特点（如 苍松 / 漂移 / 60km）...',
   sortDefault: '排序：默认推荐',
   sortLenAsc: '里程：短 → 长',
   sortLenDesc: '里程：长 → 短',
@@ -113,7 +113,7 @@ const ZH = {
   ctrlGasTitle: '油门加速',
   ctrlGasDesc: '倒计时结束瞬间在绿区踩油门触发「完美起步」',
   ctrlBrakeTitle: '点刹起漂 / 刹车',
-  ctrlBrakeDesc: '高速打方向时轻点 S 即可像极品飞车一样丝滑甩尾入弯！',
+  ctrlBrakeDesc: '高速打方向时轻点 S 即可如街机大作般丝滑甩尾入弯！',
   ctrlSteerTitle: '内切收线 / 反打修正',
   ctrlSteerDesc: '漂移中往弯心打方向收紧走线，反打外侧可稳住大角度横滑',
   ctrlDriftTitle: '手刹漂移（按住）',
@@ -446,11 +446,11 @@ const EN: Record<I18nKey, string> = {
   keyNitro: '<kbd>SHIFT</kbd> / <kbd>E</kbd> Nitro',
   keyCam: '<kbd>C</kbd> Camera',
   keyReset: '<kbd>R</kbd> Reset',
-  creditNote: '3D Fleet: 5 Open-Source Cars (458 / P1 GTR / M4 / Aventador / Khronos EV)',
+  creditNote: '3D Fleet: 5 Supercars (APEX-V12 / PHANTOM-X / KATANA-RS / VALKYRIE-GT / ECLIPSE-EVO)',
 
   // Catalog Modal
   catalogTitle: 'CIRCUIT CATALOG',
-  catalogSearchPlaceholder: 'Search tracks, features (e.g. Akina / Drift / 60km)...',
+  catalogSearchPlaceholder: 'Search tracks, features (e.g. Shadow Pine / Drift / 60km)...',
   sortDefault: 'Sort: Featured',
   sortLenAsc: 'Length: Short → Long',
   sortLenDesc: 'Length: Long → Short',
@@ -718,7 +718,7 @@ const CAR_EN_DESC: Record<string, { subtitle: string; desc: string }> = {
     desc: 'All-round GT3 balance combining high-speed downforce, crisp turn-in and predictable drift control.',
   },
   'phantom-x': {
-    subtitle: 'LE MANS SPEC · TOP SPEED',
+    subtitle: 'HYPER ENDURANCE · TOP SPEED',
     desc: 'Low-drag endurance speed monster with the highest top speed and ferocious twin-turbo nitro thrust.',
   },
   'drift-k': {
@@ -737,7 +737,7 @@ const CAR_EN_DESC: Record<string, { subtitle: string; desc: string }> = {
 
 const CAR_ZH_SUB: Record<string, string> = {
   'apex-v12': 'GT3 赛道版 · 全能均衡',
-  'phantom-x': '勒芒耐力版 · 极速猛兽',
+  'phantom-x': '极速耐力版 · 极速猛兽',
   'drift-k': '山道漂移版 · 甩尾大师',
   'valkyrie-gt': 'S级旗舰超跑 · 全能统治',
   'eclipse-evo': 'S级四驱电兽 · 瞬时爆发',
@@ -745,27 +745,27 @@ const CAR_ZH_SUB: Record<string, string> = {
 
 const TRACK_EN_DESC: Record<string, { title: string; sub: string; desc: string }> = {
   'neo-tokyo': {
-    title: 'TOKYO BAYSHORE EXPWY',
+    title: 'NEON BAYSHORE EXPWY',
     sub: 'METROPOLIS ELEVATED NIGHT',
     desc: '29m wide elevated metropolitan highway blending crisp 90° interchanges, 22° banked ramps and a 30° skyline bowl hairpin.',
   },
   'hyperion-bay': {
     title: 'HYPERION BAY BRIDGE',
     sub: 'GOLDEN HOUR CABLE-STAYED',
-    desc: '32m ultra-wide golden-hour suspension bridge featuring a 34° Zandvoort ocean bowl U-turn and Suzuka-style flowing S-curves.',
+    desc: '32m ultra-wide golden-hour suspension bridge featuring a 34° banked ocean bowl U-turn and high-speed flowing S-curves.',
   },
   'sub-zero': {
     title: 'SUB-ZERO EXPRESS TUNNEL',
-    sub: 'SUBTERRANEAN KARUSSELL',
-    desc: 'Vaulted concrete underground expressway with giant turbine vents, a steep 35° Karussell bowl and tight 90° bunker chicanes.',
+    sub: 'SUBTERRANEAN BANKED VAULT',
+    desc: 'Vaulted concrete underground expressway with giant turbine vents, a steep 35° deep banked bowl and tight 90° bunker chicanes.',
   },
   'akina-touge': {
-    title: 'AKINA MOUNTAIN PASS',
+    title: 'SHADOW PINE PASS',
     sub: 'NOCTURNAL ALPINE TOUGE',
     desc: '27m moonlit pine-forest mountain pass with warm sodium lamps, 4 varied-bank downhill hairpins and dramatic cliff plunges.',
   },
   'monaco-harbor': {
-    title: 'MONACO HARBOR GP',
+    title: 'EMERALD HARBOR GP',
     sub: 'TECHNICAL LOW-BANK STREET',
     desc: 'Precision 28m harbor street circuit with 5 technical 4°–11° flat hairpins and a waterfront tunnel for pure exit-speed mastery.',
   },
@@ -775,14 +775,14 @@ const TRACK_EN_DESC: Record<string, { title: string; sub: string; desc: string }
     desc: 'Epic 11.9 km island tour linking metropolis streets, twin-pylon suspension bridge, 34° ocean bowl, volcanic pass & arch tunnel.',
   },
   'isle-of-man': {
-    title: 'ISLE OF MAN TT',
-    sub: 'SNAEFELL MOUNTAIN · 60.7 KM',
-    desc: '1:1 full-scale 60.7 km (37.73 mi) Snaefell Mountain Course with 16 historic landmarks, 160+ bends and Sulby / Mountain Mile hyper straights.',
+    title: 'ASTRAL ISLAND GP',
+    sub: 'GRAND RIDGE COURSE · 60.7 KM',
+    desc: 'Epic 60.7 km full-scale island endurance road course with 16 landmark sectors, 160+ bends and high-speed ridge hyper straights.',
   },
   'nujiang-72': {
-    title: 'NUJIANG 72 BENDS',
-    sub: 'G318 YELA PLATEAU TOUGE',
-    desc: 'Tribute to Tibet’s legendary G318 cliff switchbacks: 154m drop, 6 stacked Z-hairpins, canyon steel bridge and 5 uphill switchbacks.',
+    title: 'CRIMSON 72 BENDS',
+    sub: 'CLOUD PASS PLATEAU SKYWAY',
+    desc: 'Extreme highland cliff switchback touge: 154m drop, 6 stacked Z-hairpins, emerald canyon steel bridge and 5 uphill switchbacks.',
   },
   'aurora-fjord': {
     title: 'AURORA FJORD LABYRINTH',
@@ -790,9 +790,9 @@ const TRACK_EN_DESC: Record<string, { title: string; sub: string; desc: string }
     desc: '20.8 km starfish-shaped basalt fjord drift labyrinth with 11 peninsula spurs, 24+ relentless hairpins and shimmering northern lights.',
   },
   'super-akina': {
-    title: 'SUPER AKINA TOUGE',
+    title: 'APEX NIGHTFALL TOUGE',
     sub: '26.1 KM EXTREME SERPENTINE',
-    desc: 'The ultimate 26.1 km evolution of Akina Pass: 35° banked canyon walls, ±13% rollercoaster plunges, 33 serpentine S-bends & 3 super straights.',
+    desc: 'The ultimate 26.1 km evolution of Shadow Pine Pass: 35° banked canyon walls, ±13% rollercoaster plunges, 33 serpentine S-bends & 3 super straights.',
   },
 };
 

@@ -32,7 +32,7 @@ export const CAR_SPECS: CarSpec[] = [
   {
     id: 'phantom-x',
     name: 'PHANTOM-X',
-    subtitle: 'LE MANS SPEC',
+    subtitle: 'HYPER ENDURANCE',
     archetype: 'TOP SPEED',
     archetypeZh: '极速型',
     description: '低风阻耐力赛极速猛兽，拥有全场最高极速与狂暴的涡轮氮气推进力。',
@@ -119,7 +119,7 @@ export const CAR_SPECS: CarSpec[] = [
     subtitle: 'CYBER EV HYPER',
     archetype: 'EV HYPER',
     archetypeZh: 'S级电驱',
-    description: '四电机瞬时扭矩赛博电驱原型车，拥有全场最强出弯加速与闪电漂移集气，征服秋名山与怒江 72 拐的弯道利器。',
+    description: '四电机瞬时扭矩赛博电驱原型车，拥有全场最强出弯加速与闪电漂移集气，征服暗夜山道与赤崖 72 拐的弯道利器。',
     primaryColor: 0x111827, // Stealth Obsidian Carbon Black
     secondaryColor: 0x0f766e,
     neonColor: 0x2dd4bf,

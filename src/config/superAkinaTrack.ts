@@ -314,12 +314,12 @@ const returnAxisZ = serpWest.endZ - 190;
  */
 export const SUPER_AKINA_TRACK: TrackConfig = {
   id: 'super-akina',
-  name: 'SUPER AKINA // EXTREME TOUGE',
-  nameZh: '超级秋名山 · 极限蛇形天道',
+  name: 'APEX NIGHTFALL // EXTREME TOUGE',
+  nameZh: '极夜苍穹 · 极限蛇形天道',
   theme: 'akina',
   difficulty: 'GRAND',
   description:
-    '原版秋名山灵魂终极进化！保留高达 35° 极限倾斜碗弯、±13% 陡峭过山车骤降/冲顶与 27m 暗夜峡谷压迫感，全面拓展为 26.1 km 超长综合山道：5 大高倾角蛇形过山车漂移区（33 组高速大弧 S 弯）、变倾角五连发卡与 3 段极速大直道，400+ km/h 贴壁横滑紧张刺激！',
+    '苍松暗夜山道的终极史诗进化！保留高达 35° 极限倾斜碗弯、±13% 陡峭过山车骤降/冲顶与 27m 暗夜峡谷压迫感，全面拓展为 26.1 km 超长综合山道：5 大高倾角蛇形过山车漂移区（33 组高速大弧 S 弯）、变倾角五连发卡与 3 段极速大直道，400+ km/h 贴壁横滑紧张刺激！',
   roadWidth: 27,
   maxBankDeg: 35,
   laps: 1,

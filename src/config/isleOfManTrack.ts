@@ -25,12 +25,12 @@ function scalePts(
  */
 export const ISLE_OF_MAN_TRACK: TrackConfig = {
   id: 'isle-of-man',
-  name: 'ISLE OF MAN TT // 60.7KM',
-  nameZh: '曼岛 TT 斯奈菲尔环岛',
+  name: 'ASTRAL ISLAND GP // 60.7KM',
+  nameZh: '星穹环岛耐力赛',
   theme: 'manx',
   difficulty: 'GRAND',
   description:
-    '1:1 完整还原真实 60.7km（37.73 英里）曼岛 TT 斯奈菲尔山地传奇赛道！16 大历史里程碑、超 160 组真实弯道与 Sulby / Mountain Mile 极速超频直道，搭配 1/2/3 圈自由选择，体验真正史诗级公路环岛耐力赛！',
+    '全长 60.7km 的超长环岛公路耐力赛！16 大环岛地标路段、超 160 组高速弯道与风脊/云岭极速超频直道，搭配 1/2/3 圈自由选择，体验真正史诗级公路环岛耐力赛！',
   roadWidth: 27,
   maxBankDeg: 32,
   laps: 1,

@@ -602,18 +602,18 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
   }
   group.add(poleInst, armInst, headInst, haloInst);
 
-  // 6. Authentic Overhead Expressway Sign Gantries (Japanese/English Green/Blue Highway Signs!)
+  // 6. Futuristic Overhead Expressway Sign Gantries (Original Fictional Circuit Landmarks)
   const signMeta: Record<string, [string, string, string]> = {
-    city: ['湾岸線  BAYSHORE', 'SHIBUYA / HANEDA AIRPORT', '#046a38'],
-    'monaco-harbor': ['摩纳哥海滨  MONACO GP', 'PORT HERCULES · LOW-BANK HAIRPINS', '#035388'],
+    city: ['霓虹湾岸  NEON BAY', 'SKYLINE HARBOR EXPRESSWAY', '#046a38'],
+    'monaco-harbor': ['翡翠海港  EMERALD GP', 'MARINA BAY · LOW-BANK HAIRPINS', '#035388'],
     bridge: ['海湾大橋  BAY BRIDGE', 'HYPERION COASTAL EXPWY', '#035388'],
     tunnel: ['地下幹線  SUB-ZERO', 'REACTOR EXPRESS TUNNEL', '#046a38'],
-    mountain: ['秋名峠  AKINA PASS', 'DOWNHILL HAIRPINS AHEAD', '#046a38'],
+    mountain: ['苍松夜岭  SHADOW PINE', 'DOWNHILL HAIRPINS AHEAD', '#046a38'],
     island: ['极境环岛  APEX ISLAND', '11.9KM GRAND COASTAL LOOP', '#035388'],
-    manx: ['ISLE OF MAN TT', 'SNAEFELL MOUNTAIN COURSE · 37.73 MI', '#991b1b'],
-    nujiang: ['G318 怒江72拐', 'YELA PASS 4658M · HAIRPIN TOUGE', '#046a38'],
+    manx: ['星穹环岛  ASTRAL GP', 'GRAND RIDGE COURSE · 60.7 KM', '#991b1b'],
+    nujiang: ['赤崖72拐  SKYWAY 72', 'CLOUD PASS 4658M · HAIRPIN TOUGE', '#046a38'],
     fjord: ['极光星湾  AURORA FJORD', '20.8KM RADIAL HAIRPIN LABYRINTH', '#035388'],
-    akina: ['超级秋名山  SUPER AKINA', '27.2KM SERPENTINE TOUGE · 41 S-BENDS', '#046a38'],
+    akina: ['极夜苍穹  NIGHTFALL', '26.1KM SERPENTINE TOUGE · 33 S-BENDS', '#046a38'],
   };
 
   const gantrySpecs: { t: number; l1: string; l2: string; bg: string }[] =
@@ -622,8 +622,8 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
           { t: 0.025, l1: '海港大道  HARBOR BAY', l2: 'WEST MARINA · GRAND ISLAND LOOP', bg: '#035388' },
           { t: 0.086, l1: '跨海悬索桥  APEX BRIDGE', l2: 'NORTH STRAIT · 34° OCEAN BOWL', bg: '#035388' },
           { t: 0.275, l1: '环岛火山峠  VOLCANIC PASS', l2: '76M SUMMIT · SWITCHBACKS AHEAD', bg: '#046a38' },
-          { t: 0.502, l1: '穿山隧道  EAST CAPE TUNNEL', l2: '1.3KM VAULT · 33° KARUSSELL', bg: '#046a38' },
-          { t: 0.648, l1: '灯塔发卡弯  LIGHTHOUSE POINT', l2: 'LOW-BANK HAIRPINS · SUZUKA S-CURVES', bg: '#035388' },
+          { t: 0.502, l1: '穿山隧道  EAST CAPE TUNNEL', l2: '1.3KM VAULT · 33° BANKED BOWL', bg: '#046a38' },
+          { t: 0.648, l1: '灯塔发卡弯  LIGHTHOUSE POINT', l2: 'LOW-BANK HAIRPINS · FLOWING S-CURVES', bg: '#035388' },
           { t: 0.908, l1: '环岛冲刺  APEX FINALE', l2: 'MARINA INLET JUMP · FINISH STRAIGHT', bg: '#035388' },
         ]
       : cfg.theme === 'fjord'
@@ -637,45 +637,44 @@ export function buildTrackMesh(spline: TrackSpline): TrackBuildResult {
           ]
       : cfg.theme === 'akina'
         ? [
-            // Authentic Akina Pass Japanese Green & Crimson Gantries — several placed RIGHT over 30°–35° banked bends so they tilt dramatically with the highway!
-            { t: 0.012, l1: '秋名峠  SUPER AKINA', l2: 'LAKE HARUNA SUMMIT · 26.1KM TOUGE', bg: '#046a38' },
-            { t: 0.076, l1: '秋名峠  32° 悬崖俯冲', l2: 'EXTREME BANKED SERPENTINE AHEAD', bg: '#046a38' },
+            { t: 0.012, l1: '极夜苍穹  APEX NIGHTFALL', l2: 'CRATER LAKE SUMMIT · 26.1KM TOUGE', bg: '#046a38' },
+            { t: 0.076, l1: '苍穹夜岭  32° 悬崖俯冲', l2: 'EXTREME BANKED SERPENTINE AHEAD', bg: '#046a38' },
             { t: 0.132, l1: '北岭飞瀑蛇道  35° BOWLS', l2: '9-BEND ROLLERCOASTER PYTHON ESSES', bg: '#046a38' },
             { t: 0.258, l1: '苍松悬崖急降  34° PLUNGE', l2: 'STEEP BANKED CANYON SWITCHBACKS', bg: '#046a38' },
-            { t: 0.362, l1: '秋名传奇五连发卡  35° MAX', l2: '33° / 18° / 9° / 35° / 32° HAIRPINS', bg: '#991b1b' },
-            { t: 0.495, l1: '山谷俯冲蛇道  34° ESSES', l2: 'BANKED DESCENT → IKAHO VALLEY', bg: '#046a38' },
-            { t: 0.580, l1: '伊香保大直道  IKAHO EXPWY', l2: '2.45KM SUPER-STRAIGHT · TUNNEL & JUMP', bg: '#035388' },
-            { t: 0.708, l1: '赤城峡谷过山车  35° ESSES', l2: 'HIGH-SPEED BANKED CANYON ROLLERCOASTER', bg: '#046a38' },
-            { t: 0.842, l1: '榛名西壁冲天梯  34° CLIMB', l2: 'STEEP UPHILL BANKED SERPENTINE', bg: '#046a38' },
+            { t: 0.362, l1: '暗夜五连发卡  35° MAX', l2: '33° / 18° / 9° / 35° / 32° HAIRPINS', bg: '#991b1b' },
+            { t: 0.495, l1: '山谷俯冲蛇道  34° ESSES', l2: 'BANKED DESCENT → MIST VALLEY', bg: '#046a38' },
+            { t: 0.580, l1: '云谷大直道  VALLEY EXPWY', l2: '2.45KM SUPER-STRAIGHT · TUNNEL & JUMP', bg: '#035388' },
+            { t: 0.708, l1: '赤焰峡谷过山车  35° ESSES', l2: 'HIGH-SPEED BANKED CANYON ROLLERCOASTER', bg: '#046a38' },
+            { t: 0.842, l1: '西壁冲天梯  34° CLIMB', l2: 'STEEP UPHILL BANKED SERPENTINE', bg: '#046a38' },
             { t: 0.916, l1: '高岭穿山大直道  TURBO CLIMB', l2: 'TUNNEL & CREST JUMP → 33° FINAL BOWL', bg: '#035388' },
-            { t: 0.986, l1: '秋名山顶冲线  AKINA FINISH', l2: '33° SLINGSHOT → WATER TOWER FINISH', bg: '#991b1b' },
+            { t: 0.986, l1: '苍穹山顶冲线  APEX FINISH', l2: '33° SLINGSHOT → SUMMIT TOWER FINISH', bg: '#991b1b' },
           ]
       : cfg.theme === 'nujiang'
         ? [
-            { t: 0.016, l1: 'G318 业拉山垭口  4658M', l2: 'NUJIANG 72 BENDS · HAIRPIN DESCENT', bg: '#046a38' },
-            { t: 0.165, l1: '怒江72拐  连续发卡弯', l2: 'STACKED Z-SWITCHBACKS · DRIFT ZONE', bg: '#991b1b' },
-            { t: 0.325, l1: '同尼村观景台  OVERLOOK', l2: 'STEEP 180° HAIRPINS → NUJIANG GORGE', bg: '#046a38' },
-            { t: 0.488, l1: '怒江峡谷大桥  3100M', l2: 'NUJIANG RIVER CROSSING · TUNNEL AHEAD', bg: '#035388' },
-            { t: 0.695, l1: '邦达西壁盘山  CLIMB', l2: '5 UPHILL HAIRPINS → YELA PASS 4658M', bg: '#046a38' },
-            { t: 0.918, l1: '业拉山冲刺  SUMMIT', l2: 'FINAL SWITCHBACKS → G318 GRANDSTAND', bg: '#991b1b' },
+            { t: 0.016, l1: '云顶垭口  4658M', l2: 'CRIMSON 72 BENDS · HAIRPIN DESCENT', bg: '#046a38' },
+            { t: 0.165, l1: '赤崖72拐  连续发卡弯', l2: 'STACKED Z-SWITCHBACKS · DRIFT ZONE', bg: '#991b1b' },
+            { t: 0.325, l1: '悬崖观景台  OVERLOOK', l2: 'STEEP 180° HAIRPINS → EMERALD GORGE', bg: '#046a38' },
+            { t: 0.488, l1: '碧渊峡谷铁桥  3100M', l2: 'CANYON RIVER CROSSING · TUNNEL AHEAD', bg: '#035388' },
+            { t: 0.695, l1: '西壁盘山天路  CLIMB', l2: '5 UPHILL HAIRPINS → CLOUD PASS 4658M', bg: '#046a38' },
+            { t: 0.918, l1: '云顶冲刺  SUMMIT', l2: 'FINAL SWITCHBACKS → SKYWAY GRANDSTAND', bg: '#991b1b' },
           ]
       : cfg.theme === 'manx'
         ? [
-            { t: 0.012, l1: 'DOUGLAS · BRAY HILL', l2: 'ISLE OF MAN TT · 60.7 KM (37.73 MI)', bg: '#991b1b' },
-            { t: 0.090, l1: 'CROSBY STRAIGHT', l2: 'A1 OVERDRIVE · GREEBA CASTLE AHEAD', bg: '#065f46' },
-            { t: 0.160, l1: 'BALLACRAINE  A1 → A3', l2: 'GLEN HELEN · WOODED VALLEY S-BENDS', bg: '#065f46' },
-            { t: 0.252, l1: 'CRONK-Y-VODDY', l2: 'RIDGE OVERDRIVE · CREST JUMP AHEAD', bg: '#991b1b' },
-            { t: 0.328, l1: 'KIRK MICHAEL VILLAGE', l2: 'STONE WALL CHICANE → BISHOPSCOURT', bg: '#065f46' },
-            { t: 0.384, l1: 'BALLAUGH BRIDGE', l2: 'FAMOUS HUMPBACK FLYING JUMP!', bg: '#991b1b' },
-            { t: 0.438, l1: 'SULBY STRAIGHT', l2: '3.5KM FLAT-OUT · HYPER OVERDRIVE II', bg: '#065f46' },
-            { t: 0.515, l1: 'KERROWMOAR · RAMSEY', l2: 'COUNTRY S-BENDS → PARLIAMENT SQ', bg: '#065f46' },
-            { t: 0.570, l1: 'RAMSEY HAIRPIN  24MI', l2: '180° TURN · GATEWAY TO SNAEFELL', bg: '#991b1b' },
-            { t: 0.618, l1: 'A18 MOUNTAIN ROAD', l2: 'THE GOOSENECK → GUTHRIE MEMORIAL', bg: '#065f46' },
-            { t: 0.674, l1: 'MOUNTAIN MILE  28MI', l2: 'HIGH-ALTITUDE OVERDRIVE → VERANDAH', bg: '#065f46' },
-            { t: 0.774, l1: 'HAILWOOD HEIGHT', l2: '422M SUMMIT · CREST JUMP → BRANDYWELL', bg: '#991b1b' },
-            { t: 0.822, l1: 'WINDY CORNER  32MI', l2: '28° MOORLAND PLUNGE → KEPPEL GATE', bg: '#065f46' },
-            { t: 0.892, l1: 'CREG-NY-BAA  34TH MS', l2: 'HISTORIC PUB CORNER → GOB-NY-GEAY', bg: '#991b1b' },
-            { t: 0.962, l1: 'SIGNPOST · GOVERNOR', l2: 'FINAL HAIRPIN → DOUGLAS GRANDSTAND', bg: '#065f46' },
+            { t: 0.012, l1: '星港起点  ASTRAL START', l2: 'ASTRAL ISLAND GP · 60.7 KM', bg: '#991b1b' },
+            { t: 0.090, l1: '晨曦直道  DAWN STRAIGHT', l2: 'OVERDRIVE ZONE · RIDGE CASTLE AHEAD', bg: '#065f46' },
+            { t: 0.160, l1: '翠谷弯道  EMERALD GLEN', l2: 'WOODED VALLEY S-BENDS AHEAD', bg: '#065f46' },
+            { t: 0.252, l1: '风脊冲顶  WIND RIDGE', l2: 'RIDGE OVERDRIVE · CREST JUMP AHEAD', bg: '#991b1b' },
+            { t: 0.328, l1: '石墙古镇  STONE VILLAGE', l2: 'STONE WALL CHICANE → COASTAL STRAIGHT', bg: '#065f46' },
+            { t: 0.384, l1: '飞跃拱桥  ARCH BRIDGE', l2: 'HIGH-SPEED HUMPBACK FLYING JUMP!', bg: '#991b1b' },
+            { t: 0.438, l1: '极速长廊  HYPER CORRIDOR', l2: '3.5KM FLAT-OUT · HYPER OVERDRIVE II', bg: '#065f46' },
+            { t: 0.515, l1: '北岸广场  NORTH HARBOR', l2: 'COUNTRY S-BENDS → HARBOR SQUARE', bg: '#065f46' },
+            { t: 0.570, l1: '北岭发卡弯  NORTH HAIRPIN', l2: '180° TURN · GATEWAY TO SKY PEAK', bg: '#991b1b' },
+            { t: 0.618, l1: '天脊盘山路  SKY RIDGE RD', l2: 'CLIFFSIDE SWITCHBACKS → HIGHLAND VIEW', bg: '#065f46' },
+            { t: 0.674, l1: '云岭超频道  CLOUD MILE', l2: 'HIGH-ALTITUDE OVERDRIVE → RIDGE SWEEP', bg: '#065f46' },
+            { t: 0.774, l1: '穹顶峰顶  APEX HEIGHT', l2: '422M SUMMIT · CREST JUMP AHEAD', bg: '#991b1b' },
+            { t: 0.822, l1: '疾风弯道  WINDY CORNER', l2: '28° MOORLAND PLUNGE → HIGHLAND GATE', bg: '#065f46' },
+            { t: 0.892, l1: '暮光回头弯  TWILIGHT BEND', l2: 'CLASSIC BANKED CORNER → VALLEY DROP', bg: '#991b1b' },
+            { t: 0.962, l1: '星港终弯  FINAL BEND', l2: 'FINAL HAIRPIN → ASTRAL GRANDSTAND', bg: '#065f46' },
           ]
         : [0.16, 0.48, 0.78].map((t) => {
           const [sL1, sL2, sBg] = signMeta[cfg.id] ?? signMeta[cfg.theme] ?? signMeta.city;
