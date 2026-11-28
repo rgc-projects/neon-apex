@@ -1,4 +1,5 @@
 import { i18n, Language, t } from '../i18n/i18n';
+import { openPrivacyPolicyViewer, PRIVACY_POLICY_URL } from './PrivacyModal';
 import {
   AIDifficulty,
   AntiAliasingMode,
@@ -580,7 +581,25 @@ export class SettingsUI {
             .join('')}
         </div>
       </div>
+      <div class="set-section">
+        <div class="set-label-strong">${cur === 'en' ? 'Privacy & Compliance' : '隐私与合规'}</div>
+        <div class="set-row">
+          <div class="set-row-info">
+            <span class="set-row-title">${cur === 'en' ? 'NEON APEX Privacy Policy' : '《NEON APEX》隐私政策'}</span>
+            <span class="set-row-desc">${cur === 'en' ? 'Offline single-player · Zero personal data collection' : '纯单机离线运行 · 不收集任何个人敏感信息'}</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button type="button" id="btn-open-privacy" class="set-auto-btn">${cur === 'en' ? 'View Policy' : '查看正文'}</button>
+            <a class="set-auto-btn" style="text-decoration:none;" href="${PRIVACY_POLICY_URL}" target="_blank" rel="noopener noreferrer">${cur === 'en' ? 'Web Link' : '网页版'}</a>
+          </div>
+        </div>
+      </div>
     `;
+
+    this.bodyEl.querySelector('#btn-open-privacy')?.addEventListener('click', () => {
+      this.callbacks.onAnyInteract?.();
+      openPrivacyPolicyViewer();
+    });
 
     this.bodyEl.querySelectorAll<HTMLButtonElement>('.lang-choice-card').forEach((btn) => {
       btn.addEventListener('click', () => {

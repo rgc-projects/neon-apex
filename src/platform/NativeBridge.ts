@@ -93,6 +93,13 @@ class NativeBridgeImpl {
     };
   }
 
+  public exitApp(): void {
+    if (!this.isNative) return;
+    void App.exitApp().catch(() => {
+      void App.minimizeApp().catch(() => {});
+    });
+  }
+
   public haptic(pattern: number | number[]): void {
     if (this.isNative) {
       const dur = Array.isArray(pattern) ? (pattern[0] ?? 16) : pattern;
